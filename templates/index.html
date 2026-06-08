@@ -1,0 +1,176 @@
+{% extends 'layout.html' %}
+{% block content %}
+<!-- 10초 카운트다운 오버레이 -->
+<div id="loading-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.98); z-index:9999; flex-direction:column; justify-content:center; align-items:center; text-align:center;">
+    <div style="padding:50px; border:3px solid #27ae60; border-radius:30px; background:white; box-shadow:0 15px 50px rgba(0,0,0,0.15); width: 500px;">
+        <h2 style="color:#27ae60; margin-bottom:15px; font-weight: bold;">🌳 제안 접수 완료</h2>
+        <p style="font-size:1.1rem; color:#666;">양평 공동체 자치 규약에 따라<br>최대 48시간의 시차 격리 검토가 시작됩니다.</p>
+        
+        <div id="countdown-number" style="font-size:100px; font-weight:bold; color:#219150; margin:20px 0;">10</div>
+        
+        <div class="progress" style="height: 10px; width: 80%; margin: 0 auto 20px;">
+            <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" style="width: 100%"></div>
+        </div>
+        
+        <p id="status-text" style="color:#888; font-weight: bold;">이웃 지킴이 AI가 분석 결과를 기록 중입니다...</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-5 mx-auto">
+        <div class="card p-4 shadow-lg border-0" style="border-radius: 20px; background: white;">
+            <h4 class="mb-4 text-center fw-bold">이웃에게 건네는 제안</h4>
+            <form id="proposal-form" enctype="multipart/form-data">
+                <input type="text" id="title" class="form-control mb-3" placeholder="제목을 입력해 주세요">
+                <textarea id="content" class="form-control mb-3" rows="6" placeholder="우리 공동체를 위한 소중한 제안을 적어주세요."></textarea>
+                
+                <!-- 참고 파일 업로드 -->
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">📎 참고 파일 (이미지, PDF 등)</label>
+                    <input type="file" id="file-input" class="form-control">
+                </div>
+
+                <!-- 그림 그리기 도구 -->
+                <div class="mb-3">
+                    <button type="button" class="btn btn-sm btn-outline-secondary mb-2" onclick="toggleCanvas()">🎨 직접 그려서 제안하기</button>
+                    <div id="canvas-container" style="display:none;">
+                        <canvas id="drawing-pad" width="400" height="300" style="border:1px solid #ccc; background:white; cursor:crosshair; width: 100%; border-radius: 12px;"></canvas>
+                        <div class="mt-1">
+                            <button type="button" class="btn btn-sm btn-light" onclick="clearCanvas()">지우기</button>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button" id="submit-btn" onclick="submitProposal()" class="btn btn-success w-100 p-3 fw-bold" style="border-radius: 12px; font-size: 1.1rem;">제안 제출하기</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+let timeLeft = 10;
+let isServerFinished = false;
+
+// [통합 제안 제출 함수]
+async function submitProposal() {
+    // 1. 로그인 여부 보안 검사
+    const loggedInUser = "{{ session.get('username', '') }}";
+    if (!loggedInUser) {
+        alert("이웃 주민만 제안을 등록할 수 있습니다. 먼저 로그인을 진행해 주세요!");
+        window.location.href = "/login";
+        return;
+    }
+
+    const title = document.getElementById('title').value;
+    const content = document.getElementById('content').value;
+    const btn = document.getElementById('submit-btn');
+
+    if(!title || !content) { 
+        alert("제목과 내용을 모두 입력해주세요."); 
+        return; 
+    }
+
+    // 2. 버튼 잠금 및 타이머 작동
+    btn.disabled = true;
+    document.getElementById('loading-overlay').style.display = 'flex';
+
+    const timer = setInterval(() => {
+        timeLeft--;
+        document.getElementById('countdown-number').innerText = timeLeft;
+        document.getElementById('progress-bar').style.width = (timeLeft * 10) + "%";
+        
+        if (timeLeft <= 0) {
+            clearInterval(timer);
+            showSuccessAndRedirect();
+        }
+    }, 1000);
+
+    // 3. 파일 및 그림 전송 데이터 준비
+    const formData = new FormData();
+    formData.append('title', title);
+    formData.append('content', content);
+    
+    // 일반 첨부파일
+    const fileField = document.getElementById('file-input');
+    if(fileField.files[0]) {
+        formData.append('file', fileField.files[0]);
+    }
+
+    // 캔버스 드로잉 이미지
+    const canvas = document.getElementById('drawing-pad');
+    const drawingData = canvas.toDataURL('image/png');
+    if(drawingData.length > 2000) { 
+        formData.append('drawing_data', drawingData);
+    }
+
+    // 4. 백엔드로 데이터 비동기 전송
+    try {
+        const response = await fetch('/submit', { method: 'POST', body: formData });
+        const data = await response.json();
+        
+        if (data.status === "fail") {
+            clearInterval(timer);
+            document.getElementById('loading-overlay').style.display = 'none';
+            btn.disabled = false;
+            alert(data.msg);
+            window.location.href = "/login";
+            return;
+        }
+        
+        if(data.status === "success") {
+            isServerFinished = true;
+        }
+    } catch (e) {
+        console.error("전송 에러:", e);
+    }
+}
+
+// 10초 카운트다운 후 1초간 녹색 성공 메시지 띄우기
+function showSuccessAndRedirect() {
+    const overlayBox = document.querySelector('#loading-overlay > div');
+    overlayBox.innerHTML = `
+        <h2 style="color:#27ae60; margin-bottom:15px; font-weight: bold;">🌳 정상적으로 등록되었습니다.</h2>
+        <p style="font-size:1.1rem; color:#666; margin-bottom:20px;">소중한 양평 자치 제안 기록소로 이동합니다.</p>
+        <div class="spinner-grow text-success" role="status" style="width: 3rem; height: 3rem;"></div>
+    `;
+
+    setTimeout(() => {
+        window.location.href = "/all-proposals";
+    }, 5000);
+}
+
+// --- 그림 그리기 (Canvas) 로직 ---
+const canvas = document.getElementById('drawing-pad');
+const ctx = canvas.getContext('2d');
+let drawing = false;
+
+canvas.addEventListener('mousedown', () => drawing = true);
+canvas.addEventListener('mouseup', () => { drawing = false; ctx.beginPath(); });
+canvas.addEventListener('mousemove', draw);
+
+function draw(e) {
+    if (!drawing) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    ctx.lineWidth = 3; 
+    ctx.lineCap = 'round'; 
+    ctx.strokeStyle = '#333';
+    
+    ctx.lineTo(x, y);
+    ctx.stroke(); 
+    ctx.beginPath(); 
+    ctx.moveTo(x, y);
+}
+
+function toggleCanvas() { 
+    const container = document.getElementById('canvas-container');
+    container.style.display = container.style.display === 'none' ? 'block' : 'none'; 
+}
+
+function clearCanvas() { 
+    ctx.clearRect(0, 0, canvas.width, canvas.height); 
+}
+</script>
+{% endblock %}

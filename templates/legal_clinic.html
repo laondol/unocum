@@ -1,0 +1,14 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="card p-4 border-0 shadow-sm" style="border-top: 10px solid #2980b9;">
+    <h2>⚖️ 이훈 노무사의 법률상담소</h2>
+    <p>노동권 보호와 공정한 일터를 위해 양평 주민들의 법률 고민을 함께합니다.</p>
+    <div class="bg-primary bg-opacity-10 p-3 mb-4 rounded">
+        <strong>📌 상담 안내:</strong> 임금체불, 부당해고, 직장 내 괴롭힘 등 노동 관련 법률 상담을 무료로 진행합니다.
+    </div>
+    <form action="/legal/ask" method="post" class="mb-4">
+        <textarea name="content" class="form-control mb-2" rows="4" placeholder="비공개 상담을 원하시면 체크해 주세요."></textarea>
+        <button class="btn btn-primary">노무 상담 신청하기</button>
+    </form>
+</div>
+{% endblock %}

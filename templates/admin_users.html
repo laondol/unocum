@@ -1,0 +1,86 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold text-success">🏡 이웃 인증 및 관리 대시보드</h3>
+        <a href="/admin" class="btn btn-sm btn-outline-secondary">📊 제안 관리로 돌아가기</a>
+    </div>
+
+    <div class="card shadow-sm border-0 p-3 bg-white">
+        <table class="table table-hover align-middle text-center">
+            <thead class="table-light">
+                <tr>
+                    <th>ID</th>
+                    <th>실명 (연락처)</th>
+                    <th>거주지 (읍/면/리)</th>
+                    <th>인증 방식</th>
+                    <th>인증 상태</th>
+                    <th>증빙 자료</th>
+                    <th>작업</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr>
+                    <td>{{ u.username }}</td>
+                    <td><strong>{{ u.real_name or '미입력' }}</strong><br><small class="text-muted">{{ u.phone or '미입력' }}</small></td>
+                    <td>{{ u.town or '' }} {{ u.village or '' }}</td>
+                    <td>
+                        {% if u.verified_method == 'gps' %}
+                            <span class="badge bg-success-subtle text-success">📍 실시간 GPS</span>
+                        {% elif u.verified_method == 'bill' %}
+                            <span class="badge bg-primary-subtle text-primary">📎 고지서 첨부</span>
+                        {% else %}
+                            <span class="badge bg-light text-dark">미인증 가입</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if u.is_verified_resident %}
+                            <span class="badge bg-success">인증 이웃</span>
+                        {% else %}
+                            <span class="badge bg-secondary">미인증 이웃</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if u.bill_image_path %}
+                            <!-- 모달 팝업으로 이미지 보기 -->
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#billModal{{ u.id }}">
+                                👁️ 고지서 확인
+                            </button>
+
+                            <!-- 모달 창 정의 -->
+                            <div class="modal fade" id="billModal{{ u.id }}" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">📎 {{ u.real_name }}님의 주소지 증빙자료</h5>
+                                            <button type="button" class="btn-close" data-bs-shadow="none" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body text-center">
+                                            <img src="{{ u.bill_image_path }}" class="img-fluid rounded" alt="고지서 사진">
+                                        </div>
+                                        <div class="modal-footer">
+                                            <a href="/admin/users/verify/{{ u.id }}/approve" class="btn btn-success">주민 인증 승인 (파일 영구삭제)</a>
+                                            <a href="/admin/users/verify/{{ u.id }}/reject" class="btn btn-danger">반려 및 파기</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% else %}
+                            <span class="text-muted small">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if not u.is_verified_resident %}
+                            <a href="/admin/users/verify/{{ u.id }}/approve" class="btn btn-sm btn-success">인증 승인</a>
+                        {% else %}
+                            <span class="text-success fw-bold small">검증 완료</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,34 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-7">
+        <!-- AI 추천 대안 알림창 (가장 중요) -->
+        <div class="card p-4 mb-4 border-0 shadow-sm" style="background-color: #fffde6; border-left: 6px solid #f1c40f;">
+            <h5 class="fw-bold text-warning-emphasis">🤖 AI 지킴이가 추천하는 보안 대안</h5>
+            <p class="mb-0 fs-6 text-dark" style="line-height: 1.6;">
+                "{{ post.ai_improvement_tip or '현재 내용을 더 풍성하게 작성해 보세요.' }}"
+            </p>
+            <small class="text-muted d-block mt-2">※ 위 AI의 조언을 참고하여 내용을 보완해 보세요. 저장 시 다시 48시간 대기가 시작됩니다.</small>
+        </div>
+
+        <!-- 수정 폼 -->
+        <div class="card p-4 shadow-sm border-0 bg-white">
+            <h4 class="fw-bold mb-4">제안서 보완하기</h4>
+            <form action="/post/edit/{{ post.id }}" method="post">
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">제안 제목</label>
+                    <input type="text" name="title" class="form-control" value="{{ post.title }}" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">보완할 내용</label>
+                    <textarea name="content" class="form-control" rows="8" required>{{ post.content }}</textarea>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="/all-proposals" class="btn btn-light w-50">취소</a>
+                    <button class="btn btn-success w-50 fw-bold">보완 완료 및 제출</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

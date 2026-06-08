@@ -1,0 +1,59 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="row">
+    <div class="col-lg-7">
+        <div class="card p-4 shadow-sm mb-4">
+            <h3 class="fw-bold">{{ post.title }}</h3>
+            <p>{{ post.content }}</p>
+        </div>
+
+        <div class="card p-4 shadow-sm bg-light">
+            <h5 class="fw-bold mb-4">🗨️ AI 지킴이와 숙의 중</h5>
+            <div id="debate-box" style="height: 400px; overflow-y: auto; background: white; padding: 20px; border-radius: 15px;">
+                {% for p in posts %}
+                <div class="mb-3 text-end"><div class="badge bg-primary text-wrap p-2 shadow-sm">지킴이: {{ log.admin }}</div></div>
+                <div class="mb-3 text-start"><div class="badge bg-light text-dark text-wrap p-2 border">AI: {{ log.ai }}</div></div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card p-4 shadow-lg sticky-top" style="top: 20px;">
+            <h4 class="fw-bold mb-4">⚖️ 판정 컨트롤 패널</h4>
+            <form action="/admin/update_scores/{{ post.id }}" method="post" class="mb-4">
+                <div class="row g-2 mb-3">
+                    <div class="col-6"><label class="small">👮 관리자(-10~10)</label><input type="number" name="admin_score" value="{{ post.admin_score }}" class="form-control"></div>
+                    <div class="col-6"><label class="small">👑 책임자(-10~10)</label><input type="number" name="leader_score" value="{{ post.leader_score }}" class="form-control"></div>
+                </div>
+                <button class="btn btn-dark w-100">운영진 점수 확정</button>
+            </form>
+
+            <div class="p-3 rounded-4 bg-warning bg-opacity-10 border border-warning">
+                <h6 class="fw-bold">🤖 AI 점수 조정 토론</h6>
+                <input type="number" id="suggested_score" class="form-control mb-2" placeholder="제안할 AI 점수 (-50~50)" value="{{ post.ai_score }}">
+                <textarea id="admin_opinion" class="form-control mb-2" rows="4" placeholder="AI를 설득할 논리적 근거를 입력하세요..."></textarea>
+                <button type="button" onclick="startDebate({{ post.id }})" id="debate-btn" class="btn btn-warning w-100 fw-bold">AI에게 의견 전달</button>
+                <div id="thinking" style="display:none;" class="text-center mt-2"><div class="spinner-border spinner-border-sm"></div> AI가 분석 중...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function startDebate(postId) {
+    const opinion = document.getElementById('admin_opinion').value;
+    const score = document.getElementById('suggested_score').value;
+    if(!opinion) return;
+    document.getElementById('debate-btn').disabled = true;
+    document.getElementById('thinking').style.display = 'block';
+
+    const res = await fetch(`/admin/debate/${postId}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `admin_opinion=${encodeURIComponent(opinion)}&suggested_score=${score}`
+    });
+    if(res.ok) location.reload();
+}
+</script>
+{% endblock %}

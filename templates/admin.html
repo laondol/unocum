@@ -1,0 +1,46 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container mt-4">
+    <h3 class="fw-bold mb-4">🛡️ 함께사는양평 지킴이 관제 리스트</h3>
+    <div class="card shadow-sm border-0">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr class="text-center">
+                    <th style="width: 55%;">제안 내용 요약</th>
+                    <th style="width: 15%;">현재 총점</th>
+                    <th style="width: 15%;">상태</th>
+                    <th style="width: 15%;">심사</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in posts %}
+                <tr class="text-center">
+                    <td class="text-start ps-4">
+                        <div class="fw-bold text-dark">{{ p.title }}</div>
+                        <small class="text-muted">{{ p.content[:50] }}...</small>
+                    </td>
+                    <td>
+                        <span class="fs-5 fw-bold {{ 'text-danger' if p.total_score <= -50 else 'text-primary' }}">
+                            {{ p.total_score }}점
+                        </span>
+                    </td>
+                    <td>
+                        {% if p.total_score <= -50 %}
+                            <span class="badge bg-danger">낙제(격리)</span>
+                        {% elif p.is_forced_approved %}
+                            <span class="badge bg-success">강제승인</span>
+                        {% else %}
+                            <span class="badge bg-secondary">검토중</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <!-- 🎯 이 버튼이 상세 심사 페이지로 연결합니다 -->
+                        <a href="/admin/post/{{ p.id }}" class="btn btn-sm btn-success fw-bold">상세보기 및 심사</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

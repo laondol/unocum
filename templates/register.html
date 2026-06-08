@@ -1,0 +1,157 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="row justify-content-center py-5">
+    <div class="col-md-6 col-lg-5">
+        <div class="card p-5 shadow-lg border-0" style="border-radius: 25px; background: white;">
+            <h3 class="fw-bold mb-3 text-center text-success">🌳 이웃 가입 신청</h3>
+            <p class="text-muted text-center small mb-4">함께사는양평의 소중한 이웃이 되어주세요.</p>
+            
+            <!-- 파일 업로드를 위해 enctype 필수 설정 -->
+            <form action="/register" method="post" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">아이디</label>
+                    <input type="text" name="username" class="form-control" placeholder="아이디 입력" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">비밀번호</label>
+                    <input type="password" name="password" class="form-control" placeholder="비밀번호 입력" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">이름(실명)</label>
+                    <input type="text" name="real_name" class="form-control" placeholder="홍길동" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">연락처</label>
+                    <input type="tel" name="phone" class="form-control" placeholder="010-1234-5678" required>
+                </div>
+                
+                <div class="mb-4">
+    <label class="form-label small fw-bold">거주지 주소 (읍/면/리 자동 연동)</label>
+    <div class="row g-2">
+        <!-- 1. 읍/면 선택 -->
+        <div class="col-6">
+            <select name="town" id="town-select" class="form-select" onchange="updateVillages()" required>
+                <option value="">읍/면 선택</option>
+                <option value="양평읍">양평읍</option>
+                <option value="강상면">강상면</option>
+                <option value="강하면">강하면</option>
+                <option value="양서면">양서면</option>
+                <option value="옥천면">옥천면</option>
+                <option value="서종면">서종면</option>
+                <option value="단월면">단월면</option>
+                <option value="청운면">청운면</option>
+                <option value="양동면">양동면</option>
+                <option value="지평면">지평면</option>
+                <option value="용문면">용문면</option>
+                <option value="개군면">개군면</option>
+            </select>
+        </div>
+        <!-- 2. 리 선택 (자동으로 목록이 채워짐) -->
+        <div class="col-6">
+            <select name="village" id="village-select" class="form-select" required disabled>
+                <option value="">리 선택</option>
+            </select>
+        </div>
+
+
+                <!-- 🏡 선택적 주민 인증 섹션 -->
+                <div class="card p-3 mb-4 border-0" style="background-color: #f4fcf6; border-radius: 15px;">
+                    <h6 class="fw-bold text-success mb-2">🏡 양평 이웃 인증 (선택사항)</h6>
+                    <p class="text-muted" style="font-size: 0.8rem; line-height: 1.4;">인증 완료 시 마을의 주요 의사결정 투표권과 마을 포인트 가점 혜택을 받으실 수 있습니다.</p>
+                    
+                    <!-- 1. GPS 실시간 위치 확인 -->
+                    <div class="mb-3">
+                        <button type="button" class="btn btn-sm btn-outline-success fw-bold" onclick="verifyGPS()">📍 실시간 위치 인증 (GPS)</button>
+                        <span id="gps-status" class="small ms-2 text-secondary">미인증</span>
+                        <input type="hidden" name="gps_verified" id="gps-verified" value="false">
+                    </div>
+
+                    <!-- 2. 고지서/화폐카드 첨부 -->
+                    <div>
+                        <label class="form-label small fw-bold">📎 고지서 또는 지역화폐 카드 사진 첨부</label>
+                        <input type="file" name="bill_image" class="form-control form-control-sm">
+                        <div class="form-text" style="font-size: 0.75rem;">주민 실명과 양평 주소지가 적힌 면을 촬영하여 올려주세요. (승인 즉시 파기됨)</div>
+                    </div>
+                </div>
+
+                <button class="btn btn-success w-100 p-3 fw-bold" style="font-size: 1.1rem; border-radius: 12px;">이웃 가입 신청하기</button>
+            </form>
+        </div>
+    </div>
+</div>
+<!-- 스크립트 영역 (기존 스크립트 블록 가장 하단에 추가하거나 포함하세요) -->
+<script>
+// 🗺️ 양평군 12개 읍·면별 실제 '리(Ri)' 데이터 정의
+const yangpyeongData = {
+    "양평읍": ["양근리", "오빈리", "신애리", "덕평리", "공흥리", "백안리", "도곡리", "창대리", "회현리"],
+    "강상면": ["병산리", "송학리", "세월리", "신화리", "화양리", "대석리", "교평리", "신대리"],
+    "강하면": ["운심리", "왕창리", "동오리", "항금리", "전수리", "성덕리"],
+    "양서면": ["용담리", "양수리", "부용리", "신원리", "국수리", "복포리", "대심리", "청계리", "목왕리"],
+    "옥천면": ["옥천리", "아신리", "신복리", "용천리"],
+    "서종면": ["문호리", "도장리", "수입리", "수능리", "명달리", "화서리", "서후리"],
+    "단월면": ["보룡리", "삼가리", "봉상리", "향소리", "덕수리", "산음리", "석산리", "명성리"],
+    "청운면": ["용두리", "여물리", "비룡리", "다대리", "신론리", "삼성리", "갈운리", "도원리"],
+    "양동면": ["쌍학리", "석곡리", "매월리", "고송리", "삼산리", "단석리", "계정리"],
+    "지평면": ["지평리", "송현리", "월산리", "망미리", "무왕리", "일신리", "대평리", "곡수리", "수곡리", "옥현리"],
+    "용문면": ["다문리", "마룡리", "화전리", "삼성리", "조현리", "신점리", "덕촌리", "오촌리", "광탄리", "금곡리", "연수리", "중원리", "망능리"],
+    "개군면": ["하자포리", "공세리", "레전리", "부리", "석장리", "자연리", "내리", "향리", "주읍리", "계전리", "구미리"]
+};
+
+function updateVillages() {
+    const townSelect = document.getElementById('town-select');
+    const villageSelect = document.getElementById('village-select');
+    const selectedTown = townSelect.value;
+
+    // 초기화
+    villageSelect.innerHTML = '<option value="">리 선택</option>';
+    
+    if (selectedTown === "") {
+        villageSelect.disabled = true;
+        return;
+    }
+
+    // 선택된 읍면에 속한 리 목록 가져와서 드롭다운에 채우기
+    const villages = yangpyeongData[selectedTown];
+    villages.forEach(function(village) {
+        const option = document.createElement('option');
+        option.value = village;
+        option.text = village;
+        villageSelect.appendChild(option);
+    });
+
+    // 잠금 해제
+    villageSelect.disabled = false;
+}
+</script>
+
+<script>
+function verifyGPS() {
+    if (!navigator.geolocation) {
+        alert("이 브라우저에서는 위치 서비스가 지원되지 않습니다.");
+        return;
+    }
+    
+    document.getElementById('gps-status').innerText = "위치 확인 중...";
+    
+    navigator.geolocation.getCurrentPosition(function(position) {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+
+        // 양평군 위경도 범위 내에 있는지 판정
+        if (lat >= 37.35 && lat <= 37.65 && lon >= 127.30 && lon <= 127.75) {
+            document.getElementById('gps-status').innerText = "📍 인증 성공 (양평군 관내)";
+            document.getElementById('gps-status').className = "small ms-2 text-success fw-bold";
+            document.getElementById('gps-verified').value = "true";
+        } else {
+            document.getElementById('gps-status').innerText = "📍 인증 실패 (관외 지역)";
+            document.getElementById('gps-status').className = "small ms-2 text-danger fw-bold";
+            document.getElementById('gps-verified').value = "false";
+            alert("현재 위치가 양평군 관외로 확인됩니다. 고지서 첨부나 활동가 보증을 이용해 주세요.");
+        }
+    }, function() {
+        document.getElementById('gps-status').innerText = "인증 실패 (권한 거부)";
+        alert("위치 권한을 허용해 주셔야 실시간 인증이 가능합니다.");
+    });
+}
+</script>
+{% endblock %}
