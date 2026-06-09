@@ -1,0 +1,107 @@
+{% extends 'layout.html' %}
+{% block content %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<div class="container-fluid px-0">
+    <div class="p-3 pb-0">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="fw-bold mb-0">🗺️ 양평군 공유 지도</h4>
+            <div class="d-flex gap-2">
+                <a href="/share" class="btn btn-sm btn-outline-secondary">목록으로</a>
+                <a href="/share-report" class="btn btn-sm btn-success">공유하기</a>
+            </div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap mb-2">
+            {% for c in categories %}
+            <label class="btn btn-sm btn-outline-info category-filter {{ 'active' if selected_category == c }}" onclick="filterCategory('{{ c }}')">
+                {{ c }}
+            </label>
+            {% endfor %}
+            <label class="btn btn-sm btn-outline-secondary category-filter {{ 'active' if not selected_category }}" onclick="filterCategory('')">
+                전체
+            </label>
+        </div>
+        <div id="countInfo" class="small text-muted mb-2">표시: {{ reports|length }}개</div>
+    </div>
+    <div id="map" style="height: calc(100vh - 200px); border-radius: 0;"></div>
+</div>
+
+<script>
+var map = L.map('map').setView([37.50, 127.52], 12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '© OpenStreetMap contributors'
+}).addTo(map);
+
+var markers = L.markerClusterGroup({
+    maxClusterRadius: 50,
+    spiderfyOnMaxZoom: true,
+    showCoverageOnHover: false
+});
+
+var allReports = {{ reports_json|safe }};
+var markerMap = {};
+
+allReports.forEach(function(r) {
+    if (r.lat && r.lon) {
+        var icon = L.divIcon({
+            html: getCategoryIcon(r.category),
+            iconSize: [30, 30],
+            className: 'custom-marker'
+        });
+        var marker = L.marker([r.lat, r.lon], {icon: icon});
+        marker.bindPopup(`
+            <div style="min-width:200px;">
+                ${r.image ? `<img src="${r.image}" style="width:100%;height:100px;object-fit:cover;border-radius:8px;margin-bottom:6px;">` : ''}
+                <strong>${r.title}</strong><br>
+                <span class="badge bg-info">${r.category}</span>
+                <span class="badge bg-light text-dark">${r.town} ${r.village}</span><br>
+                <small>${r.summary}</small><br>
+                <a href="/share/detail/${r.id}" target="_blank" style="display:inline-block;margin-top:4px;">자세히 보기 →</a>
+            </div>
+        `);
+        markers.addLayer(marker);
+        markerMap[r.id] = marker;
+    }
+});
+
+map.addLayer(markers);
+
+function getCategoryIcon(cat) {
+    var icons = {'사건': '🚨', '풍경': '🏞️', '장소': '🏛️', '맛집': '🍽️', '기타': '📍'};
+    return '<div style="font-size:24px;text-align:center;">' + (icons[cat] || '📍') + '</div>';
+}
+
+function filterCategory(cat) {
+    selected_category = cat;
+    markers.clearLayers();
+    document.querySelectorAll('.category-filter').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll(`.category-filter[onclick*="'${cat}'"]`).forEach(el => el.classList.add('active'));
+    var count = 0;
+    allReports.forEach(function(r) {
+        if (!cat || r.category === cat) {
+            if (markerMap[r.id]) {
+                markers.addLayer(markerMap[r.id]);
+                count++;
+            }
+        }
+    });
+    document.getElementById('countInfo').textContent = '표시: ' + count + '개';
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() { map.invalidateSize(); }, 500);
+});
+
+var selected_category = '{{ selected_category or "" }}';
+</script>
+
+<style>
+.custom-marker { background: none !important; border: none !important; }
+.leaflet-popup-content { margin: 10px 14px; }
+.category-filter.active { background-color: #0d6efd !important; color: white !important; border-color: #0d6efd !important; }
+</style>
+{% endblock %}

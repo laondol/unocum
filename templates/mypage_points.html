@@ -1,0 +1,46 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container mt-4" style="max-width: 700px;">
+    <h3 class="fw-bold mb-4">💎 내 포인트</h3>
+    <div class="card border-0 shadow-sm mb-4 text-center p-4" style="border-radius: 18px;">
+        <div class="fs-1 fw-bold text-success">{{ user.points }}</div>
+        <div class="text-muted small">현재 보유 포인트</div>
+    </div>
+    <div class="card border-0 shadow-sm" style="border-radius: 18px;">
+        <div class="card-body p-4">
+            <h5 class="fw-bold mb-3">📋 포인트 내역</h5>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle small">
+                    <thead class="table-light">
+                        <tr>
+                            <th>일시</th>
+                            <th>유형</th>
+                            <th>변동</th>
+                            <th>잔액</th>
+                            <th>설명</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for h in history %}
+                        <tr>
+                            <td class="text-muted">{{ h.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>
+                                {% set labels = {'signup':'가입','monthly':'월급','post':'제안','comment':'댓글','like':'추천','admin_adjust':'관리자조정','payment':'결제'} %}
+                                {{ labels.get(h.change_type, h.change_type) }}
+                            </td>
+                            <td class="fw-bold {{ 'text-success' if h.amount > 0 else 'text-danger' }}">
+                                {{ '+' if h.amount > 0 }}{{ h.amount }}
+                            </td>
+                            <td>{{ h.balance_after }}</td>
+                            <td>{{ h.description }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" class="text-center text-muted py-4">포인트 내역이 없습니다.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

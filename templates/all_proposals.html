@@ -1,0 +1,97 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="fw-bold text-success">📜 누군가의꿈</h3>
+    <a href="/main" class="btn btn-success fw-bold">새 제안 등록하기</a>
+</div>
+
+<div class="list-group">
+    {% for p in posts %}
+    <div class="list-group-item mb-3 p-4 shadow-sm border-0 bg-white" style="border-radius:18px;">
+        <div class="d-flex w-100 justify-content-between align-items-center mb-2">
+            <h5 class="fw-bold text-dark m-0">{{ p.title }}</h5>
+            <small class="text-muted">작성자: {{ p.author_name }}</small>
+        </div>
+        <p class="text-secondary mb-3">{{ p.content[:150] }}...</p>
+        
+        <!-- 첨부파일/그림 표시 -->
+        {% if p.file_path %}
+        {% set fp = p.file_path|lower %}
+        {% set is_img = fp.endswith('.png') or fp.endswith('.jpg') or fp.endswith('.jpeg') or fp.endswith('.gif') or 'draw_' in fp %}
+        {% set is_pdf = fp.endswith('.pdf') %}
+        <div class="mb-3 p-2 bg-light rounded">
+            <div class="d-flex gap-2 flex-wrap">
+                {% if is_img %}
+                <img src="{{ p.file_path }}" class="rounded" style="max-height: 120px; max-width: 100%;" alt="첨부 이미지">
+                {% elif is_pdf %}
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fs-1">📄</span>
+                    <a href="{{ p.file_path }}" target="_blank" class="text-decoration-none">PDF 파일</a>
+                </div>
+                {% else %}
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fs-1">📎</span>
+                    <a href="{{ p.file_path }}" target="_blank" class="text-decoration-none">첨부파일</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        
+        <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+            <div class="d-flex align-items-center">
+                {% if p.total_score <= -50 %}
+                    <span class="badge bg-danger p-2">🚨 보완 필요(격리됨)</span>
+                {% elif p.is_forced_approved or p.created_at <= now - timedelta(hours=48) %}
+                    <span class="badge bg-success-subtle text-success p-2">🟢 자치 검토 완료 (공개)</span>
+                {% else %}
+                    <span class="badge bg-warning text-dark p-2 me-2">⏳ 심사 중 (시차 격리)</span>
+                    <span class="countdown-timer fw-bold text-success small" data-updated="{{ p.updated_at.isoformat() }}">
+                        남은시간 계산 중...
+                    </span>
+                {% endif %}
+            </div>
+            
+            <div>
+                {% if session.get('user_id') == p.user_id and not p.is_forced_approved and p.created_at > now - timedelta(hours=48) %}
+                    <a href="/post/edit/{{ p.id }}" class="btn btn-sm btn-outline-primary fw-bold me-2">✏️ 수정 및 AI 조언 보기</a>
+                {% endif %}
+                <a href="/post/{{ p.id }}" class="btn btn-sm btn-link text-decoration-none">자세히 보기 ></a>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <p class="text-center p-5 text-muted card border-0">현재 표시할 제안이 없습니다. 첫 제안을 남겨보세요!</p>
+    {% endfor %}
+</div>
+
+<!-- 실시간 48시간 타이머 자바스크립트 -->
+<script>
+function startCountdowns() {
+    const timers = document.querySelectorAll('.countdown-timer');
+    
+    setInterval(() => {
+        timers.forEach(timer => {
+            const updatedAtStr = timer.getAttribute('data-updated');
+            if (!updatedAtStr) return;
+            
+            const updatedAt = new Date(updatedAtStr);
+            const deadline = new Date(updatedAt.getTime() + (48 * 60 * 60 * 1000));
+            const now = new Date();
+            const diff = deadline - now;
+            
+            if (diff <= 0) {
+                timer.innerText = "심사 완료 (공개됨)";
+                timer.className = "fw-bold text-success small";
+            } else {
+                const hours = Math.floor(diff / (1000 * 60 * 60));
+                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+                timer.innerText = `보안 대기: ${hours}시간 ${minutes}분 ${seconds}초 남음`;
+            }
+        });
+    }, 1000);
+}
+document.addEventListener('DOMContentLoaded', startCountdowns);
+</script>
+{% endblock %}

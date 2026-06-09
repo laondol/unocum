@@ -1,0 +1,102 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container mt-4">
+    <a href="/intro" class="btn btn-sm btn-outline-secondary mb-3">← 인트로로</a>
+    <h3 class="fw-bold mb-4">📍 {{ town }} {{ village }} 공유 현황</h3>
+    
+    <div class="card border-0 shadow-sm" style="border-radius: 16px;">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 small">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width:5%;">ID</th>
+                        <th style="width:20%;">제목/내용</th>
+                        <th style="width:10%;">공유자</th>
+                        <th style="width:10%;">위치</th>
+                        <th style="width:8%;">사진</th>
+                        <th style="width:8%;">그림</th>
+                        <th style="width:10%;">AI분류</th>
+                        <th style="width:8%;">신뢰도</th>
+                        <th style="width:8%;">위험</th>
+                        <th style="width:10%;">상태</th>
+                        <th style="width:11%;">일시</th>
+                        <th style="width:8%;">처리</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in reports %}
+                    <tr {% if r.ai_danger_alert %}class="table-danger"{% endif %}>
+                        <td class="text-muted">{{ r.id }}</td>
+                        <td class="text-start ps-2">
+                            <div class="fw-bold">{{ r.title or '제목 없음' }}</div>
+                            {% if r.description %}
+                            <small class="text-muted">{{ r.description[:60] }}{% if r.description|length > 60 %}...{% endif %}</small>
+                            {% endif %}
+                            {% if r.ai_summary %}
+                            <small class="text-primary d-block mt-1">🤖 {{ r.ai_summary[:80] }}</small>
+                            {% endif %}
+                        </td>
+                        <td>{{ r.author_name }}</td>
+                        <td>
+                            {% if r.latitude and r.longitude %}
+                            <a href="https://maps.google.com/?q={{ r.latitude }},{{ r.longitude }}" target="_blank" class="text-decoration-none small">
+                                📍 {{ r.latitude|round(4) }}, {{ r.longitude|round(4) }}
+                            </a>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if r.image_path %}
+                            <a href="{{ r.image_path }}" target="_blank" class="btn btn-sm btn-outline-primary">👁️</a>
+                            {% else %}<span class="text-muted">-</span>{% endif %}
+                        </td>
+                        <td>
+                            {% if r.drawing_path %}
+                            <a href="{{ r.drawing_path }}" target="_blank" class="btn btn-sm btn-outline-secondary">✏️</a>
+                            {% else %}<span class="text-muted">-</span>{% endif %}
+                        </td>
+                        <td>
+                            {% if r.ai_category %}
+                            <span class="badge bg-info">{{ r.ai_category }}</span>
+                            {% else %}<span class="text-muted">-</span>{% endif %}
+                        </td>
+                        <td>
+                            {% if r.ai_confidence %}
+                            <span class="text-muted small">{{ (r.ai_confidence * 100)|round(0) }}%</span>
+                            {% else %}<span class="text-muted">-</span>{% endif %}
+                        </td>
+                        <td>
+                            {% if r.ai_danger_alert %}
+                            <span class="badge bg-danger">🚨 위험</span>
+                            {% else %}<span class="text-muted">-</span>{% endif %}
+                        </td>
+                        <td>
+                            {% if r.status == 'approved' %}
+                            <span class="badge bg-success">승인</span>
+                            {% elif r.status == 'rejected' %}
+                            <span class="badge bg-danger">반려</span>
+                            {% else %}
+                            <span class="badge bg-warning text-dark">대기</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted">{{ r.created_at.strftime('%m/%d %H:%M') }}</td>
+                        <td>
+                            {% if r.status == 'pending' %}
+                            <a href="/share-report/toggle/{{ r.id }}/approve" class="btn btn-sm btn-success me-1">승인</a>
+                            <a href="/share-report/toggle/{{ r.id }}/reject" class="btn btn-sm btn-outline-danger" onclick="return confirm('반려하시겠습니까?')">반려</a>
+                            {% else %}
+                            <a href="/share-report/toggle/{{ r.id }}/approve" class="btn btn-sm btn-outline-success me-1">승인</a>
+                            <a href="/share-report/toggle/{{ r.id }}/reject" class="btn btn-sm btn-outline-danger" onclick="return confirm('반려하시겠습니까?')">반려</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="12" class="text-center py-4 text-muted">해당 리의 공유가 없습니다.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

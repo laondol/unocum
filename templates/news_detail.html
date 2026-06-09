@@ -1,0 +1,173 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container mt-4" style="max-width: 800px;">
+    <!-- 뒤로가기 -->
+    <a href="{{ request.referrer or '/world-news' }}" class="btn btn-sm btn-outline-secondary mb-3">← 목록으로</a>
+
+    <!-- 뉴스 본문 -->
+    <article class="card border-0 shadow-sm mb-4" style="border-radius: 18px; overflow: hidden;">
+        {% if article.image_path %}
+        <img src="{{ article.image_path }}" class="card-img-top" style="height: 250px; object-fit: cover;" alt="{{ article.title }}">
+        {% endif %}
+        <div class="card-body p-4">
+            <div class="d-flex flex-wrap gap-2 mb-3">
+                <span class="badge bg-success-subtle text-success">{{ article.category }}</span>
+                {% if article.source_name %}
+                <span class="badge bg-light text-dark">{{ article.source_name }}</span>
+                {% endif %}
+            </div>
+            <h2 class="fw-bold mb-3">{{ article.title }}</h2>
+            <div class="prose" style="font-size: 1.05rem; line-height: 1.8;">{{ article.content|safe }}</div>
+            
+            <hr class="my-4">
+            
+            <!-- 투표/원문보기 -->
+            <div class="d-flex flex-wrap align-items-center gap-3">
+                {% if session.get('username') %}
+                <div class="d-flex gap-2">
+                    <button onclick="voteNews({{ article.id }}, 'like')" class="btn btn-outline-success" id="likeBtn-{{ article.id }}">👍 {{ article.like_count }}</button>
+                    <button onclick="voteNews({{ article.id }}, 'dislike')" class="btn btn-outline-danger" id="dislikeBtn-{{ article.id }}">👎 {{ article.dislike_count }}</button>
+                </div>
+                {% else %}
+                <small class="text-muted">👍 {{ article.like_count }} &nbsp;👎 {{ article.dislike_count }}</small>
+                {% endif %}
+                {% if article.source_url %}
+                <a href="{{ article.source_url }}" target="_blank" class="btn btn-sm btn-outline-success ms-auto">🔗 원문보기</a>
+                {% endif %}
+            </div>
+        </div>
+    </article>
+
+    <!-- 추천링크 영역 -->
+    <section class="card border-0 shadow-sm mb-4" style="border-radius: 18px;">
+        <div class="card-body p-4">
+            <h4 class="fw-bold mb-3">📎 관련 추천링크</h4>
+
+            <!-- 추천링크 등록 폼 -->
+            {% if session.get('username') %}
+            <form id="recommendForm" class="mb-4 p-3 bg-light rounded">
+                <div class="row g-2 mb-2">
+                    <div class="col-md-6">
+                        <input type="text" name="title" class="form-control" placeholder="링크 제목" required>
+                    </div>
+                    <div class="col-md-6">
+                        <input type="url" name="url" class="form-control" placeholder="https://..." required>
+                    </div>
+                </div>
+                <textarea name="description" class="form-control mb-2" rows="2" placeholder="간단한 설명 (선택)"></textarea>
+                <button type="submit" class="btn btn-outline-primary btn-sm">추천링크 제출 (관리자 승인 후 게시)</button>
+            </form>
+            {% else %}
+            <div class="alert alert-info mb-3">
+                <a href="/login?next=/news/{{ article.id }}" class="text-decoration-none">로그인</a> 후 추천링크를 제안할 수 있습니다.
+            </div>
+            {% endif %}
+
+            <!-- 승인된 추천링크 목록 -->
+            <div id="recommendationsList">
+                {% include 'news_recommendation_item.html' with context %}
+            </div>
+        </div>
+    </section>
+
+    <!-- 댓글 영역 -->
+    <section class="card border-0 shadow-sm" style="border-radius: 18px;">
+        <div class="card-body p-4">
+            <h4 class="fw-bold mb-4">💬 주민 의견</h4>
+
+            <!-- 댓글 작성 폼 -->
+            {% if session.get('username') %}
+            <form id="commentForm" class="mb-4">
+                <input type="hidden" name="news_id" value="{{ article.id }}">
+                <textarea name="content" class="form-control mb-2" rows="3" placeholder="의견을 남겨주세요. (AI 검토 후 게시됩니다)" required></textarea>
+                <button type="submit" class="btn btn-success float-end">등록</button>
+            </form>
+            {% else %}
+            <div class="alert alert-info mb-4">
+                <a href="/login?next=/news/{{ article.id }}" class="text-decoration-none">로그인</a> 후 댓글을 작성할 수 있습니다.
+            </div>
+            {% endif %}
+
+            <!-- 댓글 목록 -->
+            <div id="commentsList">
+                {% for c in comments %}
+                {% include 'news_comment_item.html' with context %}
+                {% endfor %}
+            </div>
+
+            {% if not comments %}
+            <p class="text-center text-muted py-5">아직 의견이 없습니다. 첫 의견을 남겨보세요.</p>
+            {% endif %}
+        </div>
+    </section>
+</div>
+
+<script>
+function voteNews(id, type) {
+    fetch('/news/' + type + '/' + id, {method:'POST'})
+    .then(r=>r.json()).then(d=>{
+        if(d.status==='success') {
+            document.getElementById('likeBtn-'+id).innerHTML = '👍 ' + d.likes;
+            document.getElementById('dislikeBtn-'+id).innerHTML = '👎 ' + d.dislikes;
+        } else alert(d.msg || '오류 발생');
+    }).catch(e=>alert('오류: '+e));
+}
+
+document.getElementById('commentForm')?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const fd = new FormData(this);
+    fetch('/news/comment', {method:'POST', body:fd})
+    .then(r=>r.json()).then(d=>{
+        if(d.status==='success') {
+            alert(d.ai_score <= -50 ? '⚠️ 부적절한 내용으로 AI가 숨김 처리했습니다.' : '✅ 댓글이 등록되었습니다. (AI 검토 완료)');
+            this.reset();
+            loadComments();
+        } else alert(d.msg || '오류 발생');
+    }).catch(e=>alert('오류: '+e));
+});
+
+function replyComment(parentId) {
+    const content = prompt('답글 내용을 입력하세요:');
+    if (!content) return;
+    const fd = new FormData();
+    fd.append('news_id', '{{ article.id }}');
+    fd.append('content', content);
+    fd.append('parent_id', parentId);
+    fetch('/news/comment', {method:'POST', body:fd})
+    .then(r=>r.json()).then(d=>{
+        if(d.status==='success') {
+            alert(d.ai_score <= -50 ? '⚠️ 부적절한 내용으로 AI가 숨김 처리했습니다.' : '✅ 답글이 등록되었습니다.');
+            loadComments();
+        } else alert(d.msg || '오류 발생');
+    }).catch(e=>alert('오류: '+e));
+}
+
+function loadComments() {
+    fetch('/news/{{ article.id }}/comments')
+    .then(r=>r.text()).then(html=>{
+        document.getElementById('commentsList').innerHTML = html;
+    });
+}
+
+document.getElementById('recommendForm')?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const fd = new FormData(this);
+    fd.append('news_id', '{{ article.id }}');
+    fetch('/news/{{ article.id }}/recommend', {method:'POST', body:fd})
+    .then(r=>r.json()).then(d=>{
+        if(d.status==='success') {
+            alert(d.msg);
+            this.reset();
+            loadRecommendations();
+        } else alert(d.msg || '오류 발생');
+    }).catch(e=>alert('오류: '+e));
+});
+
+function loadRecommendations() {
+    fetch('/news/{{ article.id }}/recommendations')
+    .then(r=>r.text()).then(html=>{
+        document.getElementById('recommendationsList').innerHTML = html;
+    });
+}
+</script>
+{% endblock %}

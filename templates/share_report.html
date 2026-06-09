@@ -1,0 +1,199 @@
+{% extends 'layout.html' %}
+{% block content %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<div class="container-fluid px-3 py-3" style="max-width: 100%;">
+    <a href="/intro" class="btn btn-sm btn-outline-secondary mb-3">← 인트로로</a>
+    <h4 class="fw-bold mb-3 text-center">📍 공유하기</h4>
+    
+    <div class="card border-0 shadow-sm" style="border-radius: 16px;">
+        <div class="card-body p-3">
+            <form id="shareForm" enctype="multipart/form-data">
+                <!-- 사진 촬영 (최우선) -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">📸 사진 촬영 (필수)</label>
+                    <input type="file" name="image" class="form-control" accept="image/*" capture="environment" required onchange="previewImage(this)">
+                    <div id="imagePreview" class="mt-2" style="display:none;">
+                        <img id="previewImg" src="#" alt="미리보기" style="width:100%; border-radius:12px; border:1px solid #eee;">
+                    </div>
+                </div>
+                
+                <!-- 그리기 도구 -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">🎨 직접 그리기 (선택)</label>
+                    <button type="button" class="btn btn-sm btn-outline-secondary mb-2" onclick="toggleCanvas()">🎨 그리기 열기/닫기</button>
+                    <div id="canvas-container" style="display:none;">
+                        <canvas id="drawing-pad" width="100%" height="300" style="border:1px solid #ccc; background:white; cursor:crosshair; border-radius: 12px;"></canvas>
+                        <div class="mt-1">
+                            <button type="button" class="btn btn-sm btn-light" onclick="clearCanvas()">지우기</button>
+                        </div>
+                        <input type="hidden" name="drawing_data" id="drawing_data">
+                    </div>
+                </div>
+                
+                <!-- 제목 (선택) -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">제목 (선택 - 안 적으면 자동 생성)</label>
+                    <input type="text" name="title" class="form-control" placeholder="예: 양근리 벚꽃길, 용문산 등산로 풍경">
+                </div>
+                
+                <!-- 설명 (선택) -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">설명 (선택)</label>
+                    <textarea name="description" class="form-control" rows="3" placeholder="자세한 내용이 있으면 적어주세요."></textarea>
+                </div>
+                
+                <!-- 현재 위치 자동 수집 (페이지 진입 시 즉시) -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">📍 현재 위치</label>
+                    <div id="locationStatus" class="mb-2 text-center text-muted small">위치 수집 중... (브라우저 권한 허용 필요)</div>
+                    <div id="mapPreview" style="height: 200px; border-radius: 12px; display:none;" class="mb-2"></div>
+                    <input type="hidden" name="latitude" id="latitude">
+                    <input type="hidden" name="longitude" id="longitude">
+                </div>
+                
+                <div class="alert alert-info small py-2">
+                    <strong>귀하의 주소지:</strong> {{ user.town }} {{ user.village }}<br>
+                    페이지 진입 시 자동으로 현재 위치를 수집합니다.<br>
+                    위치 수집 완료 후 공유하기 버튼이 활성화됩니다.
+                </div>
+                
+                <button type="submit" class="btn btn-success w-100 py-3 fw-bold" style="border-radius:12px; font-size:1.1rem;" id="submitBtn" disabled>
+                    공유 접수하기
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('drawing-pad');
+const ctx = canvas.getContext('2d');
+let drawing = false;
+
+function resizeCanvas() {
+    const container = canvas.parentElement;
+    canvas.width = container.clientWidth;
+    canvas.height = 300;
+}
+window.addEventListener('resize', resizeCanvas);
+
+canvas.addEventListener('mousedown', (e) => { drawing = true; draw(e); });
+canvas.addEventListener('mouseup', () => { drawing = false; ctx.beginPath(); });
+canvas.addEventListener('mousemove', draw);
+canvas.addEventListener('touchstart', (e) => { drawing = true; draw(e.touches[0]); }, {passive: false});
+canvas.addEventListener('touchend', () => { drawing = false; ctx.beginPath(); });
+canvas.addEventListener('touchmove', (e) => { draw(e.touches[0]); }, {passive: false});
+
+function draw(e) {
+    if (!drawing) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.strokeStyle = '#333';
+    ctx.lineTo(x, y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x, y);
+}
+
+function toggleCanvas() { 
+    const container = document.getElementById('canvas-container');
+    container.style.display = container.style.display === 'none' ? 'block' : 'none'; 
+    if (container.style.display === 'block') resizeCanvas();
+}
+
+function clearCanvas() { 
+    ctx.clearRect(0, 0, canvas.width, canvas.height); 
+}
+
+function previewImage(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('previewImg').src = e.target.result;
+            document.getElementById('imagePreview').style.display = 'block';
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+// 페이지 로드 시 자동으로 위치 수집
+function autoGetLocation() {
+    const status = document.getElementById('locationStatus');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    if (!navigator.geolocation) {
+        status.textContent = '❌ 이 브라우저는 위치정보를 지원하지 않습니다.';
+        status.className = 'mb-2 text-center text-danger small';
+        // 수동 입력 허용
+        submitBtn.disabled = false;
+        return;
+    }
+    
+    status.textContent = '📍 현재 위치를 자동으로 수집 중입니다... (브라우저에서 "허용" 눌러주세요)';
+    status.className = 'mb-2 text-center text-primary small';
+    
+    navigator.geolocation.getCurrentPosition(
+        pos => {
+            document.getElementById('latitude').value = pos.coords.latitude;
+            document.getElementById('longitude').value = pos.coords.longitude;
+            status.textContent = `✅ 위치 수집 완료 (${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)})`;
+            status.className = 'mb-2 text-center text-success small';
+            submitBtn.disabled = false;
+            // 지도 표시
+            const mapDiv = document.getElementById('mapPreview');
+            mapDiv.style.display = 'block';
+            const map = L.map(mapDiv).setView([pos.coords.latitude, pos.coords.longitude], 15);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19}).addTo(map);
+            L.marker([pos.coords.latitude, pos.coords.longitude]).addTo(map);
+            setTimeout(() => map.invalidateSize(), 300);
+        },
+        err => {
+            status.textContent = '⚠️ 위치 수집 실패: ' + err.message + ' (수동으로 공유 가능)';
+            status.className = 'mb-2 text-center text-warning small';
+            // 실패해도 공유 가능하게 버튼 활성화
+            submitBtn.disabled = false;
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+}
+
+// 페이지 로드 시 즉시 실행
+document.addEventListener('DOMContentLoaded', autoGetLocation);
+
+document.getElementById('shareForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('submitBtn');
+    
+    btn.disabled = true;
+    btn.textContent = '접수 중...';
+    
+    const formData = new FormData(this);
+    
+    // 캔버스 데이터 추가
+    const drawingData = canvas.toDataURL('image/png');
+    if(drawingData.length > 2000) {
+        formData.set('drawing_data', drawingData);
+    }
+    
+    try {
+        const response = await fetch('/share-report', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            alert(data.msg);
+            window.location.href = '/share';
+        } else {
+            alert(data.msg || '오류 발생');
+            btn.disabled = false;
+            btn.textContent = '공유 접수하기';
+        }
+    } catch (err) {
+        alert('오류: ' + err.message);
+        btn.disabled = false;
+        btn.textContent = '공유 접수하기';
+    }
+});
+</script>
+{% endblock %}

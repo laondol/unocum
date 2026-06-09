@@ -1,0 +1,15 @@
+{% for r in recommendations %}
+<div class="border rounded p-3 mb-2 bg-light" style="border-radius: 12px;">
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+        <a href="{{ r.url }}" target="_blank" class="fw-bold text-primary text-decoration-none">{{ r.title }}</a>
+        <span class="badge bg-success-subtle text-success small">승인됨</span>
+    </div>
+    <div class="small text-muted">
+        추천인: <strong>{{ r.author_name }}</strong> &nbsp;|&nbsp; 
+        {{ r.created_at.strftime('%Y-%m-%d %H:%M') }}
+        {% if r.description %}<br>{{ r.description }}{% endif %}
+    </div>
+</div>
+{% else %}
+<div class="text-center text-muted py-3">아직 승인된 추천링크가 없습니다.</div>
+{% endfor %}

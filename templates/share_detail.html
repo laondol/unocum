@@ -1,0 +1,103 @@
+{% extends 'layout.html' %}
+{% block content %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<div class="container mt-4" style="max-width: 700px;">
+    <a href="/share" class="btn btn-sm btn-outline-secondary mb-3">← 공유마당으로</a>
+    <div class="card border-0 shadow-sm mb-4" style="border-radius: 18px;">
+        <div class="card-body p-4">
+            <div class="d-flex gap-2 flex-wrap mb-3">
+                <span class="badge bg-info">{{ report.ai_category }}</span>
+                <span class="badge bg-light text-dark">{{ report.town }} {{ report.village }}</span>
+            </div>
+            <h3 class="fw-bold mb-3">{{ report.title }}</h3>
+            
+            {% if report.image_path %}
+            <img src="{{ report.image_path }}" class="img-fluid rounded mb-3" style="max-height: 400px;" alt="공유 사진">
+            {% endif %}
+            {% if report.drawing_path %}
+            <img src="{{ report.drawing_path }}" class="img-fluid rounded mb-3" style="max-height: 400px;" alt="공유 그림">
+            {% endif %}
+            
+            {% if report.ai_summary %}
+            <div class="p-3 bg-light rounded mb-3 border-start border-5 border-info">
+                <strong>🤖 AI 요약:</strong><br>
+                {{ report.ai_summary }}
+            </div>
+            {% endif %}
+            
+            {% if report.description %}
+            <p class="fs-6" style="white-space: pre-wrap;">{{ report.description }}</p>
+            {% endif %}
+            
+            <hr>
+            
+            {% if report.ai_region_news and report.ai_region_news != '관련 뉴스 없음' %}
+            <div class="mb-4 p-3 bg-light rounded border-start border-5 border-primary">
+                <h6 class="fw-bold mb-2">📰 관련 지역 소식</h6>
+                <p class="mb-2">{{ report.ai_region_news }}</p>
+                {% if report.ai_news_links %}
+                {% set links = report.ai_news_links|fromjson %}
+                {% if links %}
+                <div class="mt-2">
+                    {% for link in links %}
+                    <a href="{{ link.url }}" target="_blank" class="text-decoration-none small text-primary d-block mb-1">
+                        📄 {{ link.title }}
+                    </a>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% endif %}
+            </div>
+            {% endif %}
+            
+            {% if report.ai_danger_alert %}
+            <div class="mb-4 p-3 bg-danger bg-opacity-10 rounded border border-danger">
+                <strong class="text-danger">🚨 위험/긴급 상황 감지</strong><br>
+                <small class="text-muted">관리자와 책임자에게 자동 통보되었습니다.</small>
+            </div>
+            {% endif %}
+            
+            <div class="d-flex justify-content-between small text-muted">
+                <span>공유자: <strong>{{ report.author_name }}</strong></span>
+                <span>{{ report.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+            </div>
+            <div class="d-flex justify-content-between small text-muted">
+                <span>위치: {{ report.latitude|round(6) }}, {{ report.longitude|round(6) }}</span>
+                {% if report.ai_confidence %}
+                <span>AI 신뢰도: {{ (report.ai_confidence * 100)|round(0) }}%</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- 지도 -->
+    {% if report.latitude and report.longitude %}
+    <div class="card border-0 shadow-sm mb-4" style="border-radius: 18px; overflow: hidden;">
+        <div id="map" style="height: 300px;"></div>
+    </div>
+    <div class="text-center mb-4">
+        <a href="https://www.google.com/maps/dir/?api=1&destination={{ report.latitude }},{{ report.longitude }}" target="_blank" class="btn btn-outline-primary">
+            🗺️ 길찾기
+        </a>
+        <a href="https://maps.google.com/?q={{ report.latitude }},{{ report.longitude }}" target="_blank" class="btn btn-outline-secondary">
+            📍 구글맵
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    {% if report.latitude and report.longitude %}
+    var map = L.map('map').setView([{{ report.latitude }}, {{ report.longitude }}], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap'
+    }).addTo(map);
+    L.marker([{{ report.latitude }}, {{ report.longitude }}]).addTo(map)
+        .bindPopup('{{ report.title or "공유 위치" }}');
+    {% endif %}
+});
+</script>
+{% endblock %}

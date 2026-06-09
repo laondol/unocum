@@ -1,0 +1,28 @@
+__pycache__/
+*.py[cod]
+
+# virtualenv
+.venv/
+venv/
+env/
+
+# Flask
+instance/
+.env
+.env.*
+
+# DB
+*.sqlite
+*.db
+
+# uploads
+uploads/
+static/uploads/
+
+# project tree dump
+yp_project_tree.txt
+
+# editor / OS
+.vscode/
+.DS_Store
+*.log

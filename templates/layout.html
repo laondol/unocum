@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>함께사는양평 - AI 자치 공동체</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+    <style>
+        :root { --yp-green: #27ae60; --yp-dark: #2c3e50; --yp-light: #f8f9fa; }
+        body { font-family: 'Pretendard', sans-serif; background-color: var(--yp-light); color: var(--yp-dark); }
+        .navbar { background: rgba(255, 255, 255, 0.95) !important; backdrop-filter: blur(10px); border-bottom: 1px solid #eee; }
+        .btn-success { background-color: var(--yp-green); border: none; border-radius: 12px; padding: 10px 25px; transition: 0.3s; }
+        .btn-success:hover { background-color: #219150; transform: translateY(-2px); }
+        .card { border: none; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+        .nav-link { color: var(--yp-dark) !important; font-weight: 500; }
+        .glass-card { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.3); }
+    </style>
+</head>
+<body>
+
+    <!-- 1. 상단 메뉴바 (이 안에는 팝업창 코드가 없어야 잘리지 않습니다) -->
+    <nav class="navbar navbar-expand-lg sticky-top mb-4">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center" href="/intro">
+                <!-- 원본 로고 이미지 연결 -->
+                <img src="/static/images/logo.png" alt="양평" height="40" class="me-2">
+                <span class="fw-bold text-success" style="font-size: 1.4rem;">함께사는양평</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto align-items-center">
+                    <li class="nav-item dropdown me-3">
+                        <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">소개</a>
+                        <ul class="dropdown-menu border-0 shadow">
+                            <li><a class="dropdown-item" href="/intro">사업소개</a></li>
+                            <li><a class="dropdown-item" href="/presentation">발표자료(IR)</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item dropdown me-3">
+                        <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">하는일</a>
+                        <ul class="dropdown-menu border-0 shadow">
+                            <li><a class="dropdown-item" href="/service/ramp">경사로보급</a></li>
+                            <li><a class="dropdown-item" href="/service/legal">법률상담</a></li>
+                            <li><a class="dropdown-item" href="/service/psycho">심리상담</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item me-2">
+                        <a class="nav-link p-2 d-flex align-items-center justify-content-center" href="/world-news" title="세계와 양평" data-bs-toggle="tooltip" data-bs-placement="bottom">
+                            <span class="fs-4">🌍</span>
+                        </a>
+                    </li>
+                    <li class="nav-item me-2">
+                        <a class="nav-link p-2 d-flex align-items-center justify-content-center" href="/kr-yp-news" title="대한민국과 양평" data-bs-toggle="tooltip" data-bs-placement="bottom">
+                            <span class="fs-4">🇰🇷</span>
+                        </a>
+                    </li>
+                    
+                    <!-- 꿈꾸기 (구 제안하기) -->
+                    <li class="nav-item me-3">
+                        {% if session.get('username') %}
+                            <a class="nav-link fw-bold text-success" href="/main">꿈꾸기</a>
+                        {% else %}
+                            <a class="nav-link fw-bold text-success" href="#" onclick="showLoginRequiredModal(event)">꿈꾸기</a>
+                        {% endif %}
+                    </li>
+                    
+                    <li class="nav-item me-3"><a class="nav-link" href="/all-proposals">누군가의꿈</a></li>
+                    
+                    <!-- 관리 드롭다운 (관리자/리더) -->
+                    {% if session.get('username') and session.get('role') in ['admin', 'leader'] %}
+                    <li class="nav-item dropdown me-3">
+                        <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">관리</a>
+                        <ul class="dropdown-menu border-0 shadow">
+                            <li><a class="dropdown-item" href="/admin">누구의꿈(관리)</a></li>
+                            <li><a class="dropdown-item" href="/admin/news">📰 뉴스관리</a></li>
+                            <li><a class="dropdown-item" href="/admin/share-reports">📍 공유관리</a></li>
+                        </ul>
+                    </li>
+                    {% endif %}
+                    
+                    {% if session.get('username') %}
+                        <!-- 사용자명 클릭시 프로필 페이지로 -->
+                        <li class="nav-item me-3">
+                            <a href="/user/{{ session.get('user_id') }}" class="badge bg-light text-dark p-2 me-2 text-decoration-none" title="내 프로필">💎 {{ session.get('username') }}님</a>
+                        </li>
+                        <li class="nav-item me-3">
+                            <a class="btn btn-warning btn-sm" href="/share-report" title="공유하기">📸 공유하기</a>
+                        </li>
+                    {% else %}
+                        <li class="nav-item"><a class="btn btn-success text-white" href="/login?next={{ request.path }}">시작하기</a></li>
+                        <li class="nav-item"><a class="btn btn-outline-primary btn-sm" href="/share" title="공유하기">📤 공유하기</a></li>
+                    {% endif %}
+                    <li class="nav-item ms-2">
+                        <a class="nav-link p-2 d-flex align-items-center justify-content-center" href="/share/map" title="지도로 보기" data-bs-toggle="tooltip" data-bs-placement="bottom">
+                            <span class="fs-4">🗺️</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 2. 본문 영역 -->
+    <div class="container pb-5">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- ------------------------------------------------------------- -->
+    <!-- 🎯 [해결 완료]: 팝업창(Modal) 코드를 네비게이션바 외부 최하단으로 격리 배치 -->
+    <!-- ------------------------------------------------------------- -->
+    <div class="modal fade" id="loginRequiredModal" tabindex="-1" aria-labelledby="loginRequiredModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 p-4 shadow-lg" style="border-radius: 25px; background: white;">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold text-success" id="loginRequiredModalLabel">🌳 양평 이웃 가입 안내</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" style="box-shadow: none;"></button>
+                </div>
+                <div class="modal-body py-4 text-center">
+                    <div class="fs-1 mb-3">🏡</div>
+                    <h5 class="fw-bold mb-2">이웃 주민 가입이 필요한 공간입니다.</h5>
+                    <p class="text-muted small mb-0">
+                        우리 공동체에 제안을 등록하고 자치 활동에 참여하시려면<br>
+                        따뜻한 이웃 주민 가입이 필요합니다.
+                    </p>
+                </div>
+                <div class="modal-footer border-0 d-flex gap-2">
+                    <button type="button" class="btn btn-light w-50 p-3 fw-bold" data-bs-dismiss="modal" style="border-radius: 12px;">취소</button>
+                    <a href="/register" class="btn btn-success w-50 p-3 fw-bold text-white" style="border-radius: 12px; background-color: var(--yp-green);">이웃 가입하기</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        [...document.querySelectorAll('[data-bs-toggle="tooltip"]')].forEach(el => new bootstrap.Tooltip(el));
+    });
+    function showLoginRequiredModal(event) {
+        event.preventDefault(); // 기본 링크 이동 방지
+        var myModal = new bootstrap.Modal(document.getElementById('loginRequiredModal'));
+        myModal.show();
+    }
+    </script>
+</body>
+</html>

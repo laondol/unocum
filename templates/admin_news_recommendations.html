@@ -1,0 +1,56 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container mt-4">
+    <h3 class="fw-bold mb-4">📎 추천링크 승인 관리</h3>
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr class="text-center small">
+                        <th style="width:5%;">ID</th>
+                        <th style="width:25%;">추천링크</th>
+                        <th style="width:15%;">관련 뉴스</th>
+                        <th style="width:10%;">추천인</th>
+                        <th style="width:15%;">설명</th>
+                        <th style="width:15%;">신청일</th>
+                        <th style="width:15%;">처리</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in recs.items %}
+                    <tr class="text-center">
+                        <td class="text-muted">{{ r.id }}</td>
+                        <td class="text-start ps-3">
+                            <div class="fw-bold text-dark"><a href="{{ r.url }}" target="_blank">{{ r.title[:40] }}{% if r.title|length > 40 %}...{% endif %}</a></div>
+                        </td>
+                        <td>
+                            <a href="/news/{{ r.news_id }}" class="text-decoration-none small">{{ r.news.title[:30] }}{% if r.news.title|length > 30 %}...{% endif %}</a>
+                        </td>
+                        <td>{{ r.author_name }}</td>
+                        <td class="text-start ps-2 small text-muted">{{ r.description[:50] }}{% if r.description|length > 50 %}...{% endif %}</td>
+                        <td class="small text-muted">{{ r.created_at.strftime('%m/%d %H:%M') }}</td>
+                        <td>
+                            <a href="/admin/news/recommendation/approve/{{ r.id }}" class="btn btn-sm btn-success me-1">승인</a>
+                            <a href="/admin/news/recommendation/reject/{{ r.id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('삭제하시겠습니까?')">반려</a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" class="text-center py-5 text-muted">대기 중인 추천링크가 없습니다.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% if recs.pages > 1 %}
+    <nav class="mt-3">
+        <ul class="pagination justify-content-center">
+            {% for p in range(1, recs.pages + 1) %}
+            <li class="page-item {{ 'active' if p == recs.page }}">
+                <a class="page-link" href="/admin/news/recommendations?page={{ p }}">{{ p }}</a>
+            </li>
+            {% endfor %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

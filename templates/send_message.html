@@ -1,0 +1,24 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container mt-4" style="max-width: 600px;">
+    <a href="/user/{{ receiver.id }}" class="btn btn-sm btn-outline-secondary mb-3">← 돌아가기</a>
+    <h3 class="fw-bold mb-4">📝 쪽지 보내기</h3>
+    <div class="card border-0 shadow-sm p-4" style="border-radius: 18px;">
+        <div class="mb-3">
+            <label class="form-label small fw-bold">받는 분</label>
+            <input type="text" class="form-control bg-light" value="{{ receiver.real_name }} ({{ receiver.username }})" readonly>
+        </div>
+        <form method="POST">
+            <div class="mb-3">
+                <label class="form-label fw-bold">제목</label>
+                <input type="text" name="subject" class="form-control" required placeholder="제목을 입력하세요">
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-bold">내용</label>
+                <textarea name="content" class="form-control" rows="6" required placeholder="내용을 입력하세요"></textarea>
+            </div>
+            <button type="submit" class="btn btn-success w-100 py-2 fw-bold" style="border-radius:12px;">보내기</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

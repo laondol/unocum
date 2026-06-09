@@ -1,0 +1,58 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card p-4 shadow-sm mb-4">
+            <div class="d-flex justify-content-between">
+                <span class="badge bg-success-subtle text-success mb-2">{{ post.category }}</span>
+                <span class="text-muted small">{{ post.created_at.strftime('%Y-%m-%d') }}</span>
+            </div>
+            <h2 class="fw-bold mb-4">{{ post.title }}</h2>
+            
+            <!-- AI 요약 박스 -->
+            <div class="p-3 bg-light rounded-3 mb-4 border-start border-5 border-success">
+                <strong>🤖 AI 3줄 핵심요약:</strong><br>
+                {{ post.ai_summary }}
+            </div>
+
+            <p class="fs-5" style="white-space: pre-wrap;">{{ post.content }}</p>
+
+            {% if post.file_path %}
+            <div class="mt-4 p-3 border rounded text-center">
+                <h6 class="text-start fw-bold mb-3">첨부 자료</h6>
+                {% if post.file_path|lower|endswith('.png') or post.file_path|lower|endswith('.jpg') or post.file_path|lower|endswith('.jpeg') or post.file_path|lower|endswith('.gif') or 'draw_' in post.file_path %}
+                <img src="{{ post.file_path }}" class="img-fluid rounded" style="max-height: 400px;">
+                {% elif post.file_path|lower|endswith('.pdf') %}
+                <div class="text-center p-3">
+                    <a href="{{ post.file_path }}" target="_blank" class="btn btn-outline-primary">📄 PDF 열기</a>
+                </div>
+                {% else %}
+                <a href="{{ post.file_path }}" target="_blank" class="btn btn-outline-secondary">📎 파일 다운로드</a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- 댓글 섹션 (생략 가능, 이전 코드 유지) -->
+    </div>
+
+    <!-- 사이드바 -->
+    <div class="col-lg-4">
+        <div class="card p-4 shadow-sm sticky-top" style="top: 100px;">
+            <h5 class="fw-bold mb-3">현재 진행 단계</h5>
+            <div class="mb-4">
+                <div class="progress mb-2" style="height: 20px;">
+                    {% set status_pct = {'제안': 25, '하고싶은': 50, '하고있는': 75, '했던거': 100} %}
+                    <div class="progress-bar bg-success progress-bar-striped" style="width: {{ status_pct[post.status] }}%">{{ post.status }}</div>
+                </div>
+                <small class="text-muted">이웃 100명의 호응 시 '하고싶은' 단계로 이동</small>
+            </div>
+            <div class="text-center p-3 bg-light rounded-4">
+                <div class="h1 fw-bold text-success">{{ post.total_score }}점</div>
+                <div class="small text-muted">공동체 신뢰 지수</div>
+            </div>
+            <button class="btn btn-success w-100 mt-4 py-3 fw-bold">🤝 이 제안에 동의합니다</button>
+        </div>
+    </div>
+</div>
+{% endblock %}

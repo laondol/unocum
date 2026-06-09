@@ -1,0 +1,72 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container mt-4" style="max-width: 700px;">
+    <a href="/admin/users" class="btn btn-sm btn-outline-secondary mb-3">← 회원관리로</a>
+    <h3 class="fw-bold mb-2">💎 포인트 관리</h3>
+    <div class="card border-0 shadow-sm mb-4 p-4" style="border-radius: 18px;">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h5 class="fw-bold mb-1">{{ user.real_name }} ({{ user.username }})</h5>
+                <small class="text-muted">{{ user.town }} {{ user.village }} · {{ '유료' if user.is_paid else '무료' }}</small>
+            </div>
+            <div class="fs-2 fw-bold text-success">{{ user.points }}</div>
+        </div>
+    </div>
+    <div class="card border-0 shadow-sm mb-4" style="border-radius: 18px;">
+        <div class="card-body p-4">
+            <h5 class="fw-bold mb-3">🔧 포인트 조정</h5>
+            <form method="POST">
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <input type="number" name="amount" class="form-control" placeholder="금액 (양수/음수)" required>
+                    </div>
+                    <div class="col-md-4">
+                        <select name="change_type" class="form-select">
+                            <option value="admin_adjust">관리자조정</option>
+                            <option value="monthly">월급</option>
+                            <option value="post">제안보상</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <button type="submit" class="btn btn-success w-100">적용</button>
+                    </div>
+                </div>
+                <input type="text" name="description" class="form-control mt-2" placeholder="조정 사유 (선택)">
+            </form>
+        </div>
+    </div>
+    <div class="card border-0 shadow-sm" style="border-radius: 18px;">
+        <div class="card-body p-4">
+            <h5 class="fw-bold mb-3">📋 변동 내역</h5>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle small">
+                    <thead class="table-light">
+                        <tr>
+                            <th>일시</th>
+                            <th>유형</th>
+                            <th>변동</th>
+                            <th>잔액</th>
+                            <th>설명</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for h in history %}
+                        <tr>
+                            <td class="text-muted">{{ h.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>{{ h.change_type }}</td>
+                            <td class="fw-bold {{ 'text-success' if h.amount > 0 else 'text-danger' }}">
+                                {{ '+' if h.amount > 0 }}{{ h.amount }}
+                            </td>
+                            <td>{{ h.balance_after }}</td>
+                            <td>{{ h.description }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" class="text-center text-muted py-4">내역 없음</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
