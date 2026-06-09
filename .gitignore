@@ -22,6 +22,12 @@ static/uploads/
 # project tree dump
 yp_project_tree.txt
 
+# backup / stray files
+*_회원분기전
+templates/project_ramp.html
+templates/legal_clinic.html
+templates/psychology_clinic.html
+
 # editor / OS
 .vscode/
 .DS_Store
