@@ -11,16 +11,18 @@
 
             <!-- 1. 카카오/네이버 간편로그인 (메인 강조) -->
             <div class="d-flex flex-column gap-2 mb-4">
-                <button type="button" class="btn w-100 fw-bold d-flex align-items-center justify-content-center p-3" 
-                        style="background-color: #FEE500; color: #191919; border: none; border-radius: 12px; font-size: 0.95rem;"
-                        onclick="alert('카카오 로그인 API와 연동 테스트 중입니다.')">
+                <a href="/oauth/login/google" class="btn w-100 fw-bold d-flex align-items-center justify-content-center p-3" 
+                        style="background-color: #ffffff; color: #333; border: 1px solid #ddd; border-radius: 12px; font-size: 0.95rem; text-decoration: none;">
+                    <span class="me-2">🔴</span> Google로 시작하기
+                </a>
+                <a href="/oauth/login/kakao" class="btn w-100 fw-bold d-flex align-items-center justify-content-center p-3" 
+                        style="background-color: #FEE500; color: #191919; border: none; border-radius: 12px; font-size: 0.95rem; text-decoration: none;">
                     <span class="me-2">💬</span> 카카오로 시작하기
-                </button>
-                <button type="button" class="btn w-100 fw-bold text-white d-flex align-items-center justify-content-center p-3" 
-                        style="background-color: #03C75A; border: none; border-radius: 12px; font-size: 0.95rem;"
-                        onclick="alert('네이버 로그인 API와 연동 테스트 중입니다.')">
+                </a>
+                <a href="/oauth/login/naver" class="btn w-100 fw-bold text-white d-flex align-items-center justify-content-center p-3" 
+                        style="background-color: #03C75A; border: none; border-radius: 12px; font-size: 0.95rem; text-decoration: none;">
                     <span class="me-2">N</span> 네이버로 시작하기
-                </button>
+                </a>
             </div>
 
             <div class="d-flex align-items-center my-3 text-muted">

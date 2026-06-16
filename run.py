@@ -25,6 +25,10 @@ def create_app():
     # DB 초기화 (순환 참조 원천 해결)
     db.init_app(app)
     
+    # OAuth2 초기화 (Google/Kakao/Naver)
+    from services.oauth import init_oauth
+    init_oauth(app)
+    
     # 웹 경로 등록
     register_routes(app)
     
@@ -224,6 +228,15 @@ def create_app():
                 if 'login_longitude' not in user_cols:
                     conn.execute(db.text('ALTER TABLE user ADD COLUMN login_longitude FLOAT'))
                     print('[OK] user.login_longitude column added')
+                if 'social_id' not in user_cols:
+                    conn.execute(db.text('ALTER TABLE user ADD COLUMN social_id VARCHAR(200)'))
+                    print('[OK] user.social_id column added')
+                if 'social_provider' not in user_cols:
+                    conn.execute(db.text('ALTER TABLE user ADD COLUMN social_provider VARCHAR(20)'))
+                    print('[OK] user.social_provider column added')
+                if 'social_email' not in user_cols:
+                    conn.execute(db.text('ALTER TABLE user ADD COLUMN social_email VARCHAR(100)'))
+                    print('[OK] user.social_email column added')
             
             # ShareComment 테이블 생성
             try:

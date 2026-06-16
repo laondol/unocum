@@ -30,3 +30,25 @@ class Config:
     SMTP_USERNAME = os.getenv('SMTP_USERNAME', '')
     SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', '')
     MAIL_FROM = os.getenv('MAIL_FROM', 'yp@unocum.kr')
+
+    # OAuth2
+    GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '')
+    GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET', '')
+    KAKAO_REST_API_KEY = os.getenv('KAKAO_REST_API_KEY', '')
+    KAKAO_JAVASCRIPT_KEY = os.getenv('KAKAO_JAVASCRIPT_KEY', '')
+    NAVER_CLIENT_ID = os.getenv('NAVER_CLIENT_ID', '')
+    NAVER_CLIENT_SECRET = os.getenv('NAVER_CLIENT_SECRET', '')
+
+    GOOGLE_OAUTH = {
+        'client_id': GOOGLE_CLIENT_ID,
+        'client_secret': GOOGLE_CLIENT_SECRET,
+    } if GOOGLE_CLIENT_ID else None
+
+    KAKAO_OAUTH = {
+        'client_id': KAKAO_REST_API_KEY,
+    } if KAKAO_REST_API_KEY else None
+
+    NAVER_OAUTH = {
+        'client_id': NAVER_CLIENT_ID,
+        'client_secret': NAVER_CLIENT_SECRET,
+    } if NAVER_CLIENT_ID else None

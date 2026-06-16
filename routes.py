@@ -6,6 +6,7 @@ from sqlalchemy import or_
 import json, base64, os, threading, requests
 
 from models import db, User, Post, Comment, NewsArticle, NewsComment, NewsRecommendation, PointHistory, ShareReport, Message, ShareComment, ConstructionNotice, LegalPost, LegalAppointment, LawyerSchedule, GoogleCalendarConfig, PsychoPost, PsychoAppointment, PsychoDoctorSchedule, PsychoGoogleCalendarConfig, RampApplication, Friend, FriendGroup, PostVote
+from services.oauth import oauth
 from services.security import save_village_file
 from services.ai_service import call_ai_judge, call_ai_debate, background_ai_judge, moderate_image, background_process_share
 from services.email_service import EmailService
@@ -205,6 +206,106 @@ def register_routes(app):
                 db.session.commit()
         session.clear()
         return redirect(url_for('intro'))
+
+    # --- [OAuth2 소셜 로그인] Google / Kakao / Naver ---
+    @app.route('/oauth/login/<provider>')
+    def oauth_login(provider):
+        if provider not in ('google', 'kakao', 'naver'):
+            return "<script>alert('지원하지 않는 로그인 방식입니다.'); history.back();</script>"
+        redirect_uri = url_for('oauth_callback', provider=provider, _external=True)
+        return oauth.create_client(provider).authorize_redirect(redirect_uri)
+
+    @app.route('/oauth/callback/<provider>')
+    def oauth_callback(provider):
+        if provider not in ('google', 'kakao', 'naver'):
+            return "<script>alert('지원하지 않는 로그인 방식입니다.'); history.back();</script>"
+        try:
+            token = oauth.create_client(provider).authorize_access_token()
+        except Exception as e:
+            return f"<script>alert('OAuth 인증 실패: {str(e)}'); history.back();</script>"
+        userinfo = oauth.create_client(provider).userinfo(token=token)
+        if not userinfo:
+            return "<script>alert('사용자 정보를 가져올 수 없습니다.'); history.back();</script>"
+
+        if provider == 'google':
+            social_id = userinfo.get('sub')
+            email = userinfo.get('email', '')
+            name = userinfo.get('name', email.split('@')[0] if email else 'google_user')
+        elif provider == 'kakao':
+            kakao_account = userinfo.get('kakao_account', {})
+            social_id = str(userinfo.get('id'))
+            email = kakao_account.get('email', '')
+            profile = kakao_account.get('profile', {})
+            name = profile.get('nickname', email.split('@')[0] if email else 'kakao_user')
+        elif provider == 'naver':
+            response = userinfo.get('response', {})
+            social_id = response.get('id')
+            email = response.get('email', '')
+            name = response.get('name', response.get('nickname', email.split('@')[0] if email else 'naver_user'))
+        else:
+            social_id = None
+
+        if not social_id:
+            return "<script>alert('고유 식별자를 받지 못했습니다.'); history.back();</script>"
+
+        uid = provider + '_' + str(social_id)
+        user = User.query.filter_by(social_id=uid).first()
+
+        if not user:
+            existing_email_user = None
+            if email:
+                existing_email_user = User.query.filter_by(email=email).first()
+            if existing_email_user:
+                existing_email_user.social_id = uid
+                existing_email_user.social_provider = provider
+                existing_email_user.social_email = email
+                db.session.commit()
+                user = existing_email_user
+            else:
+                base_username = name.replace(' ', '_')[:30]
+                username = base_username
+                counter = 1
+                while User.query.filter_by(username=username).first():
+                    username = f"{base_username}{counter}"
+                    counter += 1
+                hashed_pw = generate_password_hash(os.urandom(16).hex())
+                now = datetime.now()
+                user = User(
+                    username=username,
+                    password=hashed_pw,
+                    real_name=name,
+                    email=email,
+                    social_id=uid,
+                    social_provider=provider,
+                    social_email=email,
+                    town='양평읍',
+                    village='양근리',
+                    reg_town='양평읍', reg_village='양근리',
+                    curr_town='양평읍', curr_village='양근리',
+                    location_updated_at=now,
+                    points=1000
+                )
+                db.session.add(user)
+                db.session.flush()
+                user.last_payout = now
+                ph = PointHistory(user_id=user.id, change_type='signup', amount=1000,
+                                 balance_after=1000, description='SNS 회원가입 지급')
+                db.session.add(ph)
+                db.session.commit()
+
+        session.update({'user_id': user.id, 'username': user.username, 'role': user.role})
+        now = datetime.now()
+        user.last_login = now
+        if user.last_payout and (now - user.last_payout).days >= 30:
+            add_points(user.id, 1000, 'monthly', '30일 주기 물맑은머니 지급')
+            user.last_payout = now
+        elif not user.last_payout:
+            user.last_payout = now
+        db.session.commit()
+        next_url = request.args.get('next') or url_for('index')
+        if not next_url.startswith('/'):
+            next_url = url_for('index')
+        return redirect(next_url)
 
     # --- [초고속 제안 제출] 0.1초 즉시 등록 및 백그라운드 AI 스레드 작동 ---
     @app.route('/submit', methods=['POST'])

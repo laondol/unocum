@@ -44,6 +44,11 @@ class User(db.Model):
     login_location_share = db.Column(db.Boolean, default=False) # 벗에게 로그인 위치 공유 동의
     location_share = db.Column(db.Boolean, default=False) # 위치 공유 동의
 
+    # SNS 연동 로그인
+    social_id = db.Column(db.String(200), unique=True, nullable=True)
+    social_provider = db.Column(db.String(20), nullable=True)  # google, kakao, naver
+    social_email = db.Column(db.String(100), nullable=True)
+
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
