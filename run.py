@@ -512,7 +512,10 @@ def create_app():
                     print('[OK] post_vote table created')
 
     if DB_MODE != 'postgresql':
-        migrate_news_article()
+        try:
+            migrate_news_article()
+        except Exception as e:
+            print(f'[SKIP] news_article migration: {e}')
 
     # Friend 요청 메시지 ↔ Friend 레코드 불일치 보정
     try:
