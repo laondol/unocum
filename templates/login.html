@@ -30,8 +30,10 @@
             </div>
 
             <!-- 2. 일반 아이디 로그인 (보조) -->
-            <form action="/login" method="post">
+            <form id="loginForm" action="/login" method="post">
                 <input type="hidden" name="next" value="{{ next }}">
+                <input type="hidden" name="lat" id="loginLat" value="">
+                <input type="hidden" name="lon" id="loginLon" value="">
                 <div class="mb-3">
                     <input type="text" name="username" class="form-control p-3 border-0 bg-light" placeholder="아이디" style="border-radius: 12px;" required>
                 </div>
@@ -40,10 +42,27 @@
                 </div>
                 <button class="btn btn-success w-100 p-3 fw-bold mb-3" style="border-radius: 12px;">로그인</button>
             </form>
+            <script>
+            document.getElementById('loginForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const form = this;
+                function doSubmit() { form.submit(); }
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(pos => {
+                        document.getElementById('loginLat').value = pos.coords.latitude;
+                        document.getElementById('loginLon').value = pos.coords.longitude;
+                        doSubmit();
+                    }, doSubmit, {enableHighAccuracy: false, timeout: 3000});
+                } else { doSubmit(); }
+            });
+            </script>
 
             <div class="text-center mt-2">
                 <span class="text-muted small">아직 회원이 아니신가요? </span>
                 <a href="/register" class="text-success fw-bold small text-decoration-none ms-1">이웃 가입하기</a>
+            </div>
+            <div class="text-center mt-2">
+                <a href="/terms" class="text-muted small text-decoration-none">📋 회원약관 및 닢 규칙</a>
             </div>
         </div>
     </div>

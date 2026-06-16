@@ -32,23 +32,34 @@
                 <thead class="table-light">
                     <tr>
                         <th style="width:5%;">ID</th>
-                        <th style="width:20%;">제목/내용</th>
-                        <th style="width:8%;">공유자</th>
-                        <th style="width:10%;">위치</th>
-                        <th style="width:8%;">사진</th>
-                        <th style="width:8%;">그림</th>
+                        <th style="width:10%;">미리보기</th>
+                        <th style="width:17%;">제목/내용</th>
+                        <th style="width:7%;">공유자</th>
+                        <th style="width:8%;">위치</th>
                         <th style="width:10%;">AI분류</th>
-                        <th style="width:8%;">신뢰도</th>
-                        <th style="width:8%;">위험</th>
-                        <th style="width:10%;">상태</th>
-                        <th style="width:11%;">일시</th>
-                        <th style="width:8%;">처리</th>
+                        <th style="width:6%;">방역</th>
+                        <th style="width:8%;">상태</th>
+                        <th style="width:8%;">일시</th>
+                        <th style="width:21%;">처리</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for r in reports %}
                     <tr {% if r.ai_danger_alert %}class="table-danger"{% endif %}>
                         <td class="text-muted">{{ r.id }}</td>
+                        <td>
+                            <div style="width:80px;height:80px;overflow:hidden;border-radius:8px;cursor:pointer;" onclick="previewImage(this)">
+                                {% if r.image_path %}
+                                <img src="{{ r.image_path }}" style="width:100%;height:100%;object-fit:cover;" alt="사진" title="클릭하여 크게 보기">
+                                {% elif r.drawing_path %}
+                                <img src="{{ r.drawing_path }}" style="width:100%;height:100%;object-fit:cover;" alt="그림" title="클릭하여 크게 보기">
+                                {% elif r.video_path %}
+                                <div class="bg-dark d-flex align-items-center justify-content-center text-white" style="width:100%;height:100%;font-size:24px;">🎬</div>
+                                {% else %}
+                                <div class="bg-light d-flex align-items-center justify-content-center text-muted" style="width:100%;height:100%;">-</div>
+                                {% endif %}
+                            </div>
+                        </td>
                         <td class="text-start ps-2">
                             <div class="fw-bold">{{ r.title or '제목 없음' }}</div>
                             {% if r.description %}
@@ -63,22 +74,12 @@
                         </td>
                         <td>{{ r.author_name }}</td>
                         <td>
-                            {% if r.latitude and r.longitude %}
-                            <a href="https://maps.google.com/?q={{ r.latitude }},{{ r.longitude }}" target="_blank" class="text-decoration-none small">
-                                📍 {{ r.latitude|round(4) }}, {{ r.longitude|round(4) }}
-                            </a>
-                            {% else %}
-                            <span class="text-muted">-</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if r.image_path %}
-                            <a href="{{ r.image_path }}" target="_blank" class="btn btn-sm btn-outline-primary">👁️</a>
-                            {% else %}<span class="text-muted">-</span>{% endif %}
-                        </td>
-                        <td>
-                            {% if r.drawing_path %}
-                            <a href="{{ r.drawing_path }}" target="_blank" class="btn btn-sm btn-outline-secondary">✏️</a>
+                            {% if r.town and r.village %}
+                            <span class="small">양평군 {{ r.town }} {{ r.village }}</span>
+                            <a href="https://maps.google.com/?q={{ r.latitude }},{{ r.longitude }}" target="_blank" class="text-decoration-none small d-block text-muted">📍 지도보기</a>
+                            {% elif r.latitude and r.longitude %}
+                            <span class="small text-danger">관외</span>
+                            <span class="small text-muted d-block">({{ r.latitude|round(4) }}, {{ r.longitude|round(4) }})</span>
                             {% else %}<span class="text-muted">-</span>{% endif %}
                         </td>
                         <td>
@@ -87,20 +88,23 @@
                             {% else %}<span class="text-muted">-</span>{% endif %}
                         </td>
                         <td>
-                            {% if r.ai_confidence %}
-                            <span class="text-muted small">{{ (r.ai_confidence * 100)|round(0) }}%</span>
-                            {% else %}<span class="text-muted">-</span>{% endif %}
-                        </td>
-                        <td>
-                            {% if r.ai_danger_alert %}
-                            <span class="badge bg-danger">🚨 위험</span>
-                            {% else %}<span class="text-muted">-</span>{% endif %}
+                            {% if r.is_moderated and r.moderation_result == 'flagged' %}
+                            <span class="badge bg-danger">🚫</span>
+                            {% elif r.is_moderated and r.moderation_result == 'clean' %}
+                            <span class="badge bg-success">✅</span>
+                            {% elif r.is_moderated and r.moderation_result == 'pending' %}
+                            <span class="badge bg-warning text-dark">⏳</span>
+                            {% else %}
+                            <span class="badge bg-secondary">분석중</span>
+                            {% endif %}
                         </td>
                         <td>
                             {% if r.status == 'approved' %}
                             <span class="badge bg-success">승인</span>
                             {% elif r.status == 'rejected' %}
                             <span class="badge bg-danger">반려</span>
+                            {% elif r.status == 'flagged' %}
+                            <span class="badge bg-danger">차단</span>
                             {% else %}
                             <span class="badge bg-warning text-dark">대기</span>
                             {% endif %}
@@ -109,11 +113,16 @@
                         <td>
                             {% if r.status == 'pending' %}
                             <a href="/share-report/toggle/{{ r.id }}/approve" class="btn btn-sm btn-success me-1">승인</a>
-                            <a href="/share-report/toggle/{{ r.id }}/reject" class="btn btn-sm btn-outline-danger" onclick="return confirm('반려하시겠습니까?')">반려</a>
-                            {% else %}
-                            <a href="/share-report/toggle/{{ r.id }}/approve" class="btn btn-sm btn-outline-success me-1">승인</a>
-                            <a href="/share-report/toggle/{{ r.id }}/reject" class="btn btn-sm btn-outline-danger" onclick="return confirm('반려하시겠습니까?')">반려</a>
+                            <a href="/share-report/toggle/{{ r.id }}/reject" class="btn btn-sm btn-outline-danger me-1" onclick="return confirm('반려하시겠습니까?')">반려</a>
+                            {% elif r.status == 'approved' %}
+                            <a href="/share-report/toggle/{{ r.id }}/reject" class="btn btn-sm btn-outline-danger me-1" onclick="return confirm('반려하시겠습니까?')">반려</a>
+                            {% elif r.status == 'flagged' %}
+                            <a href="/share-report/toggle/{{ r.id }}/approve" class="btn btn-sm btn-success me-1">승인</a>
+                            {% elif r.status == 'rejected' %}
+                            <a href="/share-report/toggle/{{ r.id }}/approve" class="btn btn-sm btn-success me-1">승인</a>
                             {% endif %}
+                            <a href="/share/detail/{{ r.id }}" class="btn btn-sm btn-outline-primary me-1">보기</a>
+                            <button onclick="adminDeleteShare({{ r.id }})" class="btn btn-sm btn-outline-danger">삭제</button>
                         </td>
                     </tr>
                     {% endfor %}
@@ -122,4 +131,37 @@
         </div>
     </div>
 </div>
+
+<!-- 이미지 미리보기 모달 -->
+<div class="modal fade" id="imagePreviewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content bg-transparent border-0">
+            <div class="modal-body p-0 text-center">
+                <img id="previewImageTag" src="" class="img-fluid rounded shadow" style="max-height:80vh;">
+            </div>
+            <div class="text-center mt-2">
+                <button type="button" class="btn btn-sm btn-light" data-bs-dismiss="modal">닫기</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function previewImage(el) {
+    var img = el.querySelector('img');
+    if (!img) return;
+    var modal = new bootstrap.Modal(document.getElementById('imagePreviewModal'));
+    document.getElementById('previewImageTag').src = img.src;
+    modal.show();
+}
+
+function adminDeleteShare(id) {
+    if (!confirm('정말 삭제하시겠습니까? 복구할 수 없습니다.')) return;
+    fetch('/share-report/delete/' + id, {method:'POST'})
+    .then(r=>r.json()).then(d=>{
+        if(d.status==='success') { alert(d.msg); location.reload(); }
+        else alert(d.msg || '오류');
+    }).catch(e=>alert('오류: '+e));
+}
+</script>
 {% endblock %}

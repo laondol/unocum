@@ -18,6 +18,11 @@
             {% if report.drawing_path %}
             <img src="{{ report.drawing_path }}" class="img-fluid rounded mb-3" style="max-height: 400px;" alt="공유 그림">
             {% endif %}
+            {% if report.video_path and (report.video_path.endswith('.mp4') or report.video_path.endswith('.webm') or report.video_path.endswith('.mov')) %}
+            <video controls class="w-100 rounded mb-3" style="max-height:400px;">
+                <source src="{{ report.video_path }}" type="video/mp4">
+            </video>
+            {% endif %}
             
             {% if report.ai_summary %}
             <div class="p-3 bg-light rounded mb-3 border-start border-5 border-info">
@@ -41,9 +46,7 @@
                 {% if links %}
                 <div class="mt-2">
                     {% for link in links %}
-                    <a href="{{ link.url }}" target="_blank" class="text-decoration-none small text-primary d-block mb-1">
-                        📄 {{ link.title }}
-                    </a>
+                    <a href="{{ link.url }}" target="_blank" class="text-decoration-none small text-primary d-block mb-1">📄 {{ link.title }}</a>
                     {% endfor %}
                 </div>
                 {% endif %}
@@ -63,7 +66,7 @@
                 <span>{{ report.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
             </div>
             <div class="d-flex justify-content-between small text-muted">
-                <span>위치: {{ report.latitude|round(6) }}, {{ report.longitude|round(6) }}</span>
+                <span>위치: {{ report.address or (report.latitude|round(6) ~ ', ' ~ report.longitude|round(6)) }}</span>
                 {% if report.ai_confidence %}
                 <span>AI 신뢰도: {{ (report.ai_confidence * 100)|round(0) }}%</span>
                 {% endif %}
@@ -77,27 +80,129 @@
         <div id="map" style="height: 300px;"></div>
     </div>
     <div class="text-center mb-4">
-        <a href="https://www.google.com/maps/dir/?api=1&destination={{ report.latitude }},{{ report.longitude }}" target="_blank" class="btn btn-outline-primary">
-            🗺️ 길찾기
-        </a>
-        <a href="https://maps.google.com/?q={{ report.latitude }},{{ report.longitude }}" target="_blank" class="btn btn-outline-secondary">
-            📍 구글맵
-        </a>
+        <a href="https://www.google.com/maps/dir/?api=1&destination={{ report.latitude }},{{ report.longitude }}" target="_blank" class="btn btn-outline-primary">🗺️ 길찾기</a>
+        <a href="https://maps.google.com/?q={{ report.latitude }},{{ report.longitude }}" target="_blank" class="btn btn-outline-secondary">📍 구글맵</a>
     </div>
     {% endif %}
+
+    <!-- 좋아요/나빠요 -->
+    <div class="d-flex gap-2 justify-content-center mb-4">
+        <button onclick="voteShare({{ report.id }}, 'like')" class="btn btn-outline-success btn-lg px-4">👍 좋아요 {{ report.like_count }}</button>
+        <button onclick="voteShare({{ report.id }}, 'dislike')" class="btn btn-outline-danger btn-lg px-4">👎 나빠요 {{ report.dislike_count }}</button>
+    </div>
+    
+    <!-- 댓글 섹션 -->
+    <div class="card border-0 shadow-sm mb-4" style="border-radius: 18px;">
+        <div class="card-body p-4">
+            <h5 class="fw-bold mb-3">💬 댓글 ({{ comments|length }})</h5>
+            
+            {% if session.get('username') %}
+            <form id="commentForm" class="mb-4">
+                <input type="hidden" name="parent_id" id="parent_id" value="">
+                <div class="mb-2 d-flex gap-2 align-items-center">
+                    <textarea name="content" id="commentContent" class="form-control" rows="2" placeholder="댓글을 입력하세요..." required></textarea>
+                    <button type="submit" class="btn btn-primary px-3" style="white-space:nowrap;">등록</button>
+                </div>
+            </form>
+            {% else %}
+            <div class="alert alert-light text-center small mb-4">
+                <a href="/login?next=/share/detail/{{ report.id }}" class="text-decoration-none">로그인</a> 후 댓글을 작성할 수 있습니다.
+            </div>
+            {% endif %}
+            
+            <div id="replyTo" class="small text-muted mb-2" style="display:none;">
+                답글 작성 중... <button type="button" class="btn btn-sm btn-link" onclick="cancelReply()">취소</button>
+            </div>
+            
+            <div id="commentsSection">
+                {% for c in comments %}
+                <div class="mb-3 p-3 bg-light rounded">
+                    <div class="d-flex justify-content-between">
+                        <strong class="small">{{ c.author }}</strong>
+                        <div>
+                            <small class="text-muted">{{ c.created_at.strftime('%m/%d %H:%M') }}</small>
+                            {% if session.get('user_id') == c.user_id or session.get('role') in ('admin','leader') %}
+                            <button onclick="deleteComment({{ c.id }})" class="btn btn-sm btn-link text-danger p-0 ms-2">삭제</button>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <p class="mb-1 mt-1">{{ c.content }}</p>
+                    {% if session.get('username') %}
+                    <button onclick="replyTo({{ c.id }}, '{{ c.author }}')" class="btn btn-sm btn-link p-0 text-primary">답글</button>
+                    {% endif %}
+                    
+                    {% if c.replies %}
+                    <div class="mt-2 ps-3 border-start border-3">
+                        {% for r in c.replies %}
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between">
+                                <strong class="small">↳ {{ r.author }}</strong>
+                                <div>
+                                    <small class="text-muted">{{ r.created_at.strftime('%m/%d %H:%M') }}</small>
+                                    {% if session.get('user_id') == r.user_id or session.get('role') in ('admin','leader') %}
+                                    <button onclick="deleteComment({{ r.id }})" class="btn btn-sm btn-link text-danger p-0 ms-2">삭제</button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <p class="mb-0 mt-1">{{ r.content }}</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     {% if report.latitude and report.longitude %}
     var map = L.map('map').setView([{{ report.latitude }}, {{ report.longitude }}], 15);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '© OpenStreetMap'
-    }).addTo(map);
-    L.marker([{{ report.latitude }}, {{ report.longitude }}]).addTo(map)
-        .bindPopup('{{ report.title or "공유 위치" }}');
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19, attribution: '© OpenStreetMap'}).addTo(map);
+    L.marker([{{ report.latitude }}, {{ report.longitude }}]).addTo(map).bindPopup('{{ report.title or "공유 위치" }}');
     {% endif %}
 });
+
+function voteShare(id, type) {
+    if (!confirm(type === 'like' ? '좋아요 하시겠습니까?' : '나빠요 하시겠습니까?')) return;
+    fetch('/share-report/' + type + '/' + id, {method:'POST'})
+    .then(r=>r.json()).then(d=>{ if(d.status==='success') location.reload(); else alert(d.msg||'오류'); })
+    .catch(e=>alert('오류: '+e));
+}
+
+function replyTo(parentId, author) {
+    document.getElementById('parent_id').value = parentId;
+    document.getElementById('replyTo').style.display = 'block';
+    document.getElementById('replyTo').innerHTML = '💬 ' + author + '님에게 답글 작성 중... <button type="button" class="btn btn-sm btn-link" onclick="cancelReply()">취소</button>';
+    document.getElementById('commentContent').focus();
+}
+
+function cancelReply() {
+    document.getElementById('parent_id').value = '';
+    document.getElementById('replyTo').style.display = 'none';
+    document.getElementById('commentContent').value = '';
+}
+
+document.getElementById('commentForm')?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const content = document.getElementById('commentContent').value.trim();
+    if (!content) return alert('내용을 입력하세요.');
+    const parentId = document.getElementById('parent_id').value;
+    const formData = new URLSearchParams();
+    formData.set('content', content);
+    if (parentId) formData.set('parent_id', parentId);
+    fetch('/share/comment/{{ report.id }}', {method:'POST', body: formData, headers:{'Content-Type':'application/x-www-form-urlencoded'}})
+    .then(r=>r.json()).then(d=>{ if(d.status==='success') location.reload(); else alert(d.msg||'오류'); })
+    .catch(e=>alert('오류: '+e));
+});
+
+function deleteComment(id) {
+    if (!confirm('삭제하시겠습니까?')) return;
+    fetch('/share/comment/delete/' + id, {method:'POST'})
+    .then(r=>r.json()).then(d=>{ if(d.status==='success') location.reload(); else alert(d.msg||'오류'); })
+    .catch(e=>alert('오류: '+e));
+}
 </script>
 {% endblock %}

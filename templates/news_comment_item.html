@@ -9,7 +9,7 @@
     {% else %}
     <div class="mb-2">{{ c.content }}</div>
     {% endif %}
-    {% if session.get('username') and not c.is_hidden %}
+    {% if session.get('username') and session.get('user_id') != c.user_id and not c.is_hidden %}
     <button class="btn btn-sm btn-outline-secondary" onclick="replyComment({{ c.id }})">↩ 답글</button>
     {% endif %}
     

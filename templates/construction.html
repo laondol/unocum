@@ -1,0 +1,82 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container mt-4" style="max-width: 800px;">
+    <a href="/intro" class="btn btn-sm btn-outline-secondary mb-3">← 인트로로</a>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold mb-0">🚧 양평 공사·교통안내</h3>
+        {% if session.get('role') in ('admin','leader') %}
+        <a href="/construction/refresh" class="btn btn-sm btn-outline-primary" onclick="return confirm('API에서 최신 정보를 가져옵니다.')">🔄 정보갱신</a>
+        {% endif %}
+    </div>
+    
+    {% if (not api_key_configured and not traffic_key_configured) and session.get('role') in ('admin','leader') %}
+    <div class="alert alert-warning">
+        ⚠️ <code>config.py</code>의 <strong>DATA_GO_KR_API_KEY</strong> 또는 <strong>GG_TRAFFIC_API_KEY</strong>가 설정되지 않았습니다.
+    </div>
+    {% endif %}
+    
+    <ul class="nav nav-tabs mb-4" id="infoTabs">
+        <li class="nav-item"><a class="nav-link active" href="#" data-type="all">전체</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" data-type="traffic">🚗 교통돌발</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" data-type="traffic_congestion">🚦 지정체</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" data-type="road">🛣️ 도로공사</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" data-type="building">🏗️ 건축공사</a></li>
+    </ul>
+    
+    {% if notices %}
+    <div class="row g-3" id="noticeList">
+        {% for n in notices %}
+        <div class="col-12 notice-item" data-type="{{ n.notice_type }}">
+            <div class="card border-0 shadow-sm" style="border-radius: 16px; {% if n.notice_type == 'traffic_incident' %}border-left: 4px solid #dc3545;{% endif %}">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between">
+                        <h6 class="fw-bold mb-2">{{ n.title }}</h6>
+                        <span class="badge {% if n.notice_type == 'traffic_incident' %}bg-danger{% elif n.notice_type == 'traffic_congestion' %}bg-secondary{% elif n.notice_type == 'road_construction' %}bg-warning text-dark{% else %}bg-info{% endif %}">
+                            {{ {'traffic_incident':'🚗 교통돌발','traffic_congestion':'🚦 지정체','road_construction':'🛣️ 도로공사','building_permit':'🏗️ 건축공사'}.get(n.notice_type, n.notice_type) }}
+                        </span>
+                    </div>
+                    {% if n.description %}
+                    <p class="small text-muted mb-2">{{ n.description[:300] }}{% if n.description|length > 300 %}...{% endif %}</p>
+                    {% endif %}
+                    <div class="d-flex gap-3 flex-wrap small text-muted">
+                        {% if n.location %}<span>📍 {{ n.location }}</span>{% endif %}
+                        {% if n.start_date %}<span>📅 시작: {{ n.start_date.strftime('%Y-%m-%d %H:%M') }}</span>{% endif %}
+                        {% if n.end_date %}<span>➡ 종료예정: {{ n.end_date.strftime('%Y-%m-%d %H:%M') }}</span>{% endif %}
+                        {% if n.source %}
+                        <span>🔗 {{ {'gg_traffic':'경기교통정보','cals':'건설CALS','yp_gov':'양평군청'}.get(n.source, n.source) }}</span>
+                        {% endif %}
+                    </div>
+                    {% if n.latitude and n.longitude %}
+                    <a href="https://maps.google.com/?q={{ n.latitude }},{{ n.longitude }}" target="_blank" class="btn btn-sm btn-outline-secondary mt-2">🗺️ 지도보기</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-5 text-muted">
+        <div class="fs-1 mb-3">🚧</div>
+        <p>현재 등록된 정보가 없습니다.</p>
+        {% if session.get('role') in ('admin','leader') %}
+        <p class="small">관리자 메뉴에서 "정보갱신"을 눌러 API에서 데이터를 가져오세요.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<script>
+document.querySelectorAll('#infoTabs .nav-link').forEach(tab => {
+    tab.addEventListener('click', function(e) {
+        e.preventDefault();
+        document.querySelectorAll('#infoTabs .nav-link').forEach(t => t.classList.remove('active'));
+        this.classList.add('active');
+        const type = this.dataset.type;
+        document.querySelectorAll('.notice-item').forEach(item => {
+            if (type === 'all') { item.style.display = ''; return; }
+            item.style.display = item.dataset.type === type ? '' : 'none';
+        });
+    });
+});
+</script>
+{% endblock %}

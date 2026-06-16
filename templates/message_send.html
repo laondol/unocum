@@ -1,0 +1,53 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container" style="max-width: 600px;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold text-success">✉️ 쪽지 보내기</h3>
+        <div><a href="/message/inbox" class="btn btn-sm btn-outline-success">📬 받은 쪽지</a></div>
+    </div>
+
+    <div class="card border-0 shadow-sm p-4" style="border-radius: 18px;">
+        <form id="sendForm">
+            <div class="mb-3">
+                <label class="form-label small fw-bold">받는 사람</label>
+                    <select name="receiver_id" class="form-select" required>
+                        <option value="">선택하세요</option>
+                        {% for u in users %}
+                        <option value="{{ u.id }}" {% if selected_id == u.id %}selected{% endif %}>{{ u.username }}{% if u.real_name %}({{ u.real_name }}){% endif %} - {{ u.town }} {{ u.village }}</option>
+                        {% endfor %}
+                    </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-bold">제목 (선택)</label>
+                <input type="text" name="subject" class="form-control" placeholder="쪽지 제목">
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-bold">내용</label>
+                <textarea name="content" class="form-control" rows="5" required placeholder="쪽지 내용을 입력하세요. (1회 발송 10P 차감)"></textarea>
+            </div>
+            <div class="text-muted small mb-3">⚠️ 쪽지 발송 시 10닢이 차감됩니다.</div>
+            <button type="submit" class="btn btn-success w-100 fw-bold py-2">보내기 (10P)</button>
+        </form>
+        <div id="sendResult" class="mt-3 small"></div>
+    </div>
+</div>
+<script>
+document.getElementById('sendForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const btn = this.querySelector('button[type=submit]');
+    const orig = btn.innerHTML;
+    btn.disabled = true; btn.innerHTML = '⏳ 전송중...';
+    const fd = new FormData(this);
+    fetch('/message/send', {method:'POST', body:fd})
+    .then(r=>r.json()).then(d=>{
+        if(d.status==='success') {
+            document.getElementById('sendResult').innerHTML = '<span class="text-success">✅ ' + d.msg + '</span>';
+            this.reset();
+        } else {
+            document.getElementById('sendResult').innerHTML = '<span class="text-danger">❌ ' + d.msg + '</span>';
+            btn.disabled = false; btn.innerHTML = orig;
+        }
+    }).catch(e=>{ document.getElementById('sendResult').innerHTML = '<span class="text-danger">오류: '+e+'</span>'; btn.disabled = false; btn.innerHTML = orig; });
+});
+</script>
+{% endblock %}

@@ -16,6 +16,11 @@
                 <span class="badge bg-light text-dark">{{ article.source_name }}</span>
                 {% endif %}
             </div>
+            {% if article.ai_reason %}
+            <div class="alert alert-info py-2 mb-3 small" style="border-radius: 12px; border-left: 4px solid #0dcaf0;">
+                💡 <strong>AI 선정 이유:</strong> {{ article.ai_reason }}
+            </div>
+            {% endif %}
             <h2 class="fw-bold mb-3">{{ article.title }}</h2>
             <div class="prose" style="font-size: 1.05rem; line-height: 1.8;">{{ article.content|safe }}</div>
             
@@ -80,6 +85,7 @@
             <form id="commentForm" class="mb-4">
                 <input type="hidden" name="news_id" value="{{ article.id }}">
                 <textarea name="content" class="form-control mb-2" rows="3" placeholder="의견을 남겨주세요. (AI 검토 후 게시됩니다)" required></textarea>
+                <div id="loadingMsg" class="d-none text-muted small mb-2">⏳ AI가 검토중입니다...</div>
                 <button type="submit" class="btn btn-success float-end">등록</button>
             </form>
             {% else %}
@@ -115,15 +121,19 @@ function voteNews(id, type) {
 
 document.getElementById('commentForm')?.addEventListener('submit', function(e) {
     e.preventDefault();
+    const btn = this.querySelector('button[type=submit]');
+    const orig = btn.innerHTML;
+    btn.disabled = true; btn.innerHTML = '⏳ AI 검토중입니다...';
     const fd = new FormData(this);
     fetch('/news/comment', {method:'POST', body:fd})
     .then(r=>r.json()).then(d=>{
+        btn.disabled = false; btn.innerHTML = orig;
         if(d.status==='success') {
             alert(d.ai_score <= -50 ? '⚠️ 부적절한 내용으로 AI가 숨김 처리했습니다.' : '✅ 댓글이 등록되었습니다. (AI 검토 완료)');
             this.reset();
             loadComments();
         } else alert(d.msg || '오류 발생');
-    }).catch(e=>alert('오류: '+e));
+    }).catch(e=>{ btn.disabled = false; btn.innerHTML = orig; alert('오류: '+e); });
 });
 
 function replyComment(parentId) {
@@ -133,13 +143,15 @@ function replyComment(parentId) {
     fd.append('news_id', '{{ article.id }}');
     fd.append('content', content);
     fd.append('parent_id', parentId);
+    document.getElementById('loadingMsg').classList.remove('d-none');
     fetch('/news/comment', {method:'POST', body:fd})
     .then(r=>r.json()).then(d=>{
+        document.getElementById('loadingMsg').classList.add('d-none');
         if(d.status==='success') {
             alert(d.ai_score <= -50 ? '⚠️ 부적절한 내용으로 AI가 숨김 처리했습니다.' : '✅ 답글이 등록되었습니다.');
             loadComments();
         } else alert(d.msg || '오류 발생');
-    }).catch(e=>alert('오류: '+e));
+    }).catch(e=>{ document.getElementById('loadingMsg').classList.add('d-none'); alert('오류: '+e); });
 }
 
 function loadComments() {
@@ -151,16 +163,20 @@ function loadComments() {
 
 document.getElementById('recommendForm')?.addEventListener('submit', function(e) {
     e.preventDefault();
+    const btn = this.querySelector('button[type=submit]');
+    const orig = btn.innerHTML;
+    btn.disabled = true; btn.innerHTML = '⏳ 처리중...';
     const fd = new FormData(this);
     fd.append('news_id', '{{ article.id }}');
     fetch('/news/{{ article.id }}/recommend', {method:'POST', body:fd})
     .then(r=>r.json()).then(d=>{
+        btn.disabled = false; btn.innerHTML = orig;
         if(d.status==='success') {
             alert(d.msg);
             this.reset();
             loadRecommendations();
         } else alert(d.msg || '오류 발생');
-    }).catch(e=>alert('오류: '+e));
+    }).catch(e=>{ btn.disabled = false; btn.innerHTML = orig; alert('오류: '+e); });
 });
 
 function loadRecommendations() {

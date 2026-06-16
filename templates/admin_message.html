@@ -1,0 +1,108 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container" style="max-width: 700px;">
+    <h3 class="fw-bold text-success mb-4">📨 관리자 쪽지 발송</h3>
+
+    <div class="card border-0 shadow-sm p-4" style="border-radius: 18px;">
+        <form id="adminMsgForm">
+            <div class="mb-3">
+                <label class="form-label small fw-bold">발송 대상</label>
+                <select name="send_type" class="form-select" id="sendType" onchange="toggleTargets()">
+                    <option value="all">전체 회원</option>
+                    <option value="individual">개인 선택</option>
+                    <option value="town">읍/면 선택</option>
+                    <option value="village">리 단위 선택</option>
+                    <option value="group">내 그룹 선택</option>
+                </select>
+            </div>
+
+            <div class="mb-3" id="individualSelect" style="display:none;">
+                <label class="form-label small fw-bold">회원 선택</label>
+                <input type="text" id="userSearch" class="form-control mb-2" placeholder="이름 또는 아이디 검색" oninput="filterUsers()">
+                <select name="receiver_id" class="form-select" size="6">
+                    {% for u in users %}
+                    <option value="{{ u.id }}" data-search="{{ u.username }} {{ u.real_name or '' }}">{{ u.real_name or u.username }} ({{ u.username }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="mb-3" id="townSelect" style="display:none;">
+                <label class="form-label small fw-bold">읍/면 선택</label>
+                <select name="town" class="form-select">
+                    <option value="">선택하세요</option>
+                    {% for t in towns %}
+                    <option value="{{ t }}">{{ t }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="mb-3" id="villageSelect" style="display:none;">
+                <label class="form-label small fw-bold">리 단위 선택</label>
+                <select name="village" class="form-select">
+                    <option value="">선택하세요</option>
+                    {% for v in villages %}
+                    <option value="{{ v }}">{{ v }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="mb-3" id="groupSelect" style="display:none;">
+                <label class="form-label small fw-bold">그룹 선택</label>
+                <select name="group_id" class="form-select">
+                    <option value="">선택하세요</option>
+                    {% for g in groups %}
+                    <option value="{{ g.id }}">{{ g.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label small fw-bold">제목 (선택)</label>
+                <input type="text" name="subject" class="form-control" placeholder="쪽지 제목">
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-bold">내용</label>
+                <textarea name="content" class="form-control" rows="6" required placeholder="발송할 내용을 입력하세요. (1인당 10P 차감)"></textarea>
+            </div>
+            <div class="text-muted small mb-3">⚠️ 수신자 1명당 10닢이 차감됩니다.</div>
+            <button type="submit" class="btn btn-success w-100 fw-bold py-2">쪽지 발송</button>
+        </form>
+        <div id="sendResult" class="mt-3 small"></div>
+    </div>
+</div>
+
+<script>
+function toggleTargets() {
+    const v = document.getElementById('sendType').value;
+    document.getElementById('individualSelect').style.display = v === 'individual' ? '' : 'none';
+    document.getElementById('townSelect').style.display = v === 'town' ? '' : 'none';
+    document.getElementById('villageSelect').style.display = v === 'village' ? '' : 'none';
+    document.getElementById('groupSelect').style.display = v === 'group' ? '' : 'none';
+}
+function filterUsers() {
+    const q = document.getElementById('userSearch').value.toLowerCase();
+    document.querySelectorAll('#individualSelect select option').forEach(o => {
+        o.style.display = o.getAttribute('data-search').toLowerCase().includes(q) ? '' : 'none';
+    });
+}
+
+document.getElementById('adminMsgForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const btn = this.querySelector('button[type=submit]');
+    const orig = btn.innerHTML;
+    btn.disabled = true; btn.innerHTML = '⏳ 발송중...';
+    const fd = new FormData(this);
+    fetch('/admin/message/send', {method:'POST', body:fd})
+    .then(r=>r.json()).then(d=>{
+        if(d.status==='success') {
+            document.getElementById('sendResult').innerHTML = '<span class="text-success">✅ ' + d.msg + '</span>';
+            this.reset();
+            toggleTargets();
+        } else {
+            document.getElementById('sendResult').innerHTML = '<span class="text-danger">❌ ' + d.msg + '</span>';
+            btn.disabled = false; btn.innerHTML = orig;
+        }
+    }).catch(e=>{ document.getElementById('sendResult').innerHTML = '<span class="text-danger">오류: '+e+'</span>'; btn.disabled = false; btn.innerHTML = orig; });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container" style="max-width: 700px;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold text-success">📬 쪽지함</h3>
+        <button class="btn btn-success btn-sm" onclick="sendMessage()">✉️ 쪽지 보내기</button>
+    </div>
+
+    <!-- 탭 -->
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <a class="nav-link {{ 'active fw-bold' if tab == 'received' }}" href="/message/inbox?tab=received">📥 받은 쪽지</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {{ 'active fw-bold' if tab == 'sent' }}" href="/message/inbox?tab=sent">📤 보낸 쪽지</a>
+        </li>
+    </ul>
+
+    {% if tab == 'received' %}
+        {% if received %}
+        {% for m in received %}
+        <div class="card mb-2 border-0 shadow-sm" style="border-radius: 14px; {{ '' if m.is_read else 'border-left: 4px solid #27ae60;' }}">
+            <div class="card-body p-3">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <strong>{{ m.subject }}</strong>
+                        {% if not m.is_read %}<span class="badge bg-success ms-1">NEW</span>{% endif %}
+                    </div>
+                    <small class="text-muted">{{ m.created_at.strftime('%m/%d %H:%M') }}</small>
+                </div>
+                <div class="small text-muted mb-1">{{ m.sender_name }}{% if m.sender_role == 'admin' %} (관리자){% elif m.sender_role == 'leader' %} (책임자){% endif %}</div>
+                <div class="mt-2 p-2 bg-light rounded">{{ m.content }}</div>
+                {% if not m.is_read %}
+                <div class="text-end mt-1">
+                    <button class="btn btn-sm btn-outline-success" onclick="markRead({{ m.id }}, this)">✅ 읽음</button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="text-center py-5 text-muted">📭 받은 쪽지가 없습니다.</div>
+        {% endif %}
+    {% else %}
+        {% if sent %}
+        {% for m in sent %}
+        <div class="card mb-2 border-0 shadow-sm" style="border-radius: 14px;">
+            <div class="card-body p-3">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <strong>{{ m.subject }}</strong>
+                        {% if m.is_read %}<span class="badge bg-secondary ms-1">읽음</span>{% else %}<span class="badge bg-warning ms-1">읽지않음</span>{% endif %}
+                    </div>
+                    <small class="text-muted">{{ m.created_at.strftime('%m/%d %H:%M') }}</small>
+                </div>
+                <div class="small text-muted mb-1">→ {{ m.receiver_name or '알수없음' }}</div>
+                <div class="mt-2 p-2 bg-light rounded">{{ m.content }}</div>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="text-center py-5 text-muted">📭 보낸 쪽지가 없습니다.</div>
+        {% endif %}
+    {% endif %}
+</div>
+<script>
+function markRead(id, btn) {
+    fetch('/message/read/' + id, {method:'POST'})
+    .then(r=>r.json()).then(d=>{ if(d.status==='success') btn.closest('.card').style.borderLeft=''; btn.remove(); })
+    .catch(e=>alert('오류'));
+}
+function sendMessage() {
+    fetch('/friends/list', {method:'GET', headers:{'Accept':'application/json'}})
+    .then(r=>r.json()).then(d=>{
+        if(d.friends && d.friends.length > 0) {
+            let html = d.friends.map(f => `<button class="list-group-item list-group-item-action" onclick="location.href='/message/send/${f.id}'">${f.name} (${f.town} ${f.village})</button>`).join('');
+            document.getElementById('friendList').innerHTML = html;
+            new bootstrap.Modal(document.getElementById('friendModal')).show();
+        } else {
+            alert('🤝 벗이 없어서 쪽지를 보낼 수 없습니다.\n먼저 다른 주민과 벗을 맺어주세요.');
+        }
+    }).catch(()=>alert('오류가 발생했습니다.'));
+}
+</script>
+<div class="modal fade" id="friendModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 p-3" style="border-radius: 20px;">
+            <div class="modal-header border-0"><h5 class="fw-bold">💬 쪽지를 보낼 벗 선택</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body p-0"><div class="list-group list-group-flush" id="friendList"></div></div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,14 +1,14 @@
 {% extends 'layout.html' %}
 {% block content %}
 <div class="container mt-4" style="max-width: 700px;">
-    <h3 class="fw-bold mb-4">💎 내 포인트</h3>
+    <h3 class="fw-bold mb-4">💎 내 닢</h3>
     <div class="card border-0 shadow-sm mb-4 text-center p-4" style="border-radius: 18px;">
         <div class="fs-1 fw-bold text-success">{{ user.points }}</div>
-        <div class="text-muted small">현재 보유 포인트</div>
+        <div class="text-muted small">현재 보유 닢</div>
     </div>
     <div class="card border-0 shadow-sm" style="border-radius: 18px;">
         <div class="card-body p-4">
-            <h5 class="fw-bold mb-3">📋 포인트 내역</h5>
+            <h5 class="fw-bold mb-3">📋 닢 내역</h5>
             <div class="table-responsive">
                 <table class="table table-hover align-middle small">
                     <thead class="table-light">
@@ -35,7 +35,7 @@
                             <td>{{ h.description }}</td>
                         </tr>
                         {% else %}
-                        <tr><td colspan="5" class="text-center text-muted py-4">포인트 내역이 없습니다.</td></tr>
+                        <tr><td colspan="5" class="text-center text-muted py-4">닢 내역이 없습니다.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>

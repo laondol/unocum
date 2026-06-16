@@ -1,5 +1,7 @@
 {% extends 'layout.html' %}
 {% block content %}
+{% set logs = debate_logs if debate_logs is defined else [] %}
+{% set role = session.get('role') %}
 <div class="row">
     <div class="col-lg-7">
         <div class="card p-4 shadow-sm mb-4">
@@ -8,12 +10,32 @@
         </div>
 
         <div class="card p-4 shadow-sm bg-light">
-            <h5 class="fw-bold mb-4">🗨️ AI 지킴이와 숙의 중</h5>
+            <h5 class="fw-bold mb-4">🗨️ AI 지킴이와 숙의중</h5>
             <div id="debate-box" style="height: 400px; overflow-y: auto; background: white; padding: 20px; border-radius: 15px;">
-                {% for p in posts %}
-                <div class="mb-3 text-end"><div class="badge bg-primary text-wrap p-2 shadow-sm">지킴이: {{ log.admin }}</div></div>
-                <div class="mb-3 text-start"><div class="badge bg-light text-dark text-wrap p-2 border">AI: {{ log.ai }}</div></div>
-                {% endfor %}
+                {% if logs and logs|length > 0 %}
+                    {% for log in logs %}
+                    <div class="mb-3">
+                        <small class="text-muted d-block text-center mb-1">{{ log.time }}</small>
+                        <div class="text-end mb-2">
+                            <div class="d-inline-block bg-primary text-white rounded-3 p-3 shadow-sm text-start" style="max-width: 80%; border-radius: 18px 18px 4px 18px;">
+                                <small class="fw-bold d-block mb-1">👮 운영진 의견</small>
+                                {{ log.admin }}
+                            </div>
+                        </div>
+                        <div class="text-start">
+                            <div class="d-inline-block bg-light border rounded-3 p-3 text-start" style="max-width: 80%; border-radius: 18px 18px 18px 4px;">
+                                <small class="fw-bold d-block mb-1 text-success">🤖 AI 지킴이 응답</small>
+                                {{ log.ai }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <div class="text-center text-muted py-5">
+                    <div class="fs-1 mb-3">💬</div>
+                    <p>아직 AI와의 숙의 기록이 없습니다.<br>우측 패널에서 AI에게 의견을 전달해보세요.</p>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -21,16 +43,48 @@
     <div class="col-lg-5">
         <div class="card p-4 shadow-lg sticky-top" style="top: 20px;">
             <h4 class="fw-bold mb-4">⚖️ 판정 컨트롤 패널</h4>
+
+            {% if post.is_finalized %}
+            <div class="alert alert-success">✅ 점수가 확정되었습니다. 변경할 수 없습니다.</div>
+            {% endif %}
+            {% if post.admin_score != 0 and post.leader_score != 0 and post.is_forced_approved %}
+            <div class="alert alert-info">✅ 관리자·책임자 점수 확정 → 자동 공개되었습니다.</div>
+            {% endif %}
+
             <form action="/admin/update_scores/{{ post.id }}" method="post" class="mb-4">
                 <div class="row g-2 mb-3">
-                    <div class="col-6"><label class="small">👮 관리자(-10~10)</label><input type="number" name="admin_score" value="{{ post.admin_score }}" class="form-control"></div>
-                    <div class="col-6"><label class="small">👑 책임자(-10~10)</label><input type="number" name="leader_score" value="{{ post.leader_score }}" class="form-control"></div>
+                    {% if role == 'admin' %}
+                    <div class="col-6"><label class="small">👮 관리자 점수(-10~10)</label><input type="number" name="admin_score" value="{{ post.admin_score }}" class="form-control" {{ 'disabled' if post.is_finalized }}></div>
+                    <div class="col-6"><label class="small">👑 책임자 점수</label><input type="number" class="form-control" value="{{ post.leader_score }}" disabled></div>
+                    {% elif role == 'leader' %}
+                    <div class="col-6"><label class="small">👮 관리자 점수</label><input type="number" class="form-control" value="{{ post.admin_score }}" disabled></div>
+                    <div class="col-6"><label class="small">👑 책임자 점수(-10~10)</label><input type="number" name="leader_score" value="{{ post.leader_score }}" class="form-control" {{ 'disabled' if post.is_finalized }}></div>
+                    {% endif %}
                 </div>
+                {% if not post.is_finalized %}
                 <button class="btn btn-dark w-100">운영진 점수 확정</button>
+                {% endif %}
             </form>
+
+            <div class="mb-3 p-3 bg-light rounded-4">
+                <h6>📊 종합 점수</h6>
+                <div class="row small">
+                    <div class="col-4">AI: {{ post.ai_score }}</div>
+                    <div class="col-4">관리자: {{ post.admin_score }}</div>
+                    <div class="col-4">책임자: {{ post.leader_score }}</div>
+                    <div class="col-6 mt-1">회원: {{ post.member_score }}</div>
+                    <div class="col-6 mt-1 fw-bold">합계: {{ post.total_score }}</div>
+                </div>
+            </div>
 
             <div class="p-3 rounded-4 bg-warning bg-opacity-10 border border-warning">
                 <h6 class="fw-bold">🤖 AI 점수 조정 토론</h6>
+                <div class="mb-2 small text-muted">
+                    현재 AI 점수: <strong>{{ post.ai_score }}</strong>점
+                    {% if logs and logs|length > 0 %}
+                    · 마지막 AI 제안: <strong>{{ post.ai_score }}</strong>점
+                    {% endif %}
+                </div>
                 <input type="number" id="suggested_score" class="form-control mb-2" placeholder="제안할 AI 점수 (-50~50)" value="{{ post.ai_score }}">
                 <textarea id="admin_opinion" class="form-control mb-2" rows="4" placeholder="AI를 설득할 논리적 근거를 입력하세요..."></textarea>
                 <button type="button" onclick="startDebate({{ post.id }})" id="debate-btn" class="btn btn-warning w-100 fw-bold">AI에게 의견 전달</button>
@@ -48,12 +102,22 @@ async function startDebate(postId) {
     document.getElementById('debate-btn').disabled = true;
     document.getElementById('thinking').style.display = 'block';
 
-    const res = await fetch(`/admin/debate/${postId}`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: `admin_opinion=${encodeURIComponent(opinion)}&suggested_score=${score}`
-    });
-    if(res.ok) location.reload();
+    try {
+        const res = await fetch(`/admin/debate/${postId}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `admin_opinion=${encodeURIComponent(opinion)}&suggested_score=${score}`
+        });
+        if(res.ok) location.reload();
+        else {
+            const data = await res.json().catch(()=>({status:'error'}));
+            alert('오류: ' + (data.msg || '서버 오류'));
+        }
+    } catch(e) {
+        alert('네트워크 오류: ' + e.message);
+    }
+    document.getElementById('debate-btn').disabled = false;
+    document.getElementById('thinking').style.display = 'none';
 }
 </script>
 {% endblock %}

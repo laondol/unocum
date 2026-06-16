@@ -3,10 +3,7 @@
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h3 class="fw-bold mb-0">📰 AI 뉴스 큐레이션</h3>
-        <div class="d-flex gap-2">
-            <button class="btn btn-outline-success" onclick="aiSuggest()">🤖 AI 뉴스 추천</button>
-            <a href="/admin/news/create" class="btn btn-success">✏️ 직접 작성</a>
-        </div>
+        <a href="/admin/news/create" class="btn btn-success">✏️ 직접 작성</a>
     </div>
 
     <!-- 탭 필터 -->
@@ -26,12 +23,17 @@
     {% if tab != 'all' %}
     <div class="card border-0 shadow-sm mb-4 p-3">
         <form id="urlImportForm" onsubmit="importUrl(event)">
+            <input type="hidden" name="tab" value="{{ tab }}">
             <div class="input-group">
                 <input type="url" name="url" class="form-control" placeholder="뉴스 URL을 붙여넣으세요..." required>
                 <button class="btn btn-outline-primary" type="submit">🌐 가져오기 + AI 요약</button>
             </div>
         </form>
         <div id="urlResult" class="mt-2 small"></div>
+        <div class="mt-2">
+            <button class="btn btn-outline-success btn-sm" onclick="aiSuggest('{{ tab }}')">🤖 AI 뉴스 추천</button>
+            <small class="text-muted ms-2">{% if tab == 'world' %}🌐 영문 검색 → 해외 기사 중심{% else %}🇰🇷 국내 검색 → 한국 뉴스 중심{% endif %} (자동 가져오기)</small>
+        </div>
     </div>
     {% endif %}
 
@@ -42,21 +44,22 @@
                 <thead class="table-light">
                     <tr class="text-center small">
                         <th style="width:5%;">ID</th>
-                        <th style="width:30%;">제목</th>
-                        <th style="width:8%;">분류</th>
-                        <th style="width:10%;">원본링크</th>
-                        <th style="width:5%;">AI</th>
+                        <th style="width:25%;">제목</th>
+                        <th style="width:7%;">분류</th>
+                        <th style="width:14%;">AI 선정 이유</th>
+                        <th style="width:8%;">원본링크</th>
+                        <th style="width:4%;">AI</th>
                         {% if tab == 'world' %}
-                        <th style="width:10%;">채자(AI)</th>
-                        <th style="width:10%;">채자(관리)</th>
+                        <th style="width:8%;">채자(AI)</th>
+                        <th style="width:8%;">채자(관리)</th>
                         {% elif tab == 'kr_yp' %}
-                        <th style="width:10%;">채자(AI)</th>
-                        <th style="width:10%;">채자(관리)</th>
+                        <th style="width:8%;">채자(AI)</th>
+                        <th style="width:8%;">채자(관리)</th>
                         {% else %}
-                        <th style="width:8%;">선택</th>
+                        <th style="width:6%;">선택</th>
                         {% endif %}
-                        <th style="width:10%;">등록일</th>
-                        <th style="width:12%;">관리</th>
+                        <th style="width:8%;">등록일</th>
+                        <th style="width:10%;">관리</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -68,6 +71,13 @@
                             <small class="text-muted">{{ a.summary[:80] }}{% if a.summary|length > 80 %}...{% endif %}</small>
                         </td>
                         <td><span class="badge bg-secondary">{{ a.category }}</span></td>
+                        <td class="text-start small" style="max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ a.ai_reason or '' }}">
+                            {% if a.ai_reason %}
+                            <span class="text-success" data-bs-toggle="tooltip" data-bs-title="{{ a.ai_reason }}">💡 {{ a.ai_reason[:50] }}{% if a.ai_reason|length > 50 %}...{% endif %}</span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
                         <td>
                             {% if a.source_url %}
                             <a href="{{ a.source_url }}" target="_blank" class="btn btn-sm btn-outline-primary" title="{{ a.source_url }}">🔗 원문보기</a>
@@ -136,11 +146,11 @@
 </div>
 
 <script>
-function aiSuggest() {
+function aiSuggest(tab) {
     const btn = event.target; btn.disabled = true; btn.innerHTML = '⏳ 생성 중...';
-    fetch('/admin/news/ai-suggest', {method:'POST'})
+    fetch('/admin/news/ai-suggest', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'tab='+tab})
     .then(r=>r.json()).then(d=>{
-        if(d.status==='success') { alert(`✅ AI가 ${d.count}개의 뉴스를 추천했습니다.`); location.reload(); }
+        if(d.status==='success') { alert(d.msg || `✅ ${d.count}개의 실제 뉴스를 가져왔습니다.`); location.reload(); }
         else alert('❌ ' + d.msg);
     }).catch(e=>alert('❌ 오류: '+e))
     .finally(()=>{btn.disabled=false; btn.innerHTML='🤖 AI 뉴스 추천';});

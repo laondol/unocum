@@ -9,20 +9,35 @@
             </div>
             <h2 class="fw-bold mb-4">{{ post.title }}</h2>
             
-            <!-- AI 요약 박스 -->
-            <div class="p-3 bg-light rounded-3 mb-4 border-start border-5 border-success">
-                <strong>🤖 AI 3줄 핵심요약:</strong><br>
-                {{ post.ai_summary }}
+            <div class="d-flex gap-2 mb-3">
+                <button onclick="votePost({{ post.id }}, 'like')" class="btn btn-sm btn-outline-success">👍 <span id="like-{{ post.id }}">{{ post.like_count }}</span></button>
+                <button onclick="votePost({{ post.id }}, 'dislike')" class="btn btn-sm btn-outline-danger">👎 <span id="dislike-{{ post.id }}">{{ post.dislike_count }}</span></button>
             </div>
 
-            <p class="fs-5" style="white-space: pre-wrap;">{{ post.content }}</p>
+            {% if post.ai_score == 0 %}
+            <div class="p-3 rounded-3 mb-4 border-start border-5 border-secondary bg-light">
+                <strong>🔍 AI 검토 진행 중</strong><br>
+                <p class="text-muted mt-2 mb-0">검토후에 쪽지로 알려 드리겠습니다.</p>
+            </div>
+            {% else %}
+            <!-- AI 요약 박스 -->
+            <div class="p-3 rounded-3 mb-4 border-start border-5 {{ 'border-danger bg-danger-subtle' if post.total_score <= -50 else 'border-success bg-light' }}">
+                <strong>🤖 AI 3줄 핵심요약:</strong><br>
+                {% if post.total_score <= -50 %}
+                <span class="badge bg-danger fs-6 mt-1 mb-2">🚫 게시불가</span><br>
+                {% endif %}
+                {{ post.ai_summary }}
+            </div>
+            {% endif %}
+
+            <p class="fs-5" style="line-height: 1.8;">{{ post.content|safe }}</p>
 
             {% if post.file_path %}
             <div class="mt-4 p-3 border rounded text-center">
                 <h6 class="text-start fw-bold mb-3">첨부 자료</h6>
-                {% if post.file_path|lower|endswith('.png') or post.file_path|lower|endswith('.jpg') or post.file_path|lower|endswith('.jpeg') or post.file_path|lower|endswith('.gif') or 'draw_' in post.file_path %}
+                {% if '.png' in post.file_path.lower() or '.jpg' in post.file_path.lower() or '.jpeg' in post.file_path.lower() or '.gif' in post.file_path.lower() or 'draw_' in post.file_path %}
                 <img src="{{ post.file_path }}" class="img-fluid rounded" style="max-height: 400px;">
-                {% elif post.file_path|lower|endswith('.pdf') %}
+                {% elif '.pdf' in post.file_path.lower() %}
                 <div class="text-center p-3">
                     <a href="{{ post.file_path }}" target="_blank" class="btn btn-outline-primary">📄 PDF 열기</a>
                 </div>
@@ -42,17 +57,55 @@
             <h5 class="fw-bold mb-3">현재 진행 단계</h5>
             <div class="mb-4">
                 <div class="progress mb-2" style="height: 20px;">
-                    {% set status_pct = {'제안': 25, '하고싶은': 50, '하고있는': 75, '했던거': 100} %}
+                    {% set status_pct = {'제안': 25, '현실화': 60, '하고있는': 75, '했던거': 100} %}
                     <div class="progress-bar bg-success progress-bar-striped" style="width: {{ status_pct[post.status] }}%">{{ post.status }}</div>
                 </div>
-                <small class="text-muted">이웃 100명의 호응 시 '하고싶은' 단계로 이동</small>
+                <small class="text-muted">총점 80점 이상 시 '현실화' 단계로 승격</small>
+                <div class="mt-2">
+                    <small class="text-muted">이웃 동의: {{ post.like_count }}명</small>
+                    <div class="progress" style="height:6px;">
+                        <div class="progress-bar bg-info" style="width: {{ ((post.total_score or 0) / 80 * 100)|round }}%"></div>
+                    </div>
+                </div>
             </div>
+            {% if post.ai_score == 0 %}
             <div class="text-center p-3 bg-light rounded-4">
-                <div class="h1 fw-bold text-success">{{ post.total_score }}점</div>
-                <div class="small text-muted">공동체 신뢰 지수</div>
+                <div class="h5 fw-bold text-secondary">🔍 검토전</div>
+                <div class="small text-muted">AI 분석 완료 후 쪽지로 알려드립니다</div>
             </div>
-            <button class="btn btn-success w-100 mt-4 py-3 fw-bold">🤝 이 제안에 동의합니다</button>
+            {% else %}
+            <div class="text-center p-3 bg-light rounded-4">
+                {% if session.get('role') in ['admin', 'leader'] %}
+                <div class="h1 fw-bold {{ 'text-danger' if post.total_score <= -50 else 'text-success' }}" id="total-score-{{ post.id }}">{{ post.total_score }}점</div>
+                <div class="small text-muted">공동체 신뢰 지수 (관리자 전용)</div>
+                {% else %}
+                <div class="h4 fw-bold text-success">👍 이웃들의 관심</div>
+                <div class="small text-muted">이 제안에 {{ post.like_count }}명이 동의했습니다</div>
+                {% endif %}
+            </div>
+            <button class="btn btn-success w-100 mt-4 py-3 fw-bold" onclick="votePost({{ post.id }}, 'like')">🤝 이 제안에 동의합니다</button>
+            {% endif %}
         </div>
     </div>
 </div>
+
+<script>
+function votePost(id, type) {
+    if (!confirm(type === 'like' ? '👍 좋아요 하시겠습니까?\n(-5닢이 감소합니다)' : '👎 나빠요 하시겠습니까?\n(-5닢이 감소합니다)')) return;
+    fetch('/post/' + type + '/' + id, {method:'POST'})
+    .then(r=>r.json()).then(d=>{
+        if(d.status === 'success') {
+            document.getElementById('like-'+id).textContent = d.likes;
+            document.getElementById('dislike-'+id).textContent = d.dislikes;
+            {% if session.get('role') in ['admin', 'leader'] %}
+            document.getElementById('total-score-'+id).textContent = d.total_score + '점';
+            {% endif %}
+            if(d.status_changed) {
+                alert('🎉 "현실화" 단계로 도달했습니다! 곧 회의 초대 쪽지가 발송됩니다.');
+                location.reload();
+            }
+        } else { alert(d.msg); }
+    }).catch(e=>alert('오류: '+e));
+}
+</script>
 {% endblock %}

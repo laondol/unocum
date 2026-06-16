@@ -1,0 +1,14 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container py-4" style="max-width: 800px;">
+    <h3 class="fw-bold text-center mb-4">📜 정관 (사회적협동조합 제안)</h3>
+    <div class="card border-0 shadow-sm" style="border-radius: 18px;">
+        <div class="card-body p-4">
+            {{ content|safe }}
+        </div>
+    </div>
+    <div class="text-center mt-4">
+        <a href="/intro" class="btn btn-sm btn-outline-secondary">← 사업소개</a>
+    </div>
+</div>
+{% endblock %}

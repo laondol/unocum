@@ -30,13 +30,18 @@
         </div>
 
         <div class="mb-3">
+            <label class="form-label fw-bold">AI 선정 이유 (있는 경우 표시)</label>
+            <textarea name="ai_reason" class="form-control" rows="2" placeholder="AI가 이 뉴스를 선정한 이유">{{ article.ai_reason if article else '' }}</textarea>
+        </div>
+
+        <div class="mb-3">
             <label class="form-label fw-bold">요약 (intro에 표시됩니다)</label>
-            <textarea name="summary" class="form-control" rows="3" placeholder="3줄 요약">{{ article.summary if article else '' }}</textarea>
+            <textarea name="summary" class="summernote-editor form-control" rows="3" placeholder="3줄 요약">{{ article.summary if article else '' }}</textarea>
         </div>
 
         <div class="mb-3">
             <label class="form-label fw-bold">본문 (HTML 지원)</label>
-            <textarea name="content" class="form-control" rows="12" placeholder="본문 내용을 입력하세요. HTML 태그 사용 가능합니다.">{{ article.content if article else '' }}</textarea>
+            <textarea name="content" class="summernote-editor form-control" rows="12" placeholder="본문 내용을 입력하세요. HTML 태그 사용 가능합니다.">{{ article.content if article else '' }}</textarea>
         </div>
 
         <div class="row mb-3">

@@ -1,0 +1,127 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container" style="max-width: 700px;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold text-success mb-0">👥 내 벗 관리</h3>
+        <a href="/friends/map" class="btn btn-sm btn-outline-primary">🗺️ 벗 위치 지도</a>
+    </div>
+
+    <!-- 대기 중인 요청 -->
+    {% if pending_users %}
+    <div class="card border-0 shadow-sm mb-4 border-start border-4 border-warning" style="border-radius: 18px;">
+        <div class="card-body p-4">
+            <h5 class="fw-bold mb-3 text-warning">⏳ 벗 신청 대기 ({{ pending_users|length }})</h5>
+            {% for u in pending_users %}
+            <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded mb-2">
+                <div>
+                    <a href="/admin/user/{{ u.id }}" class="fw-bold text-decoration-none">{{ u.username }}</a>
+                    {% if u.real_name %} ({{ u.real_name }}){% endif %}
+                    <small class="text-muted"> - {{ u.town }} {{ u.village }}</small>
+                </div>
+                <div class="d-flex gap-1">
+                    <button class="btn btn-sm btn-success" onclick="acceptRequest({{ u.id }})">수락</button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="rejectRequest({{ u.id }})">거절</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 현재 벗 목록 -->
+    <div class="card border-0 shadow-sm mb-4" style="border-radius: 18px;">
+        <div class="card-body p-4">
+            <h5 class="fw-bold mb-3">내 벗 ({{ friend_users|length }}명)</h5>
+            {% if friend_users %}
+            <div class="list-group list-group-flush">
+                {% for u in friend_users %}
+                <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                    <div>
+                        <a href="/user/{{ u.id }}" class="fw-bold text-decoration-none text-dark">{{ u.real_name + ' (' + u.username + ')' if u.real_name else u.username }}</a>
+                        {% if u.login_location_share and u.last_login %}
+                        <small class="text-muted ms-2">마지막 로그인: {{ u.last_login.strftime('%m/%d %H:%M') }}{% if u.login_town %} · {{ u.login_town }}{% endif %}</small>
+                        {% elif u.last_logout %}
+                        <small class="text-muted ms-2">최종접속: {{ u.last_logout.strftime('%m/%d %H:%M') }}</small>
+                        {% elif u.last_login %}
+                        <small class="text-muted ms-2">최종접속: {{ u.last_login.strftime('%m/%d %H:%M') }}</small>
+                        {% endif %}
+                    </div>
+                    {% if session.get('role') in ['admin', 'leader'] %}
+                    <button class="btn btn-sm btn-outline-danger" onclick="removeFriend({{ u.id }})">✕ 삭제</button>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-muted">아직 벗이 없습니다. 회원 페이지에서 '벗 신청'을 눌러보세요.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 그룹 목록 -->
+    <div class="card border-0 shadow-sm mb-4" style="border-radius: 18px;">
+        <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold m-0">📁 그룹</h5>
+                <button class="btn btn-sm btn-outline-success" onclick="createGroup()">+ 새 그룹</button>
+            </div>
+            {% if groups %}
+            {% for g in groups %}
+            <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded mb-2">
+                <span class="fw-bold">{{ g.name }}</span>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteGroup({{ g.id }})">삭제</button>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="text-muted">아직 그룹이 없습니다.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 내가 보낸 요청 -->
+    {% if my_pending_users %}
+    <div class="card border-0 shadow-sm" style="border-radius: 18px;">
+        <div class="card-body p-4">
+            <h5 class="fw-bold mb-3 text-muted">📤 보낸 신청 (대기중)</h5>
+            {% for u in my_pending_users %}
+            <div class="text-muted small">- {{ u.real_name or u.username }} (수락 대기중)</div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function acceptRequest(id) {
+    fetch('/friends/accept/' + id, {method:'POST'})
+    .then(r=>r.json()).then(d=>{ if(d.status==='success') location.reload(); else alert(d.msg); })
+    .catch(e=>alert('오류'));
+}
+function rejectRequest(id) {
+    if(!confirm('거절하시겠습니까?')) return;
+    fetch('/friends/reject/' + id, {method:'POST'})
+    .then(r=>r.json()).then(d=>{ if(d.status==='success') location.reload(); else alert(d.msg); })
+    .catch(e=>alert('오류'));
+}
+function removeFriend(id) {
+    if(!confirm('벗 관계를 삭제하시겠습니까?')) return;
+    fetch('/friends/remove/' + id, {method:'POST'})
+    .then(r=>r.json()).then(d=>{ if(d.status==='success') location.reload(); else alert(d.msg); })
+    .catch(e=>alert('오류'));
+}
+function createGroup() {
+    const name = prompt('그룹명을 입력하세요:');
+    if(!name) return;
+    const fd = new FormData(); fd.append('name', name);
+    fetch('/friends/group/create', {method:'POST', body:fd})
+    .then(r=>r.json()).then(d=>{ if(d.status==='success') location.reload(); else alert(d.msg); })
+    .catch(e=>alert('오류'));
+}
+function deleteGroup(id) {
+    if(!confirm('그룹을 삭제하시겠습니까?')) return;
+    fetch('/friends/group/delete/' + id, {method:'POST'})
+    .then(r=>r.json()).then(d=>{ if(d.status==='success') location.reload(); else alert(d.msg); })
+    .catch(e=>alert('오류'));
+}
+</script>
+{% endblock %}

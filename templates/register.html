@@ -16,7 +16,10 @@
                 </div>
                 <div class="mb-3">
                     <label class="form-label small fw-bold">비밀번호</label>
-                    <input type="password" name="password" class="form-control" placeholder="비밀번호 입력" required>
+                    <div class="input-group">
+                        <input type="password" name="password" id="regPw" class="form-control" placeholder="비밀번호 입력" required>
+                        <button type="button" class="btn btn-outline-secondary" onclick="toggleRegPw()">👁</button>
+                    </div>
                 </div>
                 <div class="mb-3">
                     <label class="form-label small fw-bold">이름(실명)</label>
@@ -63,7 +66,7 @@
                 <!-- 🏡 선택적 주민 인증 섹션 -->
                 <div class="card p-3 mb-4 border-0" style="background-color: #f4fcf6; border-radius: 15px;">
                     <h6 class="fw-bold text-success mb-2">🏡 양평 이웃 인증 (선택사항)</h6>
-                    <p class="text-muted" style="font-size: 0.8rem; line-height: 1.4;">인증 완료 시 마을의 주요 의사결정 투표권과 마을 포인트 가점 혜택을 받으실 수 있습니다.</p>
+                    <p class="text-muted" style="font-size: 0.8rem; line-height: 1.4;">인증 완료 시 마을의 주요 의사결정 투표권과 마을 닢 가점 혜택을 받으실 수 있습니다.</p>
                     
                     <!-- 1. GPS 실시간 위치 확인 -->
                     <div class="mb-3">
@@ -77,6 +80,37 @@
                         <label class="form-label small fw-bold">📎 고지서 또는 지역화폐 카드 사진 첨부</label>
                         <input type="file" name="bill_image" class="form-control form-control-sm">
                         <div class="form-text" style="font-size: 0.75rem;">주민 실명과 양평 주소지가 적힌 면을 촬영하여 올려주세요. (승인 즉시 파기됨)</div>
+                    </div>
+                </div>
+
+                <div class="mb-3 form-check">
+                    <input type="checkbox" class="form-check-input" id="agreeTerms" required>
+                    <label class="form-check-label small" for="agreeTerms">
+                        <a href="/terms" target="_blank" class="text-decoration-none">회원약관 및 닢 운영 규칙</a>에 동의합니다 (필수)
+                    </label>
+                </div>
+
+                <!-- 중요 동의 사항 -->
+                <div class="card p-3 mb-3 border-0" style="background-color: #fff8e1; border-radius: 15px;">
+                    <h6 class="fw-bold mb-2" style="color: #8d6e00;">📌 중요! 다음 사항을 확인하고 동의해 주세요</h6>
+                    <div style="font-size: 0.82rem; line-height: 1.6; color: #5d4e37;">
+                        <p class="mb-1">✓ <strong>AI 콘텐츠 심사</strong> — 모든 게시글·댓글·공유는 AI 지킴이가 분석하며, 
+                        함께사는양평에 위해가 되는 내용은 수정 후 노출됩니다.</p>
+                        <p class="mb-1">✓ <strong>30일 수정 기간</strong> — 게시불가 판정 시 30일 이내에 수정 가능하며, 
+                        수정할 때마다 <strong>100닢</strong>이 사용됩니다.</p>
+                        <p class="mb-1">✓ <strong>닢 선지급</strong> — 회원 10,000명이 될 때까지 
+                        가입 시와 30일마다 <strong>1,000닢</strong>이 선지급됩니다.</p>
+                        <p class="mb-1">✓ <strong>주민 인증</strong> — GPS 또는 고지서·지역화폐카드 인증 시 
+                        리(里) 단위 오프라인 활동(투표, 모임 등)이 가능하며, 
+                        인증하지 않으면 온라인 활동에 제약이 있을 수 있습니다.</p>
+                        <p class="mb-0">✓ <strong>분쟁 조정</strong> — 회원 간 분쟁은 
+                        <strong>내부 중재위원회의 조정 규칙</strong>을 따라야 합니다.</p>
+                    </div>
+                    <div class="form-check mt-2">
+                        <input type="checkbox" class="form-check-input" id="agreeImportant" name="agree_important" required>
+                        <label class="form-check-label small fw-bold" for="agreeImportant" style="color: #8d6e00;">
+                            위 중요 사항을 모두 확인하였으며 동의합니다 (필수)
+                        </label>
                     </div>
                 </div>
 
@@ -143,17 +177,28 @@ function verifyGPS() {
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
 
-        // 양평군 위경도 범위 내에 있는지 판정
-        if (lat >= 37.35 && lat <= 37.65 && lon >= 127.30 && lon <= 127.75) {
-            document.getElementById('gps-status').innerText = "📍 인증 성공 (양평군 관내)";
-            document.getElementById('gps-status').className = "small ms-2 text-success fw-bold";
-            document.getElementById('gps-verified').value = "true";
-        } else {
-            document.getElementById('gps-status').innerText = "📍 인증 실패 (관외 지역)";
-            document.getElementById('gps-status').className = "small ms-2 text-danger fw-bold";
-            document.getElementById('gps-verified').value = "false";
-            alert("현재 위치가 양평군 관외로 확인됩니다. 고지서 첨부나 활동가 보증을 이용해 주세요.");
-        }
+        // 서버에 역지오코딩 요청
+        fetch('/api/reverse-geocode?lat=' + lat + '&lon=' + lon)
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {
+                var loc = '양평군 ' + (data.town ? data.town + ' ' + data.village : '관내');
+                document.getElementById('gps-status').innerText = '✅ 인증 성공 (' + loc + ')';
+                document.getElementById('gps-status').className = 'small ms-2 text-success fw-bold';
+                document.getElementById('gps-verified').value = 'true';
+                document.getElementById('reg_latitude').value = lat;
+                document.getElementById('reg_longitude').value = lon;
+            } else {
+                document.getElementById('gps-status').innerText = '📍 인증 실패 (관외 지역)';
+                document.getElementById('gps-status').className = 'small ms-2 text-danger fw-bold';
+                document.getElementById('gps-verified').value = 'false';
+                alert('현재 위치가 양평군 관외로 확인됩니다. 고지서 첨부나 활동가 보증을 이용해 주세요.');
+            }
+        })
+        .catch(function() {
+            document.getElementById('gps-status').innerText = '인증 실패 (서버 오류)';
+            document.getElementById('gps-status').className = 'small ms-2 text-danger fw-bold';
+        });
     }, function() {
         document.getElementById('gps-status').innerText = "인증 실패 (권한 거부)";
         alert("위치 권한을 허용해 주셔야 실시간 인증이 가능합니다.");
@@ -171,5 +216,10 @@ window.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+function toggleRegPw() {
+    var i = document.getElementById('regPw');
+    i.type = i.type === 'password' ? 'text' : 'password';
+}
 </script>
 {% endblock %}

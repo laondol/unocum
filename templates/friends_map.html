@@ -1,0 +1,101 @@
+{% extends 'layout.html' %}
+{% block content %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<div class="container mt-4" style="max-width: 900px;">
+    <a href="/friends" class="btn btn-sm btn-outline-secondary mb-3">← 벗관리로</a>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="fw-bold mb-0">🗺️ 벗 위치 지도</h4>
+        <button class="btn btn-sm btn-outline-primary" onclick="refreshFriends()">🔄 새로고침</button>
+    </div>
+
+    {% set my_loc = (session.get('user_id') and current_user) %}
+    <div class="card border-0 shadow-sm mb-3" style="border-radius: 18px; overflow: hidden;">
+        <div id="map" style="height: 500px;"></div>
+    </div>
+
+    <div class="row g-3" id="friend-list"></div>
+</div>
+
+<script>
+let map, markers = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    map = L.map('map').setView([37.5, 127.5], 11);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19, attribution: '© OpenStreetMap'
+    }).addTo(map);
+    refreshFriends();
+
+    // 내 위치도 있으면 마커
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(pos) {
+            L.circleMarker([pos.coords.latitude, pos.coords.longitude], {
+                radius: 8, color: '#0d6efd', fillColor: '#0d6efd', fillOpacity: 0.8
+            }).addTo(map).bindPopup('<strong>📍 내 위치</strong>');
+        }, function(){}, {enableHighAccuracy: true, timeout: 5000});
+    }
+});
+
+function refreshFriends() {
+    fetch('/api/nearby-friends')
+    .then(r => r.json())
+    .then(d => {
+        markers.forEach(m => map.removeLayer(m));
+        markers = [];
+        const list = document.getElementById('friend-list');
+        if (!d.friends || d.friends.length === 0) {
+            list.innerHTML = '<div class="text-center text-muted py-4">위치를 공유 중인 벗이 없습니다.</div>';
+            return;
+        }
+        list.innerHTML = '';
+        d.friends.forEach(f => {
+            // 지도 마커
+            const m = L.marker([f.lat, f.lon]).addTo(map)
+                .bindPopup(`
+                    <strong>${f.name}</strong><br>
+                    ${f.town} ${f.village}<br>
+                    <small>갱신: ${f.updated_at}</small><br>
+                    <button class="btn btn-sm btn-warning mt-1" onclick="coffeeInvite(${f.id})">☕ 커피 한잔?</button>
+                `);
+            markers.push(m);
+
+            // 카드
+            const col = document.createElement('div');
+            col.className = 'col-md-4 col-sm-6';
+            col.innerHTML = `
+                <div class="card border-0 shadow-sm h-100" style="border-radius: 14px;">
+                    <div class="card-body p-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="fw-bold mb-1">${f.name}</h6>
+                                <small class="text-muted">📍 ${f.town} ${f.village}</small>
+                                <div class="small text-muted mt-1">🕐 ${f.updated_at}</div>
+                            </div>
+                            <button class="btn btn-sm btn-warning" onclick="coffeeInvite(${f.id})">☕</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            list.appendChild(col);
+        });
+        // 모든 마커가 보이도록 지도 영역 조정
+        if (markers.length > 0) {
+            const group = L.featureGroup(markers);
+            map.fitBounds(group.getBounds().pad(0.1));
+        }
+    });
+}
+
+function coffeeInvite(friendId) {
+    const msg = prompt('☕ 커피 한잔할래요?\n함께 보낼 메시지를 입력하세요 (선택사항):', '');
+    if (msg === null) return;
+    const form = new FormData();
+    form.append('msg', msg || '');
+    fetch('/coffee-invite/' + friendId, {method:'POST', body: form})
+    .then(r => r.json())
+    .then(d => alert(d.msg))
+    .catch(e => alert('오류: ' + e));
+}
+</script>
+{% endblock %}

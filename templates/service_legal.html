@@ -1,0 +1,36 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container py-4" style="max-width: 800px;">
+    <div class="card border-0 shadow-sm" style="border-radius: 18px;">
+        <div class="card-body p-4 text-center">
+            <div style="font-size: 60px;">⚖️</div>
+            <h3 class="fw-bold mt-3">노무사 이훈 법률사무소</h3>
+            <p class="text-muted">근로·노동·인사 관련 법률 상담 및 자문</p>
+            <hr>
+            <div class="text-start small lh-lg">
+                <p><strong>대표 노무사</strong> : 이훈</p>
+                <p><strong>상담 분야</strong> : 임금체불, 부당해고, 산업재해, 인사·노무관리, 근로계약서 검토, 취업규칙 작성, 각종 노동위원회 사건</p>
+                <p><strong>운영 시간</strong> : 평일 10:00 ~ 16:00 (점심 12:00~13:00)</p>
+                <p><strong>위치</strong> : 경기도 양평군</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mt-3">
+        <div class="col-6">
+            <a href="/legal/list" class="btn btn-outline-primary w-100 py-3 fw-bold">
+                📋 법률상담 게시판<br><small class="text-muted">온라인 질의·답변</small>
+            </a>
+        </div>
+        <div class="col-6">
+            <a href="/legal/schedule" class="btn btn-outline-success w-100 py-3 fw-bold">
+                📅 방문상담 예약<br><small class="text-muted">대면 상담 신청</small>
+            </a>
+        </div>
+    </div>
+
+    <div class="text-center mt-3">
+        <a href="/intro" class="btn btn-sm btn-outline-secondary">← 사업소개</a>
+    </div>
+</div>
+{% endblock %}

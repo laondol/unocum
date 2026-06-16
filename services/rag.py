@@ -11,14 +11,11 @@ CHROMA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'instance'
 def _get_embedder():
     global _embedder
     if _embedder is None:
-        try:
-            import psutil
-            mem = psutil.virtual_memory()
-            if mem.available < 300 * 1024 * 1024:
-                print(f"[RAG] 메모리 부족으로 임베더 로딩 스킵 (available: {mem.available // 1024 // 1024}MB)")
-                return None
-        except ImportError:
-            pass
+        import os
+        total = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES') if hasattr(os, 'sysconf') else 0
+        if total and total < 1024 * 1024 * 1024:
+            print(f"[RAG] 1GB 미만 메모리 환경: sentence-transformers 로딩 생략")
+            return None
         from sentence_transformers import SentenceTransformer
         _embedder = SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2', device='cpu')
     return _embedder

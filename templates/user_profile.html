@@ -11,7 +11,7 @@
                     </div>
                 </div>
                 <div class="col">
-                    <h3 class="fw-bold mb-1">{{ profile_user.real_name or profile_user.username }}</h3>
+                    <h3 class="fw-bold mb-1">{{ profile_user.real_name + ' (' + profile_user.username + ')' if profile_user.real_name else profile_user.username }}</h3>
                     <div class="text-muted small">
                         <span class="badge bg-light text-dark me-1">{{ profile_user.town }} {{ profile_user.village }}</span>
                         {% if profile_user.is_verified_resident %}
@@ -26,12 +26,41 @@
                         {% endif %}
                     </div>
                     <div class="small text-muted mt-1">회원번호: {{ profile_user.id }}</div>
+                    {% if profile_user.last_logout %}
+                    <div class="small text-muted mt-1">최종접속: {{ profile_user.last_logout.strftime('%Y-%m-%d %H:%M') }}</div>
+                    {% elif profile_user.last_login %}
+                    <div class="small text-muted mt-1">최종접속: {{ profile_user.last_login.strftime('%Y-%m-%d %H:%M') }}</div>
+                    {% endif %}
                 </div>
+                {% if is_own %}
                 <div class="col-auto text-end">
                     <div class="fs-1 fw-bold text-success">{{ profile_user.points }}</div>
-                    <small class="text-muted">물맑은머니</small>
+                    <small class="text-muted">닢</small>
                 </div>
+                {% endif %}
             </div>
+            {% if is_own %}
+            <div class="text-end mt-2">
+                <a href="/logout" class="btn btn-sm btn-outline-danger" onclick="return confirm('로그아웃 하시겠습니까?')">🚪 로그아웃</a>
+            </div>
+            {% elif session.get('user_id') and session.get('user_id') != profile_user.id %}
+            <div class="text-end mt-2">
+                {% if is_friend %}
+                <span class="badge bg-success fs-6 px-3 py-2">👥 벗</span>
+                {% else %}
+                <button class="btn btn-sm btn-outline-primary" onclick="sendFriendRequest({{ profile_user.id }})">👋 벗 신청</button>
+                {% endif %}
+            </div>
+            {% endif %}
+            {% if is_friend and profile_user.login_location_share and profile_user.last_login %}
+            <div class="small text-muted mt-2 p-2 bg-light rounded">
+                <span class="fw-bold">🔐 마지막 로그인:</span>
+                {{ profile_user.last_login.strftime('%Y-%m-%d %H:%M') }}
+                {% if profile_user.login_town %}
+                · {{ profile_user.login_town }} {{ profile_user.login_village or '' }}
+                {% endif %}
+            </div>
+            {% endif %}
         </div>
     </div>
 
@@ -53,7 +82,7 @@
                 <div class="col-md-6">
                     <div class="p-3 bg-light rounded">
                         <small class="text-muted d-block">현재 위치</small>
-                        <span id="currLocationDisplay" class="fw-bold">{{ profile_user.curr_town or profile_user.town }} {{ profile_user.curr_village or profile_user.village }}</span>
+                        <span id="currLocationDisplay" class="fw-bold">{{ profile_user.curr_town or '위치 정보 없음' }} {{ profile_user.curr_village or '' }}</span>
                         {% if profile_user.curr_latitude and profile_user.curr_longitude %}
                         <small class="d-block text-muted">({{ profile_user.curr_latitude|round(4) }}, {{ profile_user.curr_longitude|round(4) }})</small>
                         {% endif %}
@@ -63,19 +92,28 @@
                     </div>
                 </div>
             </div>
-            <button id="refreshLocationBtn" class="btn btn-sm btn-outline-primary mt-3" onclick="refreshLocation()">
-                📡 현재 위치 갱신하기
-            </button>
-            <span id="locationStatus" class="small text-muted ms-2"></span>
+            <div id="locationStatus" class="small mt-2"></div>
+            <div id="locationGuide" class="mt-2 p-3 bg-warning bg-opacity-10 rounded" style="display:none;">
+                <strong>⚠️ 위치 권한 필요</strong>
+                <p class="small mb-2">브라우저가 위치 정보를 차단했습니다. 아래 버튼을 눌러 설정을 변경해주세요.</p>
+                <button class="btn btn-sm btn-warning" onclick="openLocationSettings()">🔐 브라우저 위치 권한 설정</button>
+            </div>
+            <div class="mt-2">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="locationShareToggle" {{ 'checked' if profile_user.location_share }} onchange="toggleLocationShare(this.checked)">
+                    <label class="form-check-label small" for="locationShareToggle">내 위치를 벗에게 공유하기</label>
+                </div>
+            </div>
         </div>
     </div>
     {% endif %}
 
     <div class="row g-4">
-        <!-- 포인트 내역 -->
+        {% if is_own %}
+        <!-- 닢 내역 -->
         <div class="col-md-6">
             <div class="card border-0 shadow-sm h-100" style="border-radius: 18px;">
-                <div class="card-header bg-white fw-bold" style="border-radius: 18px 18px 0 0;">💎 포인트 내역</div>
+                <div class="card-header bg-white fw-bold" style="border-radius: 18px 18px 0 0;">💎 닢 내역</div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-hover mb-0 small">
@@ -100,15 +138,20 @@
                 </div>
             </div>
         </div>
+        {% endif %}
 
+        {% if not is_own %}
+        <div class="text-end mb-3">
+            <a href="/message/send/{{ profile_user.id }}" class="btn btn-success btn-sm">💬 쪽지 보내기</a>
+        </div>
+        {% endif %}
+
+        {% if is_own or is_friend %}
         <!-- 쪽지함 -->
         <div class="col-md-6">
             <div class="card border-0 shadow-sm h-100" style="border-radius: 18px;">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center fw-bold" style="border-radius: 18px 18px 0 0;">
-                    📬 쪽지함
-                    {% if not is_own %}
-                    <a href="/message/send/{{ profile_user.id }}" class="btn btn-sm btn-success">쪽지 보내기</a>
-                    {% endif %}
+                    {% if is_own %}📬 받은 쪽지{% else %}💬 주고받은 쪽지{% endif %}
                 </div>
                 <div class="card-body p-0">
                     <div class="list-group list-group-flush">
@@ -116,63 +159,118 @@
                         <a href="/message/read/{{ m.id }}" class="list-group-item list-group-item-action {% if not m.is_read %}fw-bold bg-light{% endif %}">
                             <div class="d-flex justify-content-between">
                                 <span class="small text-muted">{{ m.created_at.strftime('%m/%d %H:%M') }}</span>
+                                {% if is_own %}
                                 <span class="badge {% if m.sender_role == 'admin' %}bg-danger{% elif m.sender_role == 'leader' %}bg-primary{% else %}bg-secondary{% endif %}">{{ m.sender_role }}</span>
+                                {% else %}
+                                <span class="badge {% if m.is_read %}bg-secondary{% else %}bg-warning text-dark{% endif %}">{{ '읽음' if m.is_read else '읽지않음' }}</span>
+                                {% endif %}
                             </div>
                             <div class="fw-medium">{{ m.subject }}</div>
+                            {% if is_own %}
                             <small class="text-muted">{{ m.sender_name }} | {{ m.content[:50] }}{% if m.content|length > 50 %}...{% endif %}</small>
+                            {% else %}
+                            <small class="text-muted">{{ m.sender_name if m.sender_id != profile_user.id else '나' }} →
+                                {% if m.receiver_id == profile_user.id %}{{ profile_user.real_name or profile_user.username }}{% else %}나{% endif %}
+                                | {{ m.content[:50] }}{% if m.content|length > 50 %}...{% endif %}</small>
+                            {% endif %}
                         </a>
                         {% else %}
-                        <div class="list-group-item text-center text-muted py-4">받은 쪽지가 없습니다.</div>
+                        <div class="list-group-item text-center text-muted py-4">{{ '받은 쪽지가 없습니다.' if is_own else '주고받은 쪽지가 없습니다.' }}</div>
                         {% endfor %}
                     </div>
                 </div>
             </div>
         </div>
+        {% endif %}
     </div>
 </div>
 
 {% if is_own %}
 <script>
-function refreshLocation() {
+function updateLocationDisplay(data) {
+    const display = document.getElementById('currLocationDisplay');
+    if (display) display.textContent = (data.town || '양평') + ' ' + (data.village || '');
+}
+function autoGetLocation() {
+    const status = document.getElementById('locationStatus');
+    const guide = document.getElementById('locationGuide');
     if (!navigator.geolocation) {
-        document.getElementById('locationStatus').textContent = 'GPS 미지원 브라우저';
+        status.innerHTML = '❌ 이 브라우저는 위치정보를 지원하지 않습니다.';
+        status.className = 'small mt-2 text-danger';
+        guide.style.display = 'block';
         return;
     }
-    const btn = document.getElementById('refreshLocationBtn');
-    const status = document.getElementById('locationStatus');
-    btn.disabled = true;
-    status.textContent = '📍 위치 확인 중...';
-    
-    navigator.geolocation.getCurrentPosition(pos => {
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
-        status.textContent = '📡 서버 전송 중...';
-        
-        fetch('/user/location/refresh', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({lat: lat, lon: lon})
-        })
-        .then(r => r.json())
-        .then(d => {
-            if (d.status === 'success') {
-                status.textContent = '✅ 위치 갱신 완료! (' + (d.town || '양평') + ' ' + (d.village || '') + ')';
-                const display = document.getElementById('currLocationDisplay');
-                if (display) display.textContent = (d.town || '양평') + ' ' + (d.village || '');
-            } else {
-                status.textContent = '❌ ' + (d.msg || '오류');
-            }
-        })
-        .catch(e => {
-            status.textContent = '❌ 네트워크 오류';
-        })
-        .finally(() => {
-            btn.disabled = false;
-        });
-    }, err => {
-        status.textContent = '⚠️ GPS 권한이 필요합니다. 브라우저 설정을 확인하세요.';
-        btn.disabled = false;
-    }, {enableHighAccuracy: true, timeout: 10000});
+    status.innerHTML = '📍 현재 위치를 자동으로 수집 중입니다...';
+    status.className = 'small mt-2 text-primary';
+    navigator.geolocation.getCurrentPosition(
+        pos => {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+            fetch('/user/location/refresh', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({lat, lon})
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (d.status === 'success') {
+                    updateLocationDisplay(d);
+                    status.innerHTML = '✅ 현재 위치 갱신 완료';
+                    status.className = 'small mt-2 text-success';
+                }
+            })
+            .catch(() => {});
+        },
+        err => {
+            status.innerHTML = '⚠️ 위치 수집 실패: ' + err.message;
+            status.className = 'small mt-2 text-warning';
+            guide.style.display = 'block';
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+}
+function openLocationSettings() {
+    const ua = navigator.userAgent.toLowerCase();
+    if (ua.includes('chrome')) {
+        alert('Chrome 설정 > 개인정보 및 보안 > 사이트 설정 > 위치\n또는 주소창 왼쪽 자물쇠 아이콘을 클릭하여 위치 권한을 허용해주세요.');
+    } else if (ua.includes('firefox')) {
+        alert('Firefox: 주소창 왼쪽 페이지 정보 아이콘 > 권한 > 위치\n또는 설정 > 개인정보 및 보안 > 권한 > 위치를 허용해주세요.');
+    } else if (ua.includes('samsung')) {
+        alert('삼성인터넷: 메뉴 > 설정 > 개인정보 및 보안 > 위치\n또는 주소창 왼쪽 자물쇠 아이콘을 클릭하여 위치 권한을 허용해주세요.');
+    } else {
+        alert('브라우저 설정에서 위치 권한을 허용해주세요.\n' + window.location.origin + ' (이)가 위치에 접근할 수 있도록 설정해주세요.');
+    }
+    // 설정 변경 후 재시도
+    setTimeout(autoGetLocation, 3000);
+}
+// 페이지 로드 시 자동 위치 확인
+document.addEventListener('DOMContentLoaded', autoGetLocation);
+
+function toggleLocationShare(enabled) {
+    const val = enabled ? 'friends' : 'off';
+    fetch('/user/location/share/toggle', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({value: val})
+    })
+    .then(r=>r.json())
+    .then(d=>{ if(d.status!=='success') alert('오류: '+d.msg); })
+    .catch(e=>alert('오류: '+e));
+}
+</script>
+{% endif %}
+
+{% if not is_own and session.get('user_id') and session.get('user_id') != profile_user.id %}
+<script>
+function sendFriendRequest(id) {
+    const msg = '⚠️ 벗신청은 신중하게 하셔야 합니다. 관례를 끊을 때는 중재위원회의 원칙에 따라 관계를 정리해야 합니다.\n\n계속 진행하시겠습니까?';
+    if(!confirm(msg)) return;
+    const shareLoc = confirm('로그인 위치와 시간을 벗에게 공유하시겠습니까?\n(벗정보에 마지막 로그인 위치와 시간이 표시됩니다)');
+    const fd = new FormData();
+    fd.append('share_login_location', shareLoc ? '1' : '0');
+    fetch('/friends/request/' + id, {method:'POST', body:fd})
+    .then(r=>r.json()).then(d=>{ if(d.status==='success') location.reload(); else alert(d.msg); })
+    .catch(e=>alert('오류: '+e));
 }
 </script>
 {% endif %}

@@ -1,0 +1,61 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container" style="max-width: 800px;">
+    <h3 class="fw-bold mb-4">통합 검색</h3>
+    <form class="d-flex mb-4" action="/search" method="GET">
+        <input class="form-control me-2" type="search" name="q" value="{{ q }}" placeholder="검색어 입력..." aria-label="검색" style="border-radius:20px;">
+        <button class="btn btn-success" type="submit">검색</button>
+    </form>
+    {% if q %}
+    {% set total = results.posts|length + results.shares|length + results.news|length %}
+    <p class="text-muted small">'{{ q }}' 검색 결과 {{ total }}건</p>
+    {% if results.posts %}
+    <h5 class="fw-bold mt-4">📜 제안 ({{ results.posts|length }})</h5>
+    <div class="list-group mb-4">
+        {% for p in results.posts %}
+        <a href="/post/{{ p.id }}" class="list-group-item list-group-item-action">
+            <div class="d-flex justify-content-between">
+                <strong>{{ p.title }}</strong>
+                <small class="text-muted">{{ p.created_at.strftime('%Y-%m-%d') }}</small>
+            </div>
+            <small class="text-muted">{{ p.content[:100] }}{% if p.content|length > 100 %}...{% endif %}</small>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% if results.shares %}
+    <h5 class="fw-bold mt-4">📸 공유 ({{ results.shares|length }})</h5>
+    <div class="list-group mb-4">
+        {% for s in results.shares %}
+        <a href="/share/detail/{{ s.id }}" class="list-group-item list-group-item-action">
+            <div class="d-flex justify-content-between">
+                <strong>{{ s.title }}</strong>
+                <small class="text-muted">{{ s.created_at.strftime('%Y-%m-%d') }}</small>
+            </div>
+            <small class="text-muted">{{ s.description[:100] }}{% if s.description|length > 100 %}...{% endif %}</small>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% if results.news %}
+    <h5 class="fw-bold mt-4">📰 소식 ({{ results.news|length }})</h5>
+    <div class="list-group mb-4">
+        {% for n in results.news %}
+        <a href="/news/{{ n.id }}" class="list-group-item list-group-item-action">
+            <div class="d-flex justify-content-between">
+                <strong>{{ n.title }}</strong>
+                <small class="text-muted">{{ n.created_at.strftime('%Y-%m-%d') }}</small>
+            </div>
+            <small class="text-muted">{{ n.summary[:100] if n.summary else '' }}{% if n.summary and n.summary|length > 100 %}...{% endif %}</small>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% if total == 0 %}
+    <div class="text-center p-5 text-muted">검색 결과가 없습니다.</div>
+    {% endif %}
+    {% else %}
+    <div class="text-center p-5 text-muted">검색어를 입력해주세요.</div>
+    {% endif %}
+</div>
+{% endblock %}

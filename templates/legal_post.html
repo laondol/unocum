@@ -1,0 +1,51 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container py-4" style="max-width: 700px;">
+    {% if need_password %}
+    <div class="card border-0 shadow-sm p-4" style="border-radius: 16px;">
+        <h5 class="fw-bold text-center">🔒 비밀번호를 입력하세요</h5>
+        {% if error %}<div class="alert alert-danger py-2">비밀번호가 틀렸습니다.</div>{% endif %}
+        <form method="post">
+            <div class="input-group">
+                <input type="password" name="password" class="form-control" placeholder="비밀번호" required>
+                <button class="btn btn-success" type="submit">확인</button>
+            </div>
+        </form>
+    </div>
+
+    {% else %}
+
+    <div class="card border-0 shadow-sm" style="border-radius: 16px;">
+        <div class="card-body p-4">
+            <h4 class="fw-bold">{{ post.title }}</h4>
+            <div class="small text-muted mb-3">
+                {{ post.author_name or '익명' }} | {{ post.created_at.strftime('%Y-%m-%d %H:%M') }}
+                {% if post.is_public %}<span class="badge bg-info ms-2">공개</span>{% endif %}
+            </div>
+            <hr>
+            <div class="mb-4" style="line-height: 1.8;">{{ post.content|safe }}</div>
+
+            {% if post.answer %}
+            <div class="bg-success bg-opacity-10 p-3 rounded" style="border-left: 4px solid #198754;">
+                <h6 class="fw-bold text-success">⚖️ 노무사 이훈 답변</h6>
+                <div style="line-height: 1.8;">{{ post.answer|safe }}</div>
+                {% if post.fee %}
+                <div class="mt-2"><strong>💰 상담비</strong> : {{ '{:,}'.format(post.fee) }}원</div>
+                {% endif %}
+                {% if post.travel_allowance %}
+                <div><strong>🚗 출장비</strong> : {{ '{:,}'.format(post.travel_allowance) }}원</div>
+                {% endif %}
+                <small class="text-muted">답변일: {{ post.answered_at.strftime('%Y-%m-%d %H:%M') }}</small>
+            </div>
+            {% else %}
+            <div class="text-center text-muted py-3">아직 답변이 등록되지 않았습니다.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="text-center mt-3">
+        <a href="/legal/list" class="btn btn-sm btn-outline-secondary">← 목록</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

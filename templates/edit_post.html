@@ -21,7 +21,7 @@
                 </div>
                 <div class="mb-3">
                     <label class="form-label small fw-bold">보완할 내용</label>
-                    <textarea name="content" class="form-control" rows="8" required>{{ post.content }}</textarea>
+                    <textarea name="content" class="summernote-editor form-control" rows="8" required>{{ post.content }}</textarea>
                 </div>
                 
                 <!-- 기존 첨부파일/그림 표시 -->
@@ -54,6 +54,13 @@
                     <a href="/all-proposals" class="btn btn-light w-50">취소</a>
                     <button class="btn btn-success w-50 fw-bold">보완 완료 및 제출</button>
                 </div>
+                {% if session.get('user_id') == post.user_id %}
+                <div class="text-end mt-3">
+                    <form action="/post/delete/{{ post.id }}" method="post" onsubmit="return confirm('정말 삭제하시겠습니까? 복구할 수 없습니다.');" style="display:inline;">
+                        <button class="btn btn-outline-danger btn-sm">🗑️ 삭제</button>
+                    </form>
+                </div>
+                {% endif %}
             </form>
         </div>
     </div>

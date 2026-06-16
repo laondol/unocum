@@ -1,0 +1,47 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container py-4" style="max-width: 700px;">
+    <h4 class="fw-bold mb-3">📝 심리상담 글쓰기</h4>
+    <form method="post" action="/psycho/write">
+        <div class="card border-0 shadow-sm p-4" style="border-radius: 16px;">
+            <div class="mb-3">
+                <label class="form-label small fw-bold">제목</label>
+                <input type="text" name="title" class="form-control" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-bold">상담 내용</label>
+                <textarea name="content" class="summernote-editor form-control" rows="8" required></textarea>
+            </div>
+            <div class="row g-2 mb-3">
+                <div class="col-4">
+                    <label class="form-label small fw-bold">작성자</label>
+                    <input type="text" name="author_name" class="form-control" placeholder="익명">
+                </div>
+                <div class="col-4">
+                    <label class="form-label small fw-bold">이메일 <span class="text-danger">*</span></label>
+                    <input type="email" name="email" class="form-control" required placeholder="answer@email.com">
+                </div>
+                <div class="col-4">
+                    <label class="form-label small fw-bold">비밀번호 <span class="text-danger">*</span></label>
+                    <div class="input-group">
+                        <input type="password" name="password" id="pwInput" class="form-control" required>
+                        <button type="button" class="btn btn-outline-secondary" onclick="togglePw()">👁</button>
+                    </div>
+                </div>
+            </div>
+            <div class="form-text mb-2">작성하신 비밀번호는 글 조회 시 필요합니다. 답변 등록 시 이메일로 알림이 발송됩니다.</div>
+            <div class="alert alert-warning py-2 mb-3 small">💡 상담 내용 및 방식에 따라 <strong>상담비</strong>가 발생할 수 있습니다. 답변 시 안내해 드립니다.</div>
+            <button type="submit" class="btn btn-success w-100 py-2 fw-bold">등록하기</button>
+        </div>
+    </form>
+    <div class="text-center mt-3">
+        <a href="/psycho/list" class="btn btn-sm btn-outline-secondary">← 목록</a>
+    </div>
+</div>
+<script>
+function togglePw() {
+    var i = document.getElementById('pwInput');
+    i.type = i.type === 'password' ? 'text' : 'password';
+}
+</script>
+{% endblock %}

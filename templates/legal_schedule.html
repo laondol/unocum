@@ -1,0 +1,86 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container py-4" style="max-width: 700px;">
+    <h4 class="fw-bold mb-3">📅 방문상담 예약</h4>
+
+    {% if not session.user_id %}
+    <div class="alert alert-warning">
+        방문상담 예약은 회원 전용입니다. <a href="/login?next=/legal/schedule" class="alert-link">로그인</a> 후 이용해 주세요.
+    </div>
+    {% endif %}
+
+    <div class="card border-0 shadow-sm" style="border-radius: 16px;">
+        <div class="card-body p-4">
+            <form method="post" action="/legal/appointment/book">
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label small fw-bold">이름</label>
+                        <input type="text" name="name" class="form-control" value="{{ session.get('username','') }}" required>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small fw-bold">연락처</label>
+                        <input type="tel" name="phone" class="form-control" placeholder="010-1234-5678">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">이메일</label>
+                    <input type="email" name="email" class="form-control" required>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">상담 장소</label>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <select name="location" class="form-select" required>
+                                <option value="">장소 선택</option>
+                                <option value="법률사무소">법률사무소 방문</option>
+                                <option value="출장">출장 상담 (별도 출장비)</option>
+                                <option value="온라인">온라인 화상상담</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <input type="text" name="location_detail" class="form-control" placeholder="상세 주소 (출장 시)">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">예약 희망일</label>
+                    <select name="date" class="form-select" required>
+                        <option value="">날짜 선택</option>
+                        {% for d in available_dates %}
+                        <option value="{{ d }}">{{ d }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">노무사 일정이 없는 날짜만 표시됩니다. (평일 10:00~16:00, 2시간 단위)</div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">희망 시간대</label>
+                    <select name="time_slot" class="form-select" required>
+                        <option value="">시간 선택</option>
+                        {% for s in time_slots %}
+                        <option value="{{ s }}">{{ s }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">상담 내용</label>
+                    <textarea name="content" class="summernote-editor form-control" rows="5" placeholder="간단한 상담 내용을 적어주세요."></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-success w-100 py-2 fw-bold" {% if not session.user_id %}disabled{% endif %}>
+                    📅 예약 신청하기
+                </button>
+                {% if not session.user_id %}
+                <div class="text-muted small text-center mt-2">로그인 후 예약 가능합니다.</div>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+    <div class="text-center mt-3">
+        <a href="/service/legal" class="btn btn-sm btn-outline-secondary">← 법률사무소</a>
+    </div>
+</div>
+{% endblock %}

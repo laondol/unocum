@@ -32,6 +32,54 @@ YANGPYEONG_VILLAGES = {
     '개군면': ['주읍리', '내리', '석장리', '하자포리', '부리', '공세리', '양동리', '구미리', '향리', '계전리'],
 }
 
+def generate_town_geojson():
+    features = []
+    for town, bounds in YANGPYEONG_BOUNDS.items():
+        feature = {
+            "type": "Feature",
+            "properties": {"name": town, "type": "town"},
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [[
+                    [bounds['lon_min'], bounds['lat_min']],
+                    [bounds['lon_max'], bounds['lat_min']],
+                    [bounds['lon_max'], bounds['lat_max']],
+                    [bounds['lon_min'], bounds['lat_max']],
+                    [bounds['lon_min'], bounds['lat_min']]
+                ]]
+            }
+        }
+        features.append(feature)
+    return {"type": "FeatureCollection", "features": features}
+
+def generate_village_geojson():
+    features = []
+    for town, villages in YANGPYEONG_VILLAGES.items():
+        bounds = YANGPYEONG_BOUNDS[town]
+        lon_step = (bounds['lon_max'] - bounds['lon_min']) / max(len(villages), 1)
+        lat_step = (bounds['lat_max'] - bounds['lat_min']) / max(len(villages), 1)
+        for i, village in enumerate(villages):
+            lat_min = bounds['lat_min'] + (i % max(len(villages)//2+1, 1)) * lat_step * 2
+            lat_max = min(lat_min + lat_step * 2, bounds['lat_max'])
+            lon_min = bounds['lon_min'] + ((i // max(len(villages)//2+1, 1)) % 2) * lon_step * (len(villages)//2)
+            lon_max = min(lon_min + lon_step * (len(villages)//2), bounds['lon_max'])
+            feature = {
+                "type": "Feature",
+                "properties": {"name": village, "town": town, "type": "village"},
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[
+                        [lon_min, lat_min],
+                        [lon_max, lat_min],
+                        [lon_max, lat_max],
+                        [lon_min, lat_max],
+                        [lon_min, lat_min]
+                    ]]
+                }
+            }
+            features.append(feature)
+    return {"type": "FeatureCollection", "features": features}
+
 def haversine(lat1, lon1, lat2, lon2):
     R = 6371
     dlat = math.radians(lat2 - lat1)
@@ -40,6 +88,37 @@ def haversine(lat1, lon1, lat2, lon2):
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
 
 def gps_to_town_village(lat, lon, kakao_key=None):
+    # 1) 행정안전부 주소기반산업지원서비스 API (좌표→주소)
+    try:
+        juso_key = current_app.config.get('JUSO_API_KEY', '')
+    except RuntimeError:
+        juso_key = ''
+    if juso_key:
+        try:
+            url = 'https://business.juso.go.kr/addrlink/coordAddrApi.do'
+            params = {'confmKey': juso_key, 'entX': lon, 'entY': lat, 'resultType': 'json'}
+            res = requests.get(url, params=params, timeout=5)
+            if res.status_code == 200:
+                data = res.json()
+                results = data.get('results', {})
+                juso = results.get('juso', [])
+                if juso:
+                    addr = juso[0]
+                    # 법정동명에서 읍면/리 추출
+                    full = addr.get('emdNm', '') or addr.get('lnmAdres', '')
+                    if full:
+                        parts = full.split()
+                        for t in YANGPYEONG_BOUNDS:
+                            if t in full:
+                                for v in YANGPYEONG_VILLAGES.get(t, []):
+                                    if v in full:
+                                        return t, v
+                                return t, ''
+            print(f"[Geocode] JUSO API status: {res.status_code}")
+        except Exception as e:
+            print(f"[Geocode] JUSO API exception: {e}")
+
+    # 2) Kakao API fallback
     if kakao_key is None:
         try:
             kakao_key = current_app.config.get('KAKAO_REST_API_KEY', '')
@@ -54,9 +133,9 @@ def gps_to_town_village(lat, lon, kakao_key=None):
                 data = res.json()
                 for doc in data.get('documents', []):
                     region_type = doc.get('region_type', '')
-                    if region_type == 'H':  # 행정구역
-                        region_3 = doc.get('region_3', '')  # 구/면
-                        region_4 = doc.get('region_4', '')  # 동/리
+                    if region_type == 'H':
+                        region_3 = doc.get('region_3', '')
+                        region_4 = doc.get('region_4', '')
                         if region_4:
                             return region_3, region_4
                         return region_3, ''
@@ -64,6 +143,7 @@ def gps_to_town_village(lat, lon, kakao_key=None):
         except Exception as e:
             print(f"[Geocode] Kakao API exception: {e}")
 
+    # 3) 최종 폴백: 양평군 bounds lookup
     return _fallback_lookup(lat, lon)
 
 def _fallback_lookup(lat, lon):
