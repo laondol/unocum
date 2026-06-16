@@ -588,9 +588,9 @@ def create_app():
             inspector = inspect(db.engine)
             user_cols = [c['name'] for c in inspector.get_columns('user')]
             with db.engine.connect() as conn:
-                for col in ['social_id', 'social_provider', 'social_email']:
+                for col in ['social_id', 'social_provider', 'social_email', 'email_verification_token', 'email_verification_sent_at']:
                     if col not in user_cols:
-                        col_type = 'VARCHAR(200)' if col == 'social_id' else 'VARCHAR(100)' if col == 'social_email' else 'VARCHAR(20)'
+                        col_type = 'VARCHAR(200)' if col in ('social_id', 'email_verification_token') else 'VARCHAR(100)' if col in ('social_email',) else 'VARCHAR(20)' if col in ('social_provider',) else 'DATETIME'
                         conn.execute(db.text(f'ALTER TABLE user ADD COLUMN {col} {col_type}'))
                         print(f'[OK] user.{col} column added')
     except Exception as e:

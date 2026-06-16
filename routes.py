@@ -98,50 +98,28 @@ def register_routes(app):
     @app.route('/register', methods=['GET', 'POST'])
     def register():
         if request.method == 'POST':
-            username = request.form['username']
+            email = request.form.get('email', '').strip()
             password = request.form['password']
             real_name = request.form['real_name']
-            phone = request.form['phone']
-            email = request.form.get('email', '').strip()
+            username = request.form['username']
             town = request.form['town']
             village = request.form['village']
-            reg_latitude = request.form.get('reg_latitude', type=float)
-            reg_longitude = request.form.get('reg_longitude', type=float)
-            gps_verified = request.form.get('gps_verified') == 'true'
             
-            if User.query.filter_by(username=username).first():
-                return "<script>alert('이미 있는 아이디입니다.'); history.back();</script>"
             if email and User.query.filter_by(email=email).first():
                 return "<script>alert('이미 등록된 이메일입니다.'); history.back();</script>"
-
-            file_url = None
-            verified_method = 'none'
-            is_verified = False
-
-            if gps_verified:
-                verified_method = 'gps'
-                is_verified = True
-
-            # 🏡 [보안 패치]: 이웃의 주소지에 맞게 static/uploads/bills/읍면_리/ 폴더 자동 생성 및 저장
-            if 'bill_image' in request.files:
-                file = request.files['bill_image']
-                if file and file.filename != '':
-                    file_url = save_village_file(file, app.config['UPLOAD_FOLDER'], town, village)
-                    verified_method = 'bill'
+            if User.query.filter_by(username=username).first():
+                return "<script>alert('이미 있는 닉네임입니다.'); history.back();</script>"
 
             hashed_pw = generate_password_hash(password)
             now = datetime.now()
             new_user = User(
                 username=username, password=hashed_pw,
-                real_name=real_name, phone=phone, email=email,
+                real_name=real_name, email=email,
                 town=town, village=village,
                 reg_town=town, reg_village=village,
-                reg_latitude=reg_latitude, reg_longitude=reg_longitude,
-                curr_latitude=reg_latitude, curr_longitude=reg_longitude,
                 curr_town=town, curr_village=village,
                 location_updated_at=now,
-                is_verified_resident=is_verified, verified_method=verified_method,
-                bill_image_path=file_url, points=1000
+                points=1000
             )
             db.session.add(new_user)
             db.session.flush()
@@ -154,8 +132,9 @@ def register_routes(app):
             db.session.commit()
             
             if email:
-                EmailService.send(email, f"[양평마을] 가입을 환영합니다, {username}님",
-                    f"{username}님, 양평마을에 가입해 주셔서 감사합니다.\n\n지금 바로 다양한 서비스를 이용해 보세요.\n- 게시글 작성 및 공유\n- 법률/심리 상담\n- 경사로 설치 신청\n- 이웃과 소통\n\nhttps://test.unocum.kr")
+                from services.email_service import EmailService
+                EmailService.send(email, f"[양평마을] 가입을 환영합니다, {real_name}님",
+                    f"{real_name}님, 양평마을에 가입해 주셔서 감사합니다.\n\n지금 바로 다양한 서비스를 이용해 보세요.\n- 게시글 작성 및 공유\n- 법률/심리 상담\n- 경사로 설치 신청\n- 이웃과 소통\n\nhttps://test.unocum.kr")
             
             return "<script>alert('가입 신청 완료! 로그인을 진행하세요.'); location.href='/intro';</script>"
         return render_template('register.html')
@@ -166,7 +145,10 @@ def register_routes(app):
         if next_url and not next_url.startswith('/'):
             next_url = url_for('index')
         if request.method == 'POST':
-            u = User.query.filter_by(username=request.form['username']).first()
+            login_id = request.form['username']
+            u = User.query.filter_by(username=login_id).first()
+            if not u:
+                u = User.query.filter_by(email=login_id).first()
             if u and check_password_hash(u.password, request.form['password']):
                 session.update({'user_id': u.id, 'username': u.username, 'role': u.role})
                 now = datetime.now()
@@ -248,6 +230,9 @@ def register_routes(app):
         if not social_id:
             return "<script>alert('고유 식별자를 받지 못했습니다.'); history.back();</script>"
 
+        if not email:
+            return "<script>alert('SNS 계정에 이메일이 연동되어 있지 않습니다. ' + ('카카오' if provider == 'kakao' else '네이버' if provider == 'naver' else 'Google') + ' 설정에서 이메일 제공을 활성화해 주세요.'); history.back();</script>"
+
         uid = provider + '_' + str(social_id)
         user = User.query.filter_by(social_id=uid).first()
 
@@ -306,6 +291,40 @@ def register_routes(app):
         if not next_url.startswith('/'):
             next_url = url_for('index')
         return redirect(next_url)
+
+    # --- [이메일 인증] ---
+    @app.route('/verify-email/send', methods=['POST'])
+    def verify_email_send():
+        uid = session.get('user_id')
+        if not uid: return jsonify({'status':'error','msg':'로그인 필요'}), 401
+        user = User.query.get(uid)
+        if not user or not user.email:
+            return jsonify({'status':'error','msg':'등록된 이메일이 없습니다.'}), 400
+        if user.email_verified:
+            return jsonify({'status':'error','msg':'이미 인증된 이메일입니다.'}), 400
+        import secrets
+        token = secrets.token_urlsafe(32)
+        user.email_verification_token = token
+        user.email_verification_sent_at = datetime.now()
+        db.session.commit()
+        verify_url = url_for('verify_email_confirm', token=token, _external=True)
+        EmailService.send(
+            user.email,
+            '[양평마을] 이메일 인증을 완료해 주세요',
+            f'{user.real_name or user.username}님,\n\n아래 링크를 클릭하면 이메일 인증이 완료됩니다:\n\n{verify_url}\n\n인증 후 게시글 작성, 투표 등 모든 기능을 이용하실 수 있습니다.\n\n감사합니다.\n함께사는양평 드림'
+        )
+        return jsonify({'status':'success','msg':'인증 이메일을 발송했습니다. 메일함을 확인해 주세요.'})
+
+    @app.route('/verify-email/<token>')
+    def verify_email_confirm(token):
+        user = User.query.filter_by(email_verification_token=token).first()
+        if not user:
+            return "<script>alert('유효하지 않거나 만료된 인증 링크입니다.'); location.href='/intro';</script>"
+        user.email_verified = True
+        user.email_verification_token = None
+        user.email_verification_sent_at = None
+        db.session.commit()
+        return "<script>alert('✅ 이메일 인증이 완료되었습니다. 이제 모든 기능을 이용하실 수 있습니다.'); location.href='/main';</script>"
 
     # --- [초고속 제안 제출] 0.1초 즉시 등록 및 백그라운드 AI 스레드 작동 ---
     @app.route('/submit', methods=['POST'])
@@ -777,6 +796,8 @@ def register_routes(app):
     def news_like(news_id):
         if not session.get('username'):
             return jsonify({"status": "error", "msg": "로그인이 필요합니다."}), 401
+        if not check_email_verified(session['user_id']):
+            return jsonify({"status": "error", "msg": "이메일 인증 후 투표가 가능합니다."}), 403
         article = NewsArticle.query.get_or_404(news_id)
         article.like_count += 1
         add_points(session['user_id'], 5, 'like', '뉴스 좋아요', news_id)
@@ -787,6 +808,8 @@ def register_routes(app):
     def news_dislike(news_id):
         if not session.get('username'):
             return jsonify({"status": "error", "msg": "로그인이 필요합니다."}), 401
+        if not check_email_verified(session['user_id']):
+            return jsonify({"status": "error", "msg": "이메일 인증 후 투표가 가능합니다."}), 403
         article = NewsArticle.query.get_or_404(news_id)
         article.dislike_count += 1
         db.session.commit()
@@ -948,6 +971,10 @@ def register_routes(app):
         db.session.commit()
         return balance
 
+    def check_email_verified(user_id):
+        user = User.query.get(user_id)
+        return user and user.email_verified
+
     @app.route('/mypage/points')
     def mypage_points():
         if not session.get('username'):
@@ -1014,6 +1041,8 @@ def register_routes(app):
     def post_like(post_id):
         uid = session.get('user_id')
         if not uid: return jsonify({'status':'error','msg':'로그인 필요'}), 401
+        if not check_email_verified(uid):
+            return jsonify({'status':'error','msg':'이메일 인증 후 투표가 가능합니다. 마이페이지에서 인증해 주세요.'}), 403
         existing = PostVote.query.filter_by(post_id=post_id, user_id=uid).first()
         if existing:
             return jsonify({'status':'error','msg':'이미 투표했습니다'}), 400
@@ -1061,6 +1090,8 @@ def register_routes(app):
     def post_dislike(post_id):
         uid = session.get('user_id')
         if not uid: return jsonify({'status':'error','msg':'로그인 필요'}), 401
+        if not check_email_verified(uid):
+            return jsonify({'status':'error','msg':'이메일 인증 후 투표가 가능합니다. 마이페이지에서 인증해 주세요.'}), 403
         existing = PostVote.query.filter_by(post_id=post_id, user_id=uid).first()
         if existing:
             return jsonify({'status':'error','msg':'이미 투표했습니다'}), 400
