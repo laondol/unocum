@@ -32,9 +32,17 @@ class User(db.Model):
     verified_method = db.Column(db.String(30), default='none')  # gps, bill, none
     bill_image_path = db.Column(db.String(300))                  # 고지서 사진 경로 (인증 후 즉시 파기)
     
-    points = db.Column(db.Integer, default=1000)         # 물맑은머니 포인트
+    points = db.Column(db.Integer, default=1000)         # 물맑은머니 닢
     is_paid = db.Column(db.Boolean, default=False)       # 유료회원 여부
     last_payout = db.Column(db.DateTime)                 # 마지막 지급일 (가입일 기준 30일 주기)
+    last_login = db.Column(db.DateTime)                  # 마지막 로그인 일시
+    last_logout = db.Column(db.DateTime)                 # 마지막 로그아웃 일시
+    login_latitude = db.Column(db.Float)                 # 마지막 로그인 위도
+    login_longitude = db.Column(db.Float)                # 마지막 로그인 경도
+    login_town = db.Column(db.String(50))                # 마지막 로그인 읍/면
+    login_village = db.Column(db.String(50))             # 마지막 로그인 리
+    login_location_share = db.Column(db.Boolean, default=False) # 벗에게 로그인 위치 공유 동의
+    location_share = db.Column(db.Boolean, default=False) # 위치 공유 동의
 
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -64,14 +72,33 @@ class Post(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now)   # 수정일 (48시간 대기 리셋용)
     deadline = db.Column(db.DateTime)                           # 낙제 시 30일 수정 기한
+    penalty_applied = db.Column(db.Boolean, default=False)
+    like_count = db.Column(db.Integer, default=0)
+    dislike_count = db.Column(db.Integer, default=0)
+    is_finalized = db.Column(db.Boolean, default=False)         # admin+leader 점수 확정
 
 class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     post_id = db.Column(db.Integer, db.ForeignKey('post.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     author = db.Column(db.String(50))
     content = db.Column(db.Text, nullable=False)
+    parent_id = db.Column(db.Integer, db.ForeignKey('comment.id'), nullable=True)
     total_score = db.Column(db.Integer, default=0)              # 댓글 AI 방역용
     created_at = db.Column(db.DateTime, default=datetime.now)
+
+    replies = db.relationship('Comment', backref=db.backref('parent', remote_side=[id]), lazy=True)
+
+class ShareComment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    share_id = db.Column(db.Integer, db.ForeignKey('share_report.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    author = db.Column(db.String(50))
+    content = db.Column(db.Text, nullable=False)
+    parent_id = db.Column(db.Integer, db.ForeignKey('share_comment.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+    replies = db.relationship('ShareComment', backref=db.backref('parent', remote_side=[id]), lazy=True)
 
 class NewsArticle(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -92,6 +119,7 @@ class NewsArticle(db.Model):
     world_admin_approved = db.Column(db.Boolean, default=False)
     kr_yp_ai_approved = db.Column(db.Boolean, default=False)
     kr_yp_admin_approved = db.Column(db.Boolean, default=False)
+    ai_reason = db.Column(db.Text)
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now)
@@ -146,26 +174,182 @@ class Message(db.Model):
 
 class ShareReport(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     author_name = db.Column(db.String(50))
     title = db.Column(db.String(200))
     description = db.Column(db.Text)
     image_path = db.Column(db.String(300))
-    drawing_path = db.Column(db.String(300))       # 그리기 이미지 경로
+    drawing_path = db.Column(db.String(300))
+    video_path = db.Column(db.String(300))
     latitude = db.Column(db.Float)
     longitude = db.Column(db.Float)
-    town = db.Column(db.String(50))                # 읍/면
-    village = db.Column(db.String(50))             # 리
-    status = db.Column(db.String(20), default='pending')  # pending, approved, rejected
+    town = db.Column(db.String(50))
+    village = db.Column(db.String(50))
+    address = db.Column(db.String(200))
+    status = db.Column(db.String(20), default='pending')
     admin_note = db.Column(db.Text)
-    # AI 분류
-    ai_category = db.Column(db.String(50))         # 사건, 풍경, 장소, 맛집, 기타
-    ai_summary = db.Column(db.Text)                # AI 요약
-    ai_confidence = db.Column(db.Float)            # 분류 신뢰도
-    ai_region_news = db.Column(db.Text)            # 동일 지역 관련 뉴스 요약
-    ai_news_links = db.Column(db.Text)             # 관련 뉴스 원본 링크 (JSON)
-    ai_danger_alert = db.Column(db.Boolean, default=False)  # 위험 알림 여부
+    ai_category = db.Column(db.String(50))
+    ai_summary = db.Column(db.Text)
+    ai_confidence = db.Column(db.Float)
+    ai_region_news = db.Column(db.Text)
+    ai_news_links = db.Column(db.Text)
+    ai_danger_alert = db.Column(db.Boolean, default=False)
     like_count = db.Column(db.Integer, default=0)
     dislike_count = db.Column(db.Integer, default=0)
+    admin_score = db.Column(db.Integer, default=0)
+    leader_score = db.Column(db.Integer, default=0)
+    member_score = db.Column(db.Integer, default=0)
+    total_score = db.Column(db.Integer, default=0)
+    is_moderated = db.Column(db.Boolean, default=False)
+    moderation_result = db.Column(db.String(20), default='pending')
+    moderation_reason = db.Column(db.Text)
+    moderation_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now)
+
+class ConstructionNotice(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(300), nullable=False)
+    description = db.Column(db.Text)
+    location = db.Column(db.String(200))
+    latitude = db.Column(db.Float)
+    longitude = db.Column(db.Float)
+    source = db.Column(db.String(50))
+    source_url = db.Column(db.String(500))
+    notice_type = db.Column(db.String(50))
+    start_date = db.Column(db.DateTime)
+    end_date = db.Column(db.DateTime)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now)
+
+class LegalPost(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    password = db.Column(db.String(200), nullable=False)
+    email = db.Column(db.String(100), nullable=False)
+    author_name = db.Column(db.String(50), default='익명')
+    answer = db.Column(db.Text)
+    answered_at = db.Column(db.DateTime)
+    fee = db.Column(db.Integer)
+    travel_allowance = db.Column(db.Integer)
+    is_public = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+class LegalAppointment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    name = db.Column(db.String(50), nullable=False)
+    email = db.Column(db.String(100), nullable=False)
+    phone = db.Column(db.String(20))
+    date = db.Column(db.Date, nullable=False)
+    time_slot = db.Column(db.String(20), nullable=False)
+    location = db.Column(db.String(200))
+    content = db.Column(db.Text)
+    status = db.Column(db.String(20), default='pending')
+    fee = db.Column(db.Integer)
+    travel_allowance = db.Column(db.Integer)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    approved_at = db.Column(db.DateTime)
+    approved_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+
+class LawyerSchedule(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    day_of_week = db.Column(db.Integer, nullable=False)
+    is_available = db.Column(db.Boolean, default=True)
+    start_hour = db.Column(db.Integer, default=10)
+    end_hour = db.Column(db.Integer, default=16)
+    slot_hours = db.Column(db.Integer, default=2)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+class GoogleCalendarConfig(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    service_account_json = db.Column(db.Text)
+    calendar_id = db.Column(db.String(200))
+    is_connected = db.Column(db.Boolean, default=False)
+    updated_at = db.Column(db.DateTime, default=datetime.now)
+
+class PsychoPost(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    password = db.Column(db.String(200), nullable=False)
+    email = db.Column(db.String(100), nullable=False)
+    author_name = db.Column(db.String(50), default='익명')
+    answer = db.Column(db.Text)
+    answered_at = db.Column(db.DateTime)
+    fee = db.Column(db.Integer)
+    travel_allowance = db.Column(db.Integer)
+    is_public = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+class PsychoAppointment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    name = db.Column(db.String(50), nullable=False)
+    email = db.Column(db.String(100), nullable=False)
+    phone = db.Column(db.String(20))
+    date = db.Column(db.Date, nullable=False)
+    time_slot = db.Column(db.String(20), nullable=False)
+    location = db.Column(db.String(200))
+    content = db.Column(db.Text)
+    status = db.Column(db.String(20), default='pending')
+    fee = db.Column(db.Integer)
+    travel_allowance = db.Column(db.Integer)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    approved_at = db.Column(db.DateTime)
+    approved_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+
+class PsychoDoctorSchedule(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    day_of_week = db.Column(db.Integer, nullable=False)
+    is_available = db.Column(db.Boolean, default=True)
+    start_hour = db.Column(db.Integer, default=10)
+    end_hour = db.Column(db.Integer, default=16)
+    slot_hours = db.Column(db.Integer, default=2)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+class PsychoGoogleCalendarConfig(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    service_account_json = db.Column(db.Text)
+    calendar_id = db.Column(db.String(200))
+    is_connected = db.Column(db.Boolean, default=False)
+    updated_at = db.Column(db.DateTime, default=datetime.now)
+
+class FriendGroup(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+class PostVote(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    vote_type = db.Column(db.String(10))  # 'like' or 'dislike'
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+class Friend(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    requester_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    receiver_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    group_id = db.Column(db.Integer, db.ForeignKey('friend_group.id'), nullable=True)
+    status = db.Column(db.String(20), default='pending')  # pending, accepted, rejected
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now)
+
+class RampApplication(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False)
+    email = db.Column(db.String(100), nullable=False)
+    phone = db.Column(db.String(20), nullable=False)
+    location = db.Column(db.String(200), nullable=False)
+    photo_path = db.Column(db.String(300))
+    step_height = db.Column(db.String(50), nullable=False)
+    ownership = db.Column(db.String(20), nullable=False)
+    agree_removal = db.Column(db.Boolean, default=False)
+    agree_damage = db.Column(db.Boolean, default=False)
+    signed_at = db.Column(db.DateTime)
+    status = db.Column(db.String(20), default='pending')
+    created_at = db.Column(db.DateTime, default=datetime.now)
