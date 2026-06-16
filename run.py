@@ -568,42 +568,40 @@ def create_app():
     except Exception as e:
         print(f'[SKIP] expired post cleanup: {e}')
 
-    # DB 테이블 생성 & 데모 데이터 (gunicorn에서도 실행되도록 create_app() 내부로 이동)
-    if DB_MODE != 'postgresql':
-        db.create_all()
-    if not User.query.first():
-        hashed_pw = generate_password_hash('pw1234')
-        demo_users = [
-            User(username='admin1', password=hashed_pw, role='admin', real_name="홍길동", phone="010-1111-2222", town="양평읍", village="양근리", is_verified_resident=True),
-            User(username='leader1', password=hashed_pw, role='leader', real_name="이순신", phone="010-3333-4444", town="강상면", village="병산리", is_verified_resident=True),
-            User(username='user1', password=hashed_pw, role='user', real_name="강감찬", phone="010-5555-6666", town="용문면", village="다문리", is_verified_resident=False)
-        ]
-        for u in demo_users:
-            db.session.add(u)
-        db.session.commit()
-        for u in demo_users:
-            u.last_payout = datetime.now()
-        db.session.commit()
-        print("[OK] Demo accounts created (pw: pw1234)")
-
-    return app
-
-app = create_app()
-
-if __name__ == '__main__':
+    # gunicorn에서도 실행되도록 초기화 보장
     with app.app_context():
+        if DB_MODE != 'postgresql':
+            db.create_all()
+        if not User.query.first():
+            hashed_pw = generate_password_hash('pw1234')
+            demo_users = [
+                User(username='admin1', password=hashed_pw, role='admin', real_name="홍길동", phone="010-1111-2222", town="양평읍", village="양근리", is_verified_resident=True),
+                User(username='leader1', password=hashed_pw, role='leader', real_name="이순신", phone="010-3333-4444", town="강상면", village="병산리", is_verified_resident=True),
+                User(username='user1', password=hashed_pw, role='user', real_name="강감찬", phone="010-5555-6666", town="용문면", village="다문리", is_verified_resident=False)
+            ]
+            for u in demo_users:
+                db.session.add(u)
+            db.session.commit()
+            for u in demo_users:
+                u.last_payout = datetime.now()
+            db.session.commit()
+            print("[OK] Demo accounts created (pw: pw1234)")
         try:
             import threading
             t = threading.Thread(target=lambda: (
                 __import__('services.rag', fromlist=['rebuild_index']).rebuild_index(app)
             ), daemon=True)
             t.start()
-            # RAG 임베더 사전 로딩 (백그라운드)
             threading.Thread(target=lambda: (
                 __import__('services.rag', fromlist=['_get_embedder'])._get_embedder()
             ), daemon=True).start()
         except Exception as e:
             print(f"[RAG] 인덱스 재구축 스킵: {e}")
-        
+
+    return app
+
+app = create_app()
+
+if __name__ == '__main__':
     print("[함께사는양평] 통합 관제 서버가 켜졌습니다. http://127.0.0.1:5000")
     app.run(host='0.0.0.0', port=5000, debug=True)
