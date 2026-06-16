@@ -1,62 +1,186 @@
-import requests
-import json
+import json, os, base64, threading
 from datetime import datetime, timedelta
-from models import db, Post, User
+from openai import OpenAI
+from models import db, Post, User, ShareReport
+from services.naver_news import get_news_for_share
+from services.geocode import gps_to_town_village
 
-# 1. 1차 심사 AI 호출 (EXAONE 3.5)
-def call_ai_judge(title, content, is_comment=False):
-    url = "http://localhost:11434/api/generate"
-    role = "댓글 방역 지킴이" if is_comment else "공동체 자치 지킴이"
-    system_prompt = f"""당신은 '함께사는양평' {role}입니다. 반드시 한국어로 JSON 형식으로만 대답하세요.
-    양식: {{"score": 숫자(-50~50), "category": "8대사회권분야", "summary": "3줄요약", "reason": "이유", "improvement_tip": "제안 보완을 위해 주민에게 제시할 대안 1가지"}}"""
-    
-    full_text = f"제목: {title}\n본문: {content}" if not is_comment else content
+GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+
+def _groq_client():
+    from flask import current_app
+    key = current_app.config.get("GROQ_API_KEY", "")
+    return OpenAI(api_key=key, base_url="https://api.groq.com/openai/v1")
+
+def _groq_json(system, user, model=GROQ_MODEL, timeout=60):
     try:
-        res = requests.post(url, json={
-            "model": "exaone3.5", "prompt": f"{system_prompt}\n분석대상: {full_text}",
-            "stream": False, "format": "json"
-        }, timeout=60)
-        data = json.loads(res.json()['response'])
-        data['score'] = max(-50, min(50, int(data.get('score', 0))))
-        return data
+        client = _groq_client()
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user}
+            ],
+            response_format={"type": "json_object"},
+            timeout=timeout
+        )
+        return json.loads(resp.choices[0].message.content)
     except Exception as e:
-        print(f"AI 심사 에러: {e}")
-        return {"score": 0, "category": "일반", "summary": "분석 일시 지연", "reason": "지연", "improvement_tip": "내용을 구체화 해보세요."}
+        print(f"[GROQ JSON] error: {e}")
+        return {}
 
-# 2. 관리자-AI 토론 호출
-def call_ai_debate(post, admin_opinion, suggested_score):
-    url = "http://localhost:11434/api/generate"
-    debate_prompt = f"""당신은 자치 지킴이 AI입니다. 관리자가 '{admin_opinion}'의 논리로 점수를 {suggested_score}점으로 조정을 요청했습니다.
-    검토 후 정중한 답변과 최종 점수를 합의하여 JSON {{"ai_reply": "답변", "final_ai_score": 점수}}로 출력하세요. 점수 범위는 -50~50입니다."""
+def _groq_vision(system, user, b64_image, model=GROQ_VISION_MODEL, timeout=30):
     try:
-        res = requests.post(url, json={"model": "exaone3.5", "prompt": debate_prompt, "stream": False, "format": "json"}, timeout=120)
-        result = json.loads(res.json()['response'])
-        result['final_ai_score'] = max(-50, min(50, int(result.get('final_ai_score', suggested_score))))
-        return result
-    except:
-        return {"ai_reply": "토론 지연 발생", "final_ai_score": post.ai_score}
+        client = _groq_client()
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": f"{system}\n{user}"},
+                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64_image}"}}
+                ]
+            }],
+            response_format={"type": "json_object"},
+            timeout=timeout
+        )
+        return json.loads(resp.choices[0].message.content)
+    except Exception as e:
+        print(f"[GROQ VISION] error: {e}")
+        return {}
 
-# 3. 비동기 멀티스레드 심사 파이프라인 (0.1초 즉시 저장용)
+def _image_to_base64(image_path):
+    if not image_path or not os.path.exists(image_path):
+        return None
+    try:
+        with open(image_path, "rb") as f:
+            return base64.b64encode(f.read()).decode()
+    except Exception as e:
+        print(f"[IMAGE BASE64] error: {e}")
+        return None
+
+def _load_rag_context(title, content, timeout=3):
+    result = [""]
+    def _work():
+        try:
+            from services.rag import build_context
+            ctx = build_context(f"{title} {content}", top_k=3)
+            if ctx:
+                result[0] = f"\n\n[참고 자료 - 커뮤니티 내 관련 게시글]\n{ctx}\n\n위 자료를 참고하여 분석하세요."
+        except Exception as e:
+            print(f"[RAG CONTEXT] error: {e}")
+    t = threading.Thread(target=_work, daemon=True)
+    t.start()
+    t.join(timeout=timeout)
+    return result[0]
+
+def call_ai_judge(title, content, is_comment=False):
+    role = "댓글 방역 지킴이" if is_comment else "공동체 자치 지킴이"
+    system = f"당신은 '함께사는양평' {role}입니다. 반드시 한국어로 JSON 형식으로만 대답하세요."
+    context = _load_rag_context(title, content, timeout=3) if not is_comment else ""
+    user = f'{{"score": 숫자(-50~50), "category": "8대사회권분야", "summary": "3줄요약", "reason": "이유", "improvement_tip": "제안 보완을 위해 주민에게 제시할 대안 1가지"}}\n분석대상: 제목: {title}\n본문: {content}{context}' if not is_comment else content
+    data = _groq_json(system, user)
+    data['score'] = max(-50, min(50, int(data.get('score', 0))))
+    return data
+
+def call_ai_debate(post, admin_opinion, suggested_score):
+    system = "당신은 자치 지킴이 AI입니다. 정중한 답변과 최종 점수를 합의하여 JSON을 출력하세요."
+    user = f"관리자: '{admin_opinion}' / 요청점수: {suggested_score}\nJSON: {{{{'ai_reply': '답변', 'final_ai_score': 점수}}}}"
+    data = _groq_json(system, user, timeout=120)
+    data['final_ai_score'] = max(-50, min(50, int(data.get('final_ai_score', suggested_score))))
+    return data
+
 def background_ai_judge(app, post_id):
     with app.app_context():
         post = Post.query.get(post_id)
         if not post: return
-
-        print(f"[BG AI] {post.title} analysis started...")
         ai_res = call_ai_judge(post.title, post.content)
-        
         post.ai_score = ai_res.get('score', 0)
         post.total_score = post.ai_score + post.admin_score + post.leader_score + post.member_score
         post.ai_category = ai_res.get('category', '일반제안')
         post.ai_summary = ai_res.get('summary', '요약 완료')
         post.ai_reason = ai_res.get('reason', '분석 완료')
         post.ai_improvement_tip = ai_res.get('improvement_tip', '보안 계획을 보완해 보세요.')
-        
-        if post.total_score <= -50:
+        if post.total_score <= -50 and not post.penalty_applied:
             user = User.query.get(post.user_id)
             if user:
                 user.points -= 100
+                user.points = max(0, user.points)
+                post.penalty_applied = True
                 post.deadline = datetime.now() + timedelta(days=30)
-                
         db.session.commit()
-        print(f"[BG AI] {post.title} analysis complete, DB updated.")
+
+def moderate_image(image_path, app=None):
+    b64 = _image_to_base64(image_path)
+    if not b64:
+        return False, ""
+    system = "당신은 양평군 공유 이미지 방역관입니다."
+    user = """다음 이미지가 아래 기준에 해당하는지 판단해주세요.
+1. 폭력적/혐오적 내용
+2. 선정적/음란적 내용
+3. 개인정보 노출 (얼굴, 번호판, 주민등록증 등)
+4. 불법 촬영물
+5. 스팸/광고성 이미지
+위 내용이 하나라도 해당되면 flagged=true, 아니면 false.
+JSON: {"flagged": true/false, "reason": "이유", "category": "violence/hate/adult/privacy/illegal/spam/clean"}"""
+    data = _groq_vision(system, user, b64)
+    flagged = data.get('flagged', False)
+    return flagged, data.get('reason', '') if flagged else ""
+
+VALUABLE_CATEGORIES = {'사건', '풍경', '장소', '맛집'}
+
+def background_process_share(app, report_id, title, description, latitude, longitude, image_path=None, drawing_path=None, user_id=0):
+    with app.app_context():
+        report = ShareReport.query.get(report_id)
+        if not report: return
+
+        try:
+            location_info = f"위도: {latitude}, 경도: {longitude}" if latitude and longitude else "위치 미제공"
+            prompt = f"양평군 공유 내용을 분석해주세요.\n제목: {title or '제목 없음'}\n내용: {description or '내용 없음'}\n위치: {location_info}\n이미지: {'있음' if image_path else '없음'}\n그리기: {'있음' if drawing_path else '없음'}\n\nJSON: {{{{'category': '사건/풍경/장소/맛집/기타', 'summary': '3줄 요약', 'confidence': 0.0~1.0, 'danger_alert': true/false}}}}"
+            data = _groq_json("양평군 공유 분석 AI입니다.", prompt)
+            if isinstance(data, str): data = json.loads(data)
+            report.ai_category = data.get('category', '기타')
+            report.ai_summary = data.get('summary', '')
+            report.ai_confidence = data.get('confidence', 0.5)
+            report.ai_danger_alert = data.get('danger_alert', False)
+        except Exception as e:
+            print(f"[BG PROCESS] classify error: {e}")
+            report.ai_category = '기타'
+
+        if latitude and longitude:
+            tw, vl = gps_to_town_village(latitude, longitude)
+            news_summary, news_links = get_news_for_share(title, description, tw, vl)
+        else:
+            news_summary, news_links = get_news_for_share(title, description, '', '')
+        report.ai_region_news = news_summary or ''
+        report.ai_news_links = news_links or '[]'
+
+        flagged = False
+        reason = ""
+        for path_key in ['image_path', 'drawing_path']:
+            rel_path = getattr(report, path_key, None)
+            if not rel_path: continue
+            abs_path = os.path.join(app.root_path, '..', rel_path.lstrip('/')).replace('/', os.sep)
+            f, r = moderate_image(abs_path, app)
+            if f:
+                flagged = True
+                reason = r
+                break
+
+        report.is_moderated = True
+        report.moderation_at = datetime.now()
+        if flagged:
+            report.moderation_result = 'flagged'
+            report.moderation_reason = reason
+            report.status = 'flagged'
+        elif user_id == 0:
+            report.moderation_result = 'pending'
+            report.status = 'pending'
+        elif report.ai_category in VALUABLE_CATEGORIES:
+            report.moderation_result = 'clean'
+            report.status = 'approved'
+        else:
+            report.moderation_result = 'clean'
+            report.status = 'pending'
+        db.session.commit()

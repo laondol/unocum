@@ -1,5 +1,5 @@
 from flask import Flask
-from config import Config
+from config import Config, DB_MODE
 from models import db, User
 from routes import register_routes
 from werkzeug.security import generate_password_hash
@@ -44,6 +44,12 @@ def create_app():
                 if 'ai_score' not in cols:
                     conn.execute(db.text('ALTER TABLE news_article ADD COLUMN ai_score INTEGER DEFAULT 0'))
                     print('[OK] news_article.ai_score column added')
+                if 'ai_reason' not in cols:
+                    try:
+                        conn.execute(db.text('ALTER TABLE news_article ADD COLUMN ai_reason TEXT'))
+                        print('[OK] news_article.ai_reason column added')
+                    except:
+                        print('[SKIP] news_article.ai_reason already exists')
             # User 테이블 마이그레이션
             user_cols = [c['name'] for c in inspector.get_columns('user')]
             with db.engine.connect() as conn:
@@ -54,7 +60,7 @@ def create_app():
                 conn.execute(db.text("UPDATE user SET last_payout = datetime('now') WHERE last_payout IS NULL"))
                 conn.commit()
                 print('[OK] user last_payout NULL backfilled')
-                # 잘못 지급된 포인트 정정 (가입 시 1000P만 유지, 불량 내역 삭제)
+                # 잘못 지급된 닢 정정 (가입 시 1000P만 유지, 불량 내역 삭제)
                 conn.execute(db.text("UPDATE user SET points = 1000 WHERE points > 1000 OR points IS NULL"))
                 conn.execute(db.text("DELETE FROM point_history WHERE change_type = 'monthly'"))
                 conn.commit()
@@ -117,16 +123,18 @@ def create_app():
                     conn.execute(db.text('''
                         CREATE TABLE share_report (
                             id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            user_id INTEGER NOT NULL,
+                            user_id INTEGER,
                             author_name VARCHAR(50),
                             title VARCHAR(200),
                             description TEXT,
                             image_path VARCHAR(300),
                             drawing_path VARCHAR(300),
+                            video_path VARCHAR(300),
                             latitude REAL,
                             longitude REAL,
                             town VARCHAR(50),
                             village VARCHAR(50),
+                            address VARCHAR(200),
                             status VARCHAR(20) DEFAULT 'pending',
                             admin_note TEXT,
                             ai_category VARCHAR(50),
@@ -137,14 +145,426 @@ def create_app():
                             ai_danger_alert BOOLEAN DEFAULT 0,
                             like_count INTEGER DEFAULT 0,
                             dislike_count INTEGER DEFAULT 0,
+                            admin_score INTEGER DEFAULT 0,
+                            leader_score INTEGER DEFAULT 0,
+                            member_score INTEGER DEFAULT 0,
+                            total_score INTEGER DEFAULT 0,
+                            is_moderated BOOLEAN DEFAULT 0,
+                            moderation_result VARCHAR(20) DEFAULT 'pending',
+                            moderation_reason TEXT,
+                            moderation_at DATETIME,
                             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
                         )
                     '''))
                     print('[OK] share_report table created')
-    
-    migrate_news_article()
-    
+            else:
+                # 기존 테이블에 누락 컬럼 추가
+                with db.engine.connect() as conn:
+                    for col in ['video_path', 'address', 'admin_score', 'leader_score', 'member_score', 'total_score', 'is_moderated', 'moderation_result', 'moderation_reason', 'moderation_at']:
+                        if col not in sr_cols:
+                            if col in ('admin_score', 'leader_score', 'member_score', 'total_score'):
+                                conn.execute(db.text(f'ALTER TABLE share_report ADD COLUMN {col} INTEGER DEFAULT 0'))
+                            elif col in ('is_moderated',):
+                                conn.execute(db.text(f'ALTER TABLE share_report ADD COLUMN {col} BOOLEAN DEFAULT 0'))
+                            elif col in ('video_path', 'address'):
+                                conn.execute(db.text(f'ALTER TABLE share_report ADD COLUMN {col} VARCHAR(300)'))
+                            elif col in ('moderation_result',):
+                                conn.execute(db.text(f'ALTER TABLE share_report ADD COLUMN {col} VARCHAR(20) DEFAULT "pending"'))
+                            elif col in ('moderation_reason',):
+                                conn.execute(db.text(f'ALTER TABLE share_report ADD COLUMN {col} TEXT'))
+                            elif col in ('moderation_at',):
+                                conn.execute(db.text(f'ALTER TABLE share_report ADD COLUMN {col} DATETIME'))
+                            print(f'[OK] share_report.{col} column added')
+                    # user_id nullable 변경 (기존 NOT NULL → NULL 허용)
+                    # SQLite는 ALTER COLUMN을 지원하지 않으므로 스킵
+            
+            # Post 테이블 마이그레이션
+            post_cols = [c['name'] for c in inspector.get_columns('post')]
+            with db.engine.connect() as conn:
+                for col in ['penalty_applied', 'like_count', 'dislike_count', 'is_finalized']:
+                    if col not in post_cols:
+                        col_type = 'BOOLEAN DEFAULT 0' if col in ('penalty_applied', 'is_finalized') else 'INTEGER DEFAULT 0'
+                        conn.execute(db.text(f'ALTER TABLE post ADD COLUMN {col} {col_type}'))
+                        print(f'[OK] post.{col} column added')
+            
+            # Comment 테이블 마이그레이션
+            comment_cols = [c['name'] for c in inspector.get_columns('comment')]
+            with db.engine.connect() as conn:
+                if 'user_id' not in comment_cols:
+                    conn.execute(db.text('ALTER TABLE comment ADD COLUMN user_id INTEGER REFERENCES user(id)'))
+                    print('[OK] comment.user_id column added')
+                if 'parent_id' not in comment_cols:
+                    conn.execute(db.text('ALTER TABLE comment ADD COLUMN parent_id INTEGER REFERENCES comment(id)'))
+                    print('[OK] comment.parent_id column added')
+            
+            # User 테이블 마이그레이션 (추가)
+            with db.engine.connect() as conn:
+                if 'last_login' not in user_cols:
+                    conn.execute(db.text('ALTER TABLE user ADD COLUMN last_login DATETIME'))
+                    print('[OK] user.last_login column added')
+                if 'location_share' not in user_cols:
+                    conn.execute(db.text('ALTER TABLE user ADD COLUMN location_share BOOLEAN DEFAULT 0'))
+                    print('[OK] user.location_share column added')
+                if 'last_logout' not in user_cols:
+                    conn.execute(db.text('ALTER TABLE user ADD COLUMN last_logout DATETIME'))
+                    print('[OK] user.last_logout column added')
+                if 'login_location_share' not in user_cols:
+                    conn.execute(db.text('ALTER TABLE user ADD COLUMN login_location_share BOOLEAN DEFAULT 0'))
+                    print('[OK] user.login_location_share column added')
+                if 'login_town' not in user_cols:
+                    conn.execute(db.text('ALTER TABLE user ADD COLUMN login_town VARCHAR(50)'))
+                    print('[OK] user.login_town column added')
+                if 'login_village' not in user_cols:
+                    conn.execute(db.text('ALTER TABLE user ADD COLUMN login_village VARCHAR(50)'))
+                    print('[OK] user.login_village column added')
+                if 'login_latitude' not in user_cols:
+                    conn.execute(db.text('ALTER TABLE user ADD COLUMN login_latitude FLOAT'))
+                    print('[OK] user.login_latitude column added')
+                if 'login_longitude' not in user_cols:
+                    conn.execute(db.text('ALTER TABLE user ADD COLUMN login_longitude FLOAT'))
+                    print('[OK] user.login_longitude column added')
+            
+            # ShareComment 테이블 생성
+            try:
+                sc_cols = [c['name'] for c in inspector.get_columns('share_comment')]
+            except:
+                with db.engine.connect() as conn:
+                    conn.execute(db.text('''
+                        CREATE TABLE share_comment (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            share_id INTEGER NOT NULL REFERENCES share_report(id),
+                            user_id INTEGER REFERENCES user(id),
+                            author VARCHAR(50),
+                            content TEXT NOT NULL,
+                            parent_id INTEGER REFERENCES share_comment(id),
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        )
+                    '''))
+                    print('[OK] share_comment table created')
+            
+            # ConstructionNotice 테이블 생성
+            try:
+                cn_cols = [c['name'] for c in inspector.get_columns('construction_notice')]
+            except:
+                with db.engine.connect() as conn:
+                    conn.execute(db.text('''
+                        CREATE TABLE construction_notice (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            title VARCHAR(300) NOT NULL,
+                            description TEXT,
+                            location VARCHAR(200),
+                            latitude REAL,
+                            longitude REAL,
+                            source VARCHAR(50),
+                            source_url VARCHAR(500),
+                            notice_type VARCHAR(50),
+                            start_date DATETIME,
+                            end_date DATETIME,
+                            is_active BOOLEAN DEFAULT 1,
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        )
+                    '''))
+                    print('[OK] construction_notice table created')
+
+            # LegalPost 테이블 생성 (fee/travel_allowance 누락 방지)
+            try:
+                cols = [c['name'] for c in inspector.get_columns('legal_post')]
+                if 'fee' not in cols:
+                    with db.engine.connect() as conn:
+                        conn.execute(db.text('ALTER TABLE legal_post ADD COLUMN fee INTEGER'))
+                        print('[OK] legal_post.fee column added')
+                if 'travel_allowance' not in cols:
+                    with db.engine.connect() as conn:
+                        conn.execute(db.text('ALTER TABLE legal_post ADD COLUMN travel_allowance INTEGER'))
+                        print('[OK] legal_post.travel_allowance column added')
+            except:
+                with db.engine.connect() as conn:
+                    conn.execute(db.text('''
+                        CREATE TABLE legal_post (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            title VARCHAR(200) NOT NULL,
+                            content TEXT NOT NULL,
+                            password VARCHAR(200) NOT NULL,
+                            email VARCHAR(100) NOT NULL,
+                            author_name VARCHAR(50) DEFAULT '익명',
+                            answer TEXT,
+                            answered_at DATETIME,
+                            fee INTEGER,
+                            travel_allowance INTEGER,
+                            is_public BOOLEAN DEFAULT 0,
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        )
+                    '''))
+                    print('[OK] legal_post table created')
+
+            # LegalAppointment 테이블 생성
+            try:
+                _ = [c['name'] for c in inspector.get_columns('legal_appointment')]
+            except:
+                with db.engine.connect() as conn:
+                    conn.execute(db.text('''
+                        CREATE TABLE legal_appointment (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            user_id INTEGER REFERENCES user(id),
+                            name VARCHAR(50) NOT NULL,
+                            email VARCHAR(100) NOT NULL,
+                            phone VARCHAR(20),
+                            date DATE NOT NULL,
+                            time_slot VARCHAR(20) NOT NULL,
+                            content TEXT,
+                            status VARCHAR(20) DEFAULT 'pending',
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            approved_at DATETIME,
+                            approved_by INTEGER REFERENCES user(id)
+                        )
+                    '''))
+                    print('[OK] legal_appointment table created')
+
+            # LawyerSchedule 테이블 생성
+            try:
+                _ = [c['name'] for c in inspector.get_columns('lawyer_schedule')]
+            except:
+                with db.engine.connect() as conn:
+                    conn.execute(db.text('''
+                        CREATE TABLE lawyer_schedule (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            day_of_week INTEGER NOT NULL,
+                            is_available BOOLEAN DEFAULT 1,
+                            start_hour INTEGER DEFAULT 10,
+                            end_hour INTEGER DEFAULT 16,
+                            slot_hours INTEGER DEFAULT 2,
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        )
+                    '''))
+                    print('[OK] lawyer_schedule table created')
+
+            # GoogleCalendarConfig 테이블 생성
+            try:
+                _ = [c['name'] for c in inspector.get_columns('google_calendar_config')]
+            except:
+                with db.engine.connect() as conn:
+                    conn.execute(db.text('''
+                        CREATE TABLE google_calendar_config (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            service_account_json TEXT,
+                            calendar_id VARCHAR(200),
+                            is_connected BOOLEAN DEFAULT 0,
+                            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        )
+                    '''))
+                    print('[OK] google_calendar_config table created')
+
+            # PsychoPost 테이블 생성
+            try:
+                _ = [c['name'] for c in inspector.get_columns('psycho_post')]
+            except:
+                with db.engine.connect() as conn:
+                    conn.execute(db.text('''
+                        CREATE TABLE psycho_post (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            title VARCHAR(200) NOT NULL,
+                            content TEXT NOT NULL,
+                            password VARCHAR(200) NOT NULL,
+                            email VARCHAR(100) NOT NULL,
+                            author_name VARCHAR(50) DEFAULT '익명',
+                            answer TEXT, answered_at DATETIME,
+                            fee INTEGER, travel_allowance INTEGER,
+                            is_public BOOLEAN DEFAULT 0,
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        )
+                    '''))
+                    print('[OK] psycho_post table created')
+
+            # PsychoAppointment 테이블 생성
+            try:
+                _ = [c['name'] for c in inspector.get_columns('psycho_appointment')]
+            except:
+                with db.engine.connect() as conn:
+                    conn.execute(db.text('''
+                        CREATE TABLE psycho_appointment (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            user_id INTEGER REFERENCES user(id),
+                            name VARCHAR(50) NOT NULL, email VARCHAR(100) NOT NULL,
+                            phone VARCHAR(20), date DATE NOT NULL,
+                            time_slot VARCHAR(20) NOT NULL, location VARCHAR(200),
+                            content TEXT, status VARCHAR(20) DEFAULT 'pending',
+                            fee INTEGER, travel_allowance INTEGER,
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            approved_at DATETIME, approved_by INTEGER REFERENCES user(id)
+                        )
+                    '''))
+                    print('[OK] psycho_appointment table created')
+
+            # PsychoDoctorSchedule 테이블 생성
+            try:
+                _ = [c['name'] for c in inspector.get_columns('psycho_doctor_schedule')]
+            except:
+                with db.engine.connect() as conn:
+                    conn.execute(db.text('''
+                        CREATE TABLE psycho_doctor_schedule (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            day_of_week INTEGER NOT NULL, is_available BOOLEAN DEFAULT 1,
+                            start_hour INTEGER DEFAULT 10, end_hour INTEGER DEFAULT 16,
+                            slot_hours INTEGER DEFAULT 2,
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        )
+                    '''))
+                    print('[OK] psycho_doctor_schedule table created')
+
+            # PsychoGoogleCalendarConfig 테이블 생성
+            try:
+                _ = [c['name'] for c in inspector.get_columns('psycho_google_calendar_config')]
+            except:
+                with db.engine.connect() as conn:
+                    conn.execute(db.text('''
+                        CREATE TABLE psycho_google_calendar_config (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            service_account_json TEXT, calendar_id VARCHAR(200),
+                            is_connected BOOLEAN DEFAULT 0,
+                            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        )
+                    '''))
+                    print('[OK] psycho_google_calendar_config table created')
+
+            # RampApplication 테이블 생성
+            try:
+                _ = [c['name'] for c in inspector.get_columns('ramp_application')]
+            except:
+                with db.engine.connect() as conn:
+                    conn.execute(db.text('''
+                        CREATE TABLE ramp_application (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            name VARCHAR(50) NOT NULL, email VARCHAR(100) NOT NULL,
+                            phone VARCHAR(20) NOT NULL, location VARCHAR(200) NOT NULL,
+                            photo_path VARCHAR(300), step_height VARCHAR(50) NOT NULL,
+                            ownership VARCHAR(20) NOT NULL,
+                            agree_removal BOOLEAN DEFAULT 0, agree_damage BOOLEAN DEFAULT 0,
+                            signed_at DATETIME, status VARCHAR(20) DEFAULT 'pending',
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        )
+                    '''))
+                    print('[OK] ramp_application table created')
+
+            # FriendGroup 테이블 생성
+            try:
+                _ = [c['name'] for c in inspector.get_columns('friend_group')]
+            except:
+                with db.engine.connect() as conn:
+                    conn.execute(db.text('''
+                        CREATE TABLE friend_group (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            user_id INTEGER NOT NULL REFERENCES user(id),
+                            name VARCHAR(100) NOT NULL,
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        )
+                    '''))
+                    print('[OK] friend_group table created')
+
+            # Friend 테이블 생성
+            try:
+                _ = [c['name'] for c in inspector.get_columns('friend')]
+            except:
+                with db.engine.connect() as conn:
+                    conn.execute(db.text('''
+                        CREATE TABLE friend (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            requester_id INTEGER NOT NULL REFERENCES user(id),
+                            receiver_id INTEGER NOT NULL REFERENCES user(id),
+                            group_id INTEGER REFERENCES friend_group(id),
+                            status VARCHAR(20) DEFAULT 'pending',
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        )
+                    '''))
+                    print('[OK] friend table created')
+
+            # Friend 테이블 컬럼 마이그레이션 (이미 존재하는 테이블에 누락 컬럼 추가)
+            try:
+                friend_cols = [c['name'] for c in inspector.get_columns('friend')]
+                with db.engine.connect() as conn:
+                    for col, col_type in [('requester_id', 'INTEGER DEFAULT 0'),
+                                          ('receiver_id', 'INTEGER DEFAULT 0'),
+                                          ('group_id', 'INTEGER'),
+                                          ('status', "VARCHAR(20) DEFAULT 'pending'"),
+                                          ('updated_at', 'DATETIME')]:
+                        if col not in friend_cols:
+                            conn.execute(db.text(f'ALTER TABLE friend ADD COLUMN {col} {col_type}'))
+                            print(f'[OK] friend.{col} column added')
+            except:
+                pass
+
+            # PostVote 테이블 생성
+            try:
+                _ = [c['name'] for c in inspector.get_columns('post_vote')]
+            except:
+                with db.engine.connect() as conn:
+                    conn.execute(db.text('''
+                        CREATE TABLE post_vote (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            post_id INTEGER NOT NULL REFERENCES post(id),
+                            user_id INTEGER NOT NULL REFERENCES user(id),
+                            vote_type VARCHAR(10),
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        )
+                    '''))
+                    print('[OK] post_vote table created')
+
+    if DB_MODE != 'postgresql':
+        migrate_news_article()
+
+    # Friend 요청 메시지 ↔ Friend 레코드 불일치 보정
+    try:
+        from models import Message, Friend
+        orphan_msgs = Message.query.filter(
+            Message.subject.in_(['👋 벗 맺기 신청', '👋 벗 신청'])
+        ).all()
+        for m in orphan_msgs:
+            existing = Friend.query.filter(
+                ((Friend.requester_id == m.sender_id) & (Friend.receiver_id == m.receiver_id)) |
+                ((Friend.requester_id == m.receiver_id) & (Friend.receiver_id == m.sender_id))
+            ).first()
+            if not existing:
+                f = Friend(requester_id=m.sender_id, receiver_id=m.receiver_id, status='pending')
+                db.session.add(f)
+        if orphan_msgs:
+            db.session.commit()
+            print(f'[OK] {len(orphan_msgs)} orphaned friend request(s) fixed')
+    except Exception as e:
+        print(f'[SKIP] orphan friend fix: {e}')
+
+    # PointHistory balance_after 일괄 보정 (실제 user.points 기준)
+    try:
+        from models import User, PointHistory
+        from sqlalchemy import inspect as sa_inspect
+        inspector = sa_inspect(db.engine)
+        if 'point_history' in [t for t in inspector.get_table_names()]:
+            all_users = User.query.all()
+            for u in all_users:
+                records = PointHistory.query.filter_by(user_id=u.id).order_by(PointHistory.created_at.asc()).all()
+                running = 0
+                for r in records:
+                    running += r.amount
+                    r.balance_after = running
+            db.session.commit()
+            print('[OK] point_history balance_after recalculated for all users')
+    except Exception as e:
+        print(f'[SKIP] point_history recalculation: {e}')
+
+    # 낙제 게시물 30일 deadline 초과 자동 삭제
+    try:
+        from models import Post
+        from datetime import datetime
+        expired = Post.query.filter(Post.total_score <= -50, Post.deadline != None, Post.deadline < datetime.now()).all()
+        for p in expired:
+            db.session.delete(p)
+        if expired:
+            db.session.commit()
+            print(f'[OK] {len(expired)} expired post(s) deleted at startup')
+    except Exception as e:
+        print(f'[SKIP] expired post cleanup: {e}')
+
     return app
 
 app = create_app()
@@ -170,8 +590,23 @@ def init_demo_system():
 
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()
-        init_demo_system()
+        if DB_MODE != 'postgresql':
+            db.create_all()
+            init_demo_system()
+        elif not User.query.first():
+            init_demo_system()
+        try:
+            import threading
+            t = threading.Thread(target=lambda: (
+                __import__('services.rag', fromlist=['rebuild_index']).rebuild_index(app)
+            ), daemon=True)
+            t.start()
+            # RAG 임베더 사전 로딩 (백그라운드)
+            threading.Thread(target=lambda: (
+                __import__('services.rag', fromlist=['_get_embedder'])._get_embedder()
+            ), daemon=True).start()
+        except Exception as e:
+            print(f"[RAG] 인덱스 재구축 스킵: {e}")
         
     print("[함께사는양평] 통합 관제 서버가 켜졌습니다. http://127.0.0.1:5000")
     app.run(host='0.0.0.0', port=5000, debug=True)
