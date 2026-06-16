@@ -15,21 +15,11 @@
     <div class="card border-0 shadow-sm" style="border-radius: 16px;">
         <div class="card-body p-3">
             <form id="shareForm" enctype="multipart/form-data">
-                <!-- 사진 촬영 (카메라) -->
-                <div class="mb-3" id="cameraSection">
-                    <input type="file" name="camera_image" class="form-control" accept="image/*" capture="environment" onchange="previewImage(this, 'cameraPreview')">
-                    <div id="cameraPreview" class="mt-2" style="display:none;">
-                        <img src="#" alt="사진 미리보기" style="width:100%; border-radius:12px; border:1px solid #eee;">
-                    </div>
-                    <div id="cameraMobileMsg" class="mt-1 small text-muted" style="display:none;">휴대폰에서 카메라를 켜려면 이 버튼을 누르세요.</div>
-                </div>
-
-                <!-- 파일 올리기 -->
+                <!-- 사진/파일 선택 -->
                 <div class="mb-3">
-                    <label class="form-label fw-bold small">📸 사진촬영</label>
-                    <input type="file" name="image" class="form-control" accept="image/*" onchange="previewImage(this, 'filePreview')">
+                    <input type="file" name="image" class="form-control" accept="image/*" capture="environment" onchange="previewImage(this, 'filePreview')">
                     <div id="filePreview" class="mt-2" style="display:none;">
-                        <img src="#" alt="파일 미리보기" style="width:100%; border-radius:12px; border:1px solid #eee;">
+                        <img src="#" alt="미리보기" style="width:100%; border-radius:12px; border:1px solid #eee;">
                     </div>
                 </div>
 
@@ -189,22 +179,7 @@ function autoGetLocation() {
     );
 }
 
-// PC에서 카메라 감지
-function checkCameraSupport() {
-    const cameraInput = document.querySelector('input[name="camera_image"]');
-    const msgDiv = document.getElementById('cameraMobileMsg');
-    if (!cameraInput) return;
-    const isMobile = /Mobi|Android|iPhone|iPad|iPod|webOS/i.test(navigator.userAgent);
-    if (!isMobile) {
-        cameraInput.setAttribute('disabled', 'disabled');
-        cameraInput.classList.add('text-muted');
-        msgDiv.style.display = 'block';
-        msgDiv.textContent = '⚠️ 이 기기는 카메라를 지원하지 않습니다. 휴대폰에서 해주세요.';
-        msgDiv.className = 'mt-1 small text-warning';
-    }
-}
-
-document.addEventListener('DOMContentLoaded', () => { autoGetLocation(); checkCameraSupport(); });
+document.addEventListener('DOMContentLoaded', autoGetLocation);
 
 document.getElementById('shareForm').addEventListener('submit', async function(e) {
     e.preventDefault();
@@ -220,12 +195,7 @@ document.getElementById('shareForm').addEventListener('submit', async function(e
         formData.set('drawing_data', drawingData);
     }
 
-    // 사진촬영 필드가 있으면 image로 복사
-    const cameraFile = formData.get('camera_image');
-    if (cameraFile && cameraFile.size > 0 && !formData.get('image')?.size) {
-        formData.set('image', cameraFile);
-    }
-    formData.delete('camera_image');
+
     
     try {
         const response = await fetch('/share-report', {
