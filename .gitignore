@@ -27,6 +27,18 @@ yp_project_tree.txt
 templates/project_ramp.html
 templates/legal_clinic.html
 templates/psychology_clinic.html
+templates/admin_village_reports.html
+templates/leader_village_reports.html
+templates/village_news.html
+templates/village_report.html
+templates/village_report_detail.html
+templates/admin_user_detail.html
+templates/message_sent.html
+templates/share_map_v2.html
+
+# dev docs / exports
+작업내역_요약.md
+ollama.txt
 
 # editor / OS
 .vscode/
