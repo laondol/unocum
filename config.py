@@ -17,13 +17,9 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
     MAX_CONTENT_LENGTH = 10 * 1024 * 1024
-    KAKAO_REST_API_KEY = os.getenv('KAKAO_REST_API_KEY', '')
-    KAKAO_JAVASCRIPT_KEY = os.getenv('KAKAO_JAVASCRIPT_KEY', '')
     JUSO_API_KEY = os.getenv('JUSO_API_KEY', '')
     DATA_GO_KR_API_KEY = os.getenv('DATA_GO_KR_API_KEY', '')
     GG_TRAFFIC_API_KEY = os.getenv('GG_TRAFFIC_API_KEY', '')
-    NAVER_CLIENT_ID = os.getenv('NAVER_CLIENT_ID', '')
-    NAVER_CLIENT_SECRET = os.getenv('NAVER_CLIENT_SECRET', '')
     GROQ_API_KEY = os.getenv('GROQ_API_KEY', '')
     SMTP_HOST = os.getenv('SMTP_HOST', 'email-smtp.ap-northeast-2.amazonaws.com')
     SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
@@ -32,12 +28,12 @@ class Config:
     MAIL_FROM = os.getenv('MAIL_FROM', 'yp@unocum.kr')
 
     # OAuth2
-    GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '')
-    GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET', '')
     KAKAO_REST_API_KEY = os.getenv('KAKAO_REST_API_KEY', '')
     KAKAO_JAVASCRIPT_KEY = os.getenv('KAKAO_JAVASCRIPT_KEY', '')
     NAVER_CLIENT_ID = os.getenv('NAVER_CLIENT_ID', '')
     NAVER_CLIENT_SECRET = os.getenv('NAVER_CLIENT_SECRET', '')
+    GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '')
+    GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET', '')
 
     GOOGLE_OAUTH = {
         'client_id': GOOGLE_CLIENT_ID,
