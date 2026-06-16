@@ -568,36 +568,30 @@ def create_app():
     except Exception as e:
         print(f'[SKIP] expired post cleanup: {e}')
 
+    # DB 테이블 생성 & 데모 데이터 (gunicorn에서도 실행되도록 create_app() 내부로 이동)
+    if DB_MODE != 'postgresql':
+        db.create_all()
+    if not User.query.first():
+        hashed_pw = generate_password_hash('pw1234')
+        demo_users = [
+            User(username='admin1', password=hashed_pw, role='admin', real_name="홍길동", phone="010-1111-2222", town="양평읍", village="양근리", is_verified_resident=True),
+            User(username='leader1', password=hashed_pw, role='leader', real_name="이순신", phone="010-3333-4444", town="강상면", village="병산리", is_verified_resident=True),
+            User(username='user1', password=hashed_pw, role='user', real_name="강감찬", phone="010-5555-6666", town="용문면", village="다문리", is_verified_resident=False)
+        ]
+        for u in demo_users:
+            db.session.add(u)
+        db.session.commit()
+        for u in demo_users:
+            u.last_payout = datetime.now()
+        db.session.commit()
+        print("[OK] Demo accounts created (pw: pw1234)")
+
     return app
 
 app = create_app()
 
-# 프리젠테이션용 데모 데이터베이스 세팅 로직
-def init_demo_system():
-    if User.query.first(): return
-    hashed_pw = generate_password_hash('pw1234')
-    demo_users = [
-        User(username='admin1', password=hashed_pw, role='admin', real_name="홍길동", phone="010-1111-2222", town="양평읍", village="양근리", is_verified_resident=True),
-        User(username='leader1', password=hashed_pw, role='leader', real_name="이순신", phone="010-3333-4444", town="강상면", village="병산리", is_verified_resident=True),
-        User(username='user1', password=hashed_pw, role='user', real_name="강감찬", phone="010-5555-6666", town="용문면", village="다문리", is_verified_resident=False)
-    ]
-    for u in demo_users:
-        db.session.add(u)
-    db.session.commit()
-    # 데모 계정 last_payout 설정 (가입 시각, 30일 지나야 월급 지급)
-    for u in demo_users:
-        from datetime import datetime
-        u.last_payout = datetime.now()
-    db.session.commit()
-    print("[OK] Demo accounts created (pw: pw1234)")
-
 if __name__ == '__main__':
     with app.app_context():
-        if DB_MODE != 'postgresql':
-            db.create_all()
-            init_demo_system()
-        elif not User.query.first():
-            init_demo_system()
         try:
             import threading
             t = threading.Thread(target=lambda: (
