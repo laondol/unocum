@@ -8,8 +8,8 @@ NAVER_NEWS_URL = "https://openapi.naver.com/v1/search/news.json"
 GOOGLE_NEWS_RSS = "https://news.google.com/rss/search?hl=ko&gl=KR&ceid=KR:ko"
 
 def search_naver_news(query, display=5):
-    client_id = current_app.config.get('NAVER_CLIENT_ID', '')
-    client_secret = current_app.config.get('NAVER_CLIENT_SECRET', '')
+    client_id = current_app.config.get('NAVER_SEARCH_CLIENT_ID', '')
+    client_secret = current_app.config.get('NAVER_SEARCH_CLIENT_SECRET', '')
     if not client_id or not client_secret:
         return []
     headers = {
