@@ -581,6 +581,21 @@ def create_app():
     except Exception as e:
         print(f'[SKIP] expired post cleanup: {e}')
 
+    # User 테이블 social_id 등 신규 컬럼 별도 마이그레이션 (기존 migrate_news_article 스킵 방지)
+    try:
+        with app.app_context():
+            from sqlalchemy import inspect
+            inspector = inspect(db.engine)
+            user_cols = [c['name'] for c in inspector.get_columns('user')]
+            with db.engine.connect() as conn:
+                for col in ['social_id', 'social_provider', 'social_email']:
+                    if col not in user_cols:
+                        col_type = 'VARCHAR(200)' if col == 'social_id' else 'VARCHAR(100)' if col == 'social_email' else 'VARCHAR(20)'
+                        conn.execute(db.text(f'ALTER TABLE user ADD COLUMN {col} {col_type}'))
+                        print(f'[OK] user.{col} column added')
+    except Exception as e:
+        print(f'[SKIP] social column migration: {e}')
+
     # gunicorn에서도 실행되도록 초기화 보장
     with app.app_context():
         if DB_MODE != 'postgresql':
