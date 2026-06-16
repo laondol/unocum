@@ -27,6 +27,12 @@
                     </div>
                 </div>
 
+                <!-- 파일 업로드 -->
+                <div class="mb-3">
+                    <input type="file" name="file_upload" class="form-control" onchange="previewFile(this)">
+                    <div id="fileUploadPreview" class="mt-2" style="display:none;"></div>
+                </div>
+
                 <!-- 직접 그리기 -->
                 <div class="mb-3">
                     <label class="form-label fw-bold small">🎨 직접 그리기</label>
@@ -129,6 +135,24 @@ function previewVideo(input) {
         };
         reader.readAsDataURL(input.files[0]);
     }
+}
+
+function previewFile(input) {
+    const preview = document.getElementById('fileUploadPreview');
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        if (file.type.startsWith('image/')) {
+            preview.innerHTML = `<img src="${e.target.result}" style="width:100%; border-radius:12px; border:1px solid #eee;">`;
+        } else if (file.type.startsWith('video/')) {
+            preview.innerHTML = `<video src="${e.target.result}" controls style="width:100%; border-radius:12px; border:1px solid #eee;"></video>`;
+        } else {
+            preview.innerHTML = `<div class="alert alert-info py-2 small">✅ ${file.name} 선택됨</div>`;
+        }
+        preview.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
 }
 
 function autoGetLocation() {
