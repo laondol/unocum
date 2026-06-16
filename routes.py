@@ -2,13 +2,16 @@ from flask import render_template, request, redirect, url_for, jsonify, session,
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+from sqlalchemy import or_
 import json, base64, os, threading, requests
 
-from models import db, User, Post, Comment, NewsArticle, NewsComment, NewsRecommendation, PointHistory, ShareReport, Message
+from models import db, User, Post, Comment, NewsArticle, NewsComment, NewsRecommendation, PointHistory, ShareReport, Message, ShareComment, ConstructionNotice, LegalPost, LegalAppointment, LawyerSchedule, GoogleCalendarConfig, PsychoPost, PsychoAppointment, PsychoDoctorSchedule, PsychoGoogleCalendarConfig, RampApplication, Friend, FriendGroup, PostVote
 from services.security import save_village_file
-from services.ai_service import call_ai_judge, call_ai_debate, background_ai_judge
+from services.ai_service import call_ai_judge, call_ai_debate, background_ai_judge, moderate_image, background_process_share
+from services.email_service import EmailService
+from services.construction import sync_construction_notices, sync_traffic_incidents, sync_congestion_info
 from services.news_service import ai_search_news, ai_translate_and_format, ai_summarize_url
-from services.geocode import haversine, gps_to_town_village, get_nearby_reports, is_in_yangpyeong
+from services.geocode import haversine, gps_to_town_village, get_nearby_reports, is_in_yangpyeong, YANGPYEONG_BOUNDS, YANGPYEONG_VILLAGES
 
 # --- [공개 경로] 인트로 및 대시보드 ---
 def register_routes(app):
@@ -23,9 +26,23 @@ def register_routes(app):
     def presentation():
         return render_template('presentation.html')
 
+    @app.route('/terms')
+    def terms():
+        return render_template('terms.html')
+
+    @app.route('/charter')
+    def charter():
+        import markdown as md
+        charter_path = os.path.join(current_app.root_path, 'charter.md')
+        with open(charter_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        html = md.markdown(content, extensions=['fenced_code', 'tables'])
+        return render_template('charter.html', content=html)
+
     @app.route('/main')
     def index():
         now = datetime.now()
+        _cleanup_expired_posts()
         posts = Post.query.filter(Post.total_score > -50, ((Post.created_at <= now - timedelta(hours=48)) | (Post.is_forced_approved == True))).order_by(Post.created_at.desc()).all()
         return render_template('index.html', posts=posts)
 
@@ -33,10 +50,15 @@ def register_routes(app):
     def all_proposals():
         now = datetime.now()
         user_id = session.get('user_id')
+        _cleanup_expired_posts()
         
         all_posts = Post.query.order_by(Post.created_at.desc()).all()
         posts = []
         for p in all_posts:
+            # AI 검토전 (ai_score==0): 작성자만 볼 수 있음
+            if p.ai_score == 0 and p.created_at and p.created_at > now - timedelta(hours=48):
+                if p.user_id == user_id: posts.append(p)
+                continue
             # 점수 -50 이하: 본인만 볼 수 있음
             if p.total_score <= -50:
                 if p.user_id == user_id: posts.append(p)
@@ -60,6 +82,18 @@ def register_routes(app):
         return render_template('all_proposals.html', posts=posts, now=now, timedelta=timedelta)
 
     # --- [회원가입] 이웃 가입 및 선택적 주민 인증 수집 ---
+    @app.route('/api/reverse-geocode')
+    def reverse_geocode():
+        lat = request.args.get('lat', type=float)
+        lon = request.args.get('lon', type=float)
+        if not lat or not lon:
+            return jsonify({"status": "error", "msg": "위도/경도 필요"})
+        from services.geocode import gps_to_town_village, is_in_yangpyeong
+        if not is_in_yangpyeong(lat, lon):
+            return jsonify({"status": "outside", "msg": "관외 지역"})
+        town, village = gps_to_town_village(lat, lon)
+        return jsonify({"status": "success", "town": town or '', "village": village or ''})
+
     @app.route('/register', methods=['GET', 'POST'])
     def register():
         if request.method == 'POST':
@@ -118,11 +152,11 @@ def register_routes(app):
             db.session.add(history)
             db.session.commit()
             
-            # 이메일 인증 메일 발송 (개발환경에서는 콘솔 출력)
             if email:
-                print(f"[이메일 인증] {email} 로 인증 메일 발송 (username: {username})")
+                EmailService.send(email, f"[양평마을] 가입을 환영합니다, {username}님",
+                    f"{username}님, 양평마을에 가입해 주셔서 감사합니다.\n\n지금 바로 다양한 서비스를 이용해 보세요.\n- 게시글 작성 및 공유\n- 법률/심리 상담\n- 경사로 설치 신청\n- 이웃과 소통\n\nhttps://test.unocum.kr")
             
-            return "<script>alert('가입 신청 완료! 로그인을 진행하세요.'); location.href='/login';</script>"
+            return "<script>alert('가입 신청 완료! 로그인을 진행하세요.'); location.href='/intro';</script>"
         return render_template('register.html')
 
     @app.route('/login', methods=['GET', 'POST'])
@@ -134,7 +168,20 @@ def register_routes(app):
             u = User.query.filter_by(username=request.form['username']).first()
             if u and check_password_hash(u.password, request.form['password']):
                 session.update({'user_id': u.id, 'username': u.username, 'role': u.role})
-                # 30일 주기 포인트 지급 (가입일 기준, 가입 시 1000P만 지급)
+                now = datetime.now()
+                u.last_login = now
+                # 로그인 위치 기록 (GPS from form)
+                lat = request.form.get('lat', type=float)
+                lon = request.form.get('lon', type=float)
+                if lat and lon:
+                    u.login_latitude = lat
+                    u.login_longitude = lon
+                    from services.geocode import gps_to_town_village
+                    town, village = gps_to_town_village(lat, lon)
+                    if town:
+                        u.login_town = town
+                        u.login_village = village or ''
+                # 30일 주기 닢 지급 (가입일 기준, 가입 시 1000P만 지급)
                 now = datetime.now()
                 if u.last_payout:
                     if (now - u.last_payout).days >= 30:
@@ -150,6 +197,12 @@ def register_routes(app):
 
     @app.route('/logout')
     def logout():
+        uid = session.get('user_id')
+        if uid:
+            user = User.query.get(uid)
+            if user:
+                user.last_logout = datetime.now()
+                db.session.commit()
         session.clear()
         return redirect(url_for('intro'))
 
@@ -171,7 +224,15 @@ def register_routes(app):
         if 'file' in request.files:
             file = request.files['file']
             if file and file.filename != '':
-                file_url = save_village_file(file, app.config['UPLOAD_FOLDER'], user.town, user.village)
+                ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+                if ext in ('mp4', 'avi', 'mov', 'mkv', 'webm'):
+                    fname = f"video_{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(file.filename)}"
+                    target_dir = os.path.join(app.config['UPLOAD_FOLDER'], f"{user.town}_{user.village}")
+                    if not os.path.exists(target_dir): os.makedirs(target_dir)
+                    file.save(os.path.join(target_dir, fname))
+                    file_url = f"/static/uploads/{user.town}_{user.village}/{fname}"
+                else:
+                    file_url = save_village_file(file, app.config['UPLOAD_FOLDER'], user.town, user.village)
 
         # 그림판 드로잉 저장
         drawing = request.form.get('drawing_data')
@@ -193,6 +254,13 @@ def register_routes(app):
             file_path=file_url, updated_at=datetime.now()
         )
         db.session.add(new_post)
+        db.session.flush()
+
+        # 게시글 작성 시 100닢 차감 (즉시 적용)
+        user.points -= 100
+        user.points = max(0, user.points)
+        new_post.penalty_applied = True
+        new_post.deadline = datetime.now() + timedelta(days=30)
         db.session.commit()
 
         # 백그라운드 AI 처리 스레드 기동
@@ -202,6 +270,17 @@ def register_routes(app):
     @app.route('/post/<int:post_id>')
     def view(post_id):
         post = Post.query.get_or_404(post_id)
+        uid = session.get('user_id')
+        role = session.get('role')
+        is_owner = (post.user_id == uid)
+        # AI 검토전: 작성자와 관리자만 접근
+        if post.ai_score == 0 and post.created_at and post.created_at > datetime.now() - timedelta(hours=48):
+            if not is_owner and role not in ('admin', 'leader'):
+                return "검토전입니다. AI 분석 완료 후 공개됩니다.", 403
+        # 낙제(-50점 이하): 작성자와 관리자만 접근
+        if post.total_score <= -50:
+            if not is_owner and role not in ('admin', 'leader'):
+                return "접근 권한이 없습니다. 낙제(-50점 이하) 게시물은 작성자만 볼 수 있습니다.", 403
         comments = Comment.query.filter_by(post_id=post_id).order_by(Comment.created_at.asc()).all()
         return render_template('view.html', post=post, comments=comments)
 
@@ -258,31 +337,42 @@ def register_routes(app):
     def admin_post_view(post_id):
         if session.get('role') not in ['admin', 'leader']: return "권한 부족", 403
         post = Post.query.get_or_404(post_id)
-        return render_template('admin_view.html', post=post)
+        import json as _json
+        debate_logs = _json.loads(post.ai_debate_log) if post.ai_debate_log else []
+        return render_template('admin_view.html', post=post, debate_logs=debate_logs)
 
     @app.route('/admin/update_scores/<int:post_id>', methods=['POST'])
     def update_scores(post_id):
         if session.get('role') not in ['admin', 'leader']: return "권한 부족", 403
         post = Post.query.get_or_404(post_id)
-        post.admin_score = int(request.form.get('admin_score', 0))
-        post.leader_score = int(request.form.get('leader_score', 0))
+        role = session.get('role')
+        if role == 'admin':
+            post.admin_score = int(request.form.get('admin_score', 0))
+        elif role == 'leader':
+            post.leader_score = int(request.form.get('leader_score', 0))
         post.is_forced_approved = 'force_approve' in request.form
         post.total_score = post.ai_score + post.admin_score + post.leader_score + post.member_score
+        # 관리자와 책임자가 모두 점수를 주면 자동 공개 (-50점 이하는 제외)
+        if post.admin_score != 0 and post.leader_score != 0 and post.total_score > -50:
+            post.is_forced_approved = True
         db.session.commit()
         return redirect(url_for('admin_post_view', post_id=post.id))
 
     @app.route('/admin/debate/<int:post_id>', methods=['POST'])
     def admin_debate(post_id):
-        if session.get('role') not in ['admin', 'leader']: return "권한 부족", 403
+        if session.get('role') not in ['admin', 'leader']: return jsonify({"status": "error", "msg": "권한 부족"}), 403
         post = Post.query.get_or_404(post_id)
         admin_opinion = request.form.get('admin_opinion')
+        if not admin_opinion:
+            return jsonify({"status": "error", "msg": "의견을 입력하세요"}), 400
         suggested_score = int(request.form.get('suggested_score', post.ai_score))
-        
-        res = call_ai_debate(post, admin_opinion, suggested_score)
-        logs = json.loads(post.ai_debate_log)
-        logs.append({"time": datetime.now().strftime('%H:%M'), "admin": admin_opinion, "ai": res.get('ai_reply', '오류')})
+        try:
+            res = call_ai_debate(post, admin_opinion, suggested_score)
+        except Exception as e:
+            return jsonify({"status": "error", "msg": f"AI 응답 오류: {e}"}), 500
+        logs = json.loads(post.ai_debate_log) if post.ai_debate_log else []
+        logs.append({"time": datetime.now().strftime('%H:%M'), "admin": admin_opinion, "ai": res.get('ai_reply', 'AI 분석 오류')})
         post.ai_debate_log = json.dumps(logs, ensure_ascii=False)
-        
         post.ai_score = res.get('final_ai_score', post.ai_score)
         post.total_score = post.ai_score + post.admin_score + post.leader_score + post.member_score
         db.session.commit()
@@ -303,7 +393,7 @@ def register_routes(app):
         if action == 'approve':
             user.is_verified_resident = True
             user.points += 500
-            print(f"[{user.real_name}] 이웃 인증 승인 완료. 500포인트 가점.")
+            print(f"[{user.real_name}] 이웃 인증 승인 완료. 500닢 가점.")
         elif action == 'reject':
             user.is_verified_resident = False
             user.verified_method = 'none'
@@ -342,7 +432,9 @@ def register_routes(app):
         page = request.args.get('page', 1, type=int)
         tab = request.args.get('tab', 'all')
         query = NewsArticle.query
-        if tab == 'world':
+        if tab == 'all':
+            query = query.filter(or_(NewsArticle.is_ai_generated == False, NewsArticle.is_selected == True))
+        elif tab == 'world':
             query = query.filter(NewsArticle.category.in_(['세계뉴스', '환경뉴스', '건강정보', '복지정보', '농업정보', '관광소식']))
         elif tab == 'kr_yp':
             query = query.filter(NewsArticle.category.in_(['대한민국뉴스', '양평소식', '정책정보', '지역소식']))
@@ -353,25 +445,58 @@ def register_routes(app):
     def admin_news_ai_suggest():
         if session.get('role') not in ['admin', 'leader']:
             return jsonify({"status": "error", "msg": "권한 없음"}), 403
-        suggestions = ai_search_news()
+        tab = request.form.get('tab', 'world')
+        suggestions = ai_search_news(news_type=tab)
         if not suggestions:
-            return jsonify({"status": "error", "msg": "AI 뉴스 생성 실패. Ollama 서버를 확인하세요."})
+            return jsonify({"status": "error", "msg": "AI 주제 제안 실패. Groq 서버를 확인하세요."})
+        from services.naver_news import search_news
         count = 0
         for item in suggestions:
-            article = NewsArticle(
-                title=item.get('title', '제목 없음'),
-                summary=item.get('summary', ''),
-                content=f"<p><strong>양평군민 관련성:</strong> {item.get('reason', '')}</p><p>{item.get('summary', '')}</p>",
-                category=item.get('category', '세계뉴스'),
-                source_url=item.get('url', ''),
-                is_ai_generated=True,
-                created_by=session.get('user_id'),
-                source_name='AI 추천'
-            )
-            db.session.add(article)
-            count += 1
+            title = item.get('title', '')
+            if not title:
+                continue
+            search_lang = 'en' if tab == 'world' else 'ko'
+            news_results, news_source = search_news(title, display=1, language=search_lang)
+            if news_results:
+                real = news_results[0]
+                category = item.get('category', '세계뉴스')
+                if tab == 'kr_yp' and category not in ['대한민국뉴스', '양평소식', '정책정보', '지역소식']:
+                    category = '대한민국뉴스'
+                elif tab == 'world' and category not in ['세계뉴스', '환경뉴스', '건강정보', '복지정보', '농업정보', '관광소식']:
+                    category = '세계뉴스'
+                ai_reason = item.get('reason', '')
+                # 세계뉴스는 영문→한글 번역
+                raw_title = real.get('title', title)
+                raw_desc = real.get('description', '')
+                if tab == 'world' and raw_title:
+                    try:
+                        from services.news_service import _groq_text
+                        trans = _groq_text(
+                            "Translate English news to natural Korean. Output JSON only.",
+                            f"Translate to Korean:\nEN title: {raw_title[:200]}\nEN description: {raw_desc[:500]}\n\nJSON: {{\"title\": \"번역된 제목\", \"description\": \"번역된 내용\"}}",
+                            format_json=True
+                        )
+                        if trans:
+                            raw_title = trans.get('title', raw_title) or raw_title
+                            raw_desc = trans.get('description', raw_desc) or raw_desc
+                    except:
+                        pass
+                article = NewsArticle(
+                    title=raw_title,
+                    summary=(raw_desc or '')[:200],
+                    content=f"<p>{(raw_desc or '')[:1000]}</p>",
+                    category=category,
+                    source_url=real.get('url', ''),
+                    is_ai_generated=False,
+                    is_selected=True,
+                    ai_reason=ai_reason,
+                    created_by=session.get('user_id'),
+                    source_name=news_source
+                )
+                db.session.add(article)
+                count += 1
         db.session.commit()
-        return jsonify({"status": "success", "count": count})
+        return jsonify({"status": "success", "count": count, "msg": f"✅ 실제 뉴스 {count}개를 가져왔습니다{' (영문→한글 번역 완료)' if tab == 'world' else ''}."})
 
     @app.route('/admin/news/toggle/<int:news_id>')
     def admin_news_toggle(news_id):
@@ -441,6 +566,7 @@ def register_routes(app):
                 source_name=request.form.get('source_name', ''),
                 image_path=img_path,
                 category=request.form.get('category', '세계뉴스'),
+                ai_reason=request.form.get('ai_reason', ''),
                 is_selected='is_selected' in request.form,
                 created_by=session.get('user_id')
             )
@@ -466,6 +592,7 @@ def register_routes(app):
             article.source_url = request.form.get('source_url', '')
             article.source_name = request.form.get('source_name', '')
             article.category = request.form.get('category', '세계뉴스')
+            article.ai_reason = request.form.get('ai_reason', '')
             article.is_selected = 'is_selected' in request.form
             article.updated_at = datetime.now()
             if 'image' in request.files:
@@ -490,6 +617,7 @@ def register_routes(app):
         if session.get('role') not in ['admin', 'leader']:
             return jsonify({"status": "error", "msg": "권한 없음"}), 403
         url = request.form.get('url', '').strip()
+        tab = request.form.get('tab', 'world')
         if not url:
             return jsonify({"status": "error", "msg": "URL을 입력하세요."})
         try:
@@ -499,22 +627,44 @@ def register_routes(app):
             text = resp.text
         except Exception as e:
             return jsonify({"status": "error", "msg": f"페이지를 가져올 수 없습니다: {str(e)}"})
-        result = ai_summarize_url(text[:4000])
-        if not result:
-            result = {"title": "URL에서 가져온 기사", "summary": "AI 요약 실패", "category": "세계뉴스", "is_useful": True}
         try:
             from bs4 import BeautifulSoup
             soup = BeautifulSoup(text, 'html.parser')
-            for tag in soup(['script', 'style', 'nav', 'footer', 'header']): tag.decompose()
-            body_text = soup.get_text(separator='\n', strip=True)[:3000]
+            # 제거할 태그
+            for tag in soup(['script', 'style', 'nav', 'footer', 'header', 'aside', 'iframe', 'noscript', 'form', 'button']): tag.decompose()
+            # 제거할 클래스/아이디 패턴 (UI/광고/네비게이션)
+            for pattern in ['gnb', 'lnb', 'menu', 'navi', 'sidebar', 'footer', 'header', 'banner', 'ad ', 'wrap_', 'search', 'comment', 'reply', 'btn_', 'link_']:
+                for el in soup.find_all(class_=lambda c: c and pattern in str(c).lower()):
+                    el.decompose()
+                for el in soup.find_all(id=lambda i: i and pattern in str(i).lower()):
+                    el.decompose()
+            # 본문 영역 우선 추출 시도
+            main_area = soup.find('article') or soup.find('main') or soup.find('[role="main"]')
+            raw_text = main_area.get_text(separator='\n', strip=True) if main_area else soup.get_text(separator='\n', strip=True)
+            # 한 줄에 2글자 미만 or 특정 UI 키워드 줄 제거
+            ui_keywords = ['본문 바로가기', '카테고리 이동', 'MY메뉴', '검색', '공유하기', 'URL복사', '신고하기',
+                           '메뉴 열기', '메뉴 닫기', '이웃추가', '폰트 크기', '폰트크기', '블로그', '카페',
+                           '메일', '뉴스', '지도', '로그인', 'MY', '메뉴', '펼쳐보기', '더보기']
+            lines = [l for l in raw_text.split('\n')
+                     if len(l.strip()) >= 3
+                     and not any(kw in l for kw in ui_keywords)]
+            body_text = '\n'.join(lines)[:3000]
         except:
             body_text = text[:2000]
+        result = ai_summarize_url(body_text[:3000])
+        if not result:
+            result = {"title": "URL에서 가져온 기사", "summary": "AI 요약 실패", "category": "세계뉴스", "is_useful": True}
+        # URL을 가져온 탭에 맞게 카테고리 지정
+        category = result.get('category', '세계뉴스')
+        if tab == 'kr_yp' and category not in ['대한민국뉴스', '양평소식', '정책정보', '지역소식']:
+            category = '대한민국뉴스'
         article = NewsArticle(
             title=result.get('title', '가져온 기사'),
             summary=result.get('summary', ''),
             content=f"<p>{body_text[:2000].replace(chr(10), '</p><p>')}</p>",
             source_url=url,
-            category=result.get('category', '세계뉴스'),
+            category=category,
+            is_selected=True,
             is_ai_generated=True,
             created_by=session.get('user_id')
         )
@@ -668,9 +818,19 @@ def register_routes(app):
         db.session.commit()
         return redirect(url_for('admin_news_recommendations'))
 
-    # ========== 포인트 시스템 ==========
+    # ========== 낙제 게시물 30일 자동 삭제 ==========
+    def _cleanup_expired_posts():
+        now = datetime.now()
+        expired = Post.query.filter(Post.total_score <= -50, Post.deadline != None, Post.deadline < now).all()
+        for p in expired:
+            db.session.delete(p)
+        if expired:
+            db.session.commit()
+            print(f'[CLEANUP] {len(expired)} expired post(s) deleted')
+
+    # ========== 닢 시스템 ==========
     def add_points(user_id, amount, change_type, description, related_id=None):
-        """포인트 적립/차감 + 내역 기록"""
+        """닢 적립/차감 + 내역 기록"""
         user = User.query.get(user_id)
         if not user: return
         user.points += amount
@@ -692,8 +852,13 @@ def register_routes(app):
         if not session.get('username'):
             return redirect(url_for('login', next=request.path))
         user = User.query.get(session['user_id'])
-        history = PointHistory.query.filter_by(user_id=user.id).order_by(PointHistory.created_at.desc()).limit(100).all()
-        return render_template('mypage_points.html', user=user, history=history)
+        raw_history = PointHistory.query.filter_by(user_id=user.id).order_by(PointHistory.created_at.desc()).limit(100).all()
+        # 잔액을 실제 user.points 기준으로 재계산 (내역 불일치 방지)
+        running = user.points
+        for h in raw_history:
+            h.balance_after = running
+            running -= h.amount
+        return render_template('mypage_points.html', user=user, history=raw_history)
 
     @app.route('/admin/users/points/<int:user_id>', methods=['GET', 'POST'])
     def admin_user_points(user_id):
@@ -717,29 +882,155 @@ def register_routes(app):
             pass
         return total_users > 10000
 
+    @app.route('/search')
+    def search():
+        q = request.args.get('q', '').strip()
+        results = {'posts': [], 'shares': [], 'news': []}
+        if q:
+            results['posts'] = Post.query.filter(
+                db.or_(Post.title.ilike(f'%{q}%'), Post.content.ilike(f'%{q}%'))
+            ).order_by(Post.created_at.desc()).limit(20).all()
+            results['shares'] = ShareReport.query.filter(
+                db.or_(ShareReport.title.ilike(f'%{q}%'), ShareReport.description.ilike(f'%{q}%'))
+            ).order_by(ShareReport.created_at.desc()).limit(20).all()
+            results['news'] = NewsArticle.query.filter(
+                db.or_(NewsArticle.title.ilike(f'%{q}%'), NewsArticle.summary.ilike(f'%{q}%'))
+            ).order_by(NewsArticle.created_at.desc()).limit(20).all()
+        return render_template('search.html', q=q, results=results)
+
+    @app.route('/api/rag/search')
+    def rag_search_api():
+        q = request.args.get('q', '').strip()
+        if not q:
+            return jsonify({'hits': []})
+        from services.rag import search
+        hits = search(q, top_k=10)
+        return jsonify({'hits': hits})
+
     # --- [회원 프로필 & 쪽지] ---
+
+    @app.route('/post/like/<int:post_id>', methods=['POST'])
+    def post_like(post_id):
+        uid = session.get('user_id')
+        if not uid: return jsonify({'status':'error','msg':'로그인 필요'}), 401
+        existing = PostVote.query.filter_by(post_id=post_id, user_id=uid).first()
+        if existing:
+            return jsonify({'status':'error','msg':'이미 투표했습니다'}), 400
+        post = Post.query.get_or_404(post_id)
+        v = PostVote(post_id=post_id, user_id=uid, vote_type='like')
+        db.session.add(v)
+        post.like_count = (post.like_count or 0) + 1
+        like_count = post.like_count
+        dislike_count = post.dislike_count or 0
+        total_voters = like_count + dislike_count
+        if total_voters <= 30:
+            post.member_score = like_count - dislike_count
+        else:
+            post.member_score = round((like_count - dislike_count) * 30 / total_voters)
+        post.member_score = max(-30, min(30, post.member_score))
+        post.total_score = post.ai_score + post.admin_score + post.leader_score + post.member_score
+        voter = User.query.get(uid)
+        voter_history = PointHistory(user_id=uid, change_type='like', amount=-5, balance_after=voter.points - 5, description='좋아요 투표', related_id=post_id)
+        db.session.add(voter_history)
+        voter.points -= 5
+        if post.user_id and post.user_id != uid:
+            author = User.query.get(post.user_id)
+            author_history = PointHistory(user_id=post.user_id, change_type='like_reward', amount=1, balance_after=author.points + 1, description='좋아요 받음', related_id=post_id)
+            db.session.add(author_history)
+            author.points += 1
+        status_changed = False
+        if post.status == '제안' and post.total_score >= 80:
+            post.status = '현실화'
+            status_changed = True
+            admin_user = User.query.filter(User.role == 'admin').first()
+            if admin_user and post.user_id and post.user_id != admin_user.id:
+                msg = Message(
+                    sender_id=admin_user.id,
+                    sender_name=admin_user.username,
+                    sender_role='admin',
+                    receiver_id=post.user_id,
+                    subject='🎉 현실화 축하드립니다',
+                    content='회의에 참석 하실 수 있으실까요 가능한 날짜와 시간을 알려 주세요. 직접 방문하거나 구글미트로 회의 하실 수 있습니다. 혹시 문의 사항이 있으시면 010-2438-7953으로 오전 10시 ~ 오후 6시 월 금요일 사이에 연락 주세요.'
+                )
+                db.session.add(msg)
+        db.session.commit()
+        return jsonify({'status':'success', 'likes':post.like_count, 'dislikes':post.dislike_count, 'total_score':post.total_score, 'status_changed':status_changed, 'new_status':post.status})
+
+    @app.route('/post/dislike/<int:post_id>', methods=['POST'])
+    def post_dislike(post_id):
+        uid = session.get('user_id')
+        if not uid: return jsonify({'status':'error','msg':'로그인 필요'}), 401
+        existing = PostVote.query.filter_by(post_id=post_id, user_id=uid).first()
+        if existing:
+            return jsonify({'status':'error','msg':'이미 투표했습니다'}), 400
+        post = Post.query.get_or_404(post_id)
+        v = PostVote(post_id=post_id, user_id=uid, vote_type='dislike')
+        db.session.add(v)
+        post.dislike_count = (post.dislike_count or 0) + 1
+        like_count = post.like_count or 0
+        dislike_count = post.dislike_count
+        total_voters = like_count + dislike_count
+        if total_voters <= 30:
+            post.member_score = like_count - dislike_count
+        else:
+            post.member_score = round((like_count - dislike_count) * 30 / total_voters)
+        post.member_score = max(-30, min(30, post.member_score))
+        post.total_score = post.ai_score + post.admin_score + post.leader_score + post.member_score
+        voter = User.query.get(uid)
+        voter_history = PointHistory(user_id=uid, change_type='dislike', amount=-5, balance_after=voter.points - 5, description='나빠요 투표', related_id=post_id)
+        db.session.add(voter_history)
+        voter.points -= 5
+        if post.user_id and post.user_id != uid:
+            author = User.query.get(post.user_id)
+            author_history = PointHistory(user_id=post.user_id, change_type='dislike_penalty', amount=-1, balance_after=author.points - 1, description='나빠요 받음', related_id=post_id)
+            db.session.add(author_history)
+            author.points -= 1
+        db.session.commit()
+        return jsonify({'status':'success', 'likes':post.like_count, 'dislikes':post.dislike_count, 'total_score':post.total_score})
+
     @app.route('/user/<int:user_id>')
     def user_profile(user_id):
         if not session.get('username'):
             return redirect(url_for('login', next=request.path))
         user = User.query.get_or_404(user_id)
-        point_history = PointHistory.query.filter_by(user_id=user.id).order_by(PointHistory.created_at.desc()).limit(50).all()
+        raw_history = PointHistory.query.filter_by(user_id=user.id).order_by(PointHistory.created_at.desc()).limit(50).all()
+        running = user.points
+        for h in raw_history:
+            h.balance_after = running
+            running -= h.amount
+        point_history = raw_history
         
+        uid = session['user_id']
         # 받은 쪽지 (관리자/리더 우선 정렬)
-        messages = Message.query.filter_by(receiver_id=user.id).order_by(
-            db.case(
-                (Message.sender_role == 'admin', 0),
-                (Message.sender_role == 'leader', 1),
-                else_=2
-            ),
-            Message.created_at.desc()
-        ).all()
+        if user.id == uid:
+            messages = Message.query.filter_by(receiver_id=user.id).order_by(
+                db.case(
+                    (Message.sender_role == 'admin', 0),
+                    (Message.sender_role == 'leader', 1),
+                    else_=2
+                ),
+                Message.created_at.desc()
+            ).all()
+        else:
+            messages = Message.query.filter(
+                ((Message.sender_id==uid) & (Message.receiver_id==user.id)) |
+                ((Message.sender_id==user.id) & (Message.receiver_id==uid))
+            ).order_by(Message.created_at.desc()).all()
+        
+        is_friend = False
+        if session.get('user_id') and session['user_id'] != user.id:
+            f = Friend.query.filter(
+                ((Friend.requester_id==session['user_id']) & (Friend.receiver_id==user.id) & (Friend.status=='accepted')) |
+                ((Friend.requester_id==user.id) & (Friend.receiver_id==session['user_id']) & (Friend.status=='accepted'))
+            ).first()
+            is_friend = bool(f)
         
         return render_template('user_profile.html', 
             profile_user=user, 
             point_history=point_history, 
             messages=messages,
-            is_own=(session.get('user_id') == user.id)
+            is_own=(session.get('user_id') == user.id),
+            is_friend=is_friend
         )
 
     @app.route('/user/location/refresh', methods=['POST'])
@@ -752,21 +1043,46 @@ def register_routes(app):
         lon = data.get('lon', type=float)
         if not lat or not lon:
             return jsonify({"status": "error", "msg": "GPS 위치가 필요합니다."}), 400
-        if not is_in_yangpyeong(lat, lon):
-            return jsonify({"status": "error", "msg": "양평군 내에서만 위치 갱신이 가능합니다."}), 400
         town, village = gps_to_town_village(lat, lon)
         user.curr_latitude = lat
         user.curr_longitude = lon
-        user.curr_town = town
-        user.curr_village = village
+        if town:
+            user.curr_town = town
+            user.curr_village = village or ''
         user.location_updated_at = datetime.now()
         db.session.commit()
         return jsonify({
             "status": "success",
             "lat": lat, "lon": lon,
-            "town": town or user.town,
-            "village": village or user.village
+            "town": user.curr_town or '',
+            "village": user.curr_village or ''
         })
+
+    @app.route('/user/location/share/toggle', methods=['POST'])
+    def user_location_share_toggle():
+        if not session.get('username'):
+            return jsonify({"status": "error", "msg": "로그인이 필요합니다."}), 401
+        user = User.query.get(session['user_id'])
+        data = request.get_json() or {}
+        val = data.get('value', 'off')
+        if val not in ('friends', 'off'):
+            return jsonify({"status": "error", "msg": "잘못된 값입니다."}), 400
+        user.location_share = (val == 'friends')
+        db.session.commit()
+        return jsonify({"status": "success", "value": val})
+
+    @app.route('/message/inbox')
+    def message_inbox():
+        if not session.get('username'):
+            return redirect(url_for('login', next='/message/inbox'))
+        uid = session['user_id']
+        tab = request.args.get('tab', 'received')
+        received = Message.query.filter_by(receiver_id=uid).order_by(Message.created_at.desc()).all()
+        sent_msgs = Message.query.filter_by(sender_id=uid).order_by(Message.created_at.desc()).all()
+        for m in sent_msgs:
+            u = User.query.get(m.receiver_id)
+            m.receiver_name = u.real_name or u.username if u else '알수없음'
+        return render_template('message_inbox.html', received=received, sent=sent_msgs, tab=tab)
 
     @app.route('/message/send/<int:receiver_id>', methods=['GET', 'POST'])
     def send_message(receiver_id):
@@ -791,7 +1107,7 @@ def register_routes(app):
             return redirect(url_for('user_profile', user_id=receiver.id))
         return render_template('send_message.html', receiver=receiver)
 
-    @app.route('/message/read/<int:msg_id>')
+    @app.route('/message/read/<int:msg_id>', methods=['GET', 'POST'])
     def read_message(msg_id):
         if not session.get('username'):
             return redirect(url_for('login', next=request.path))
@@ -800,7 +1116,9 @@ def register_routes(app):
             return "권한 없음", 403
         msg.is_read = True
         db.session.commit()
-        return redirect(url_for('user_profile', user_id=session['user_id']))
+        if request.method == 'POST':
+            return jsonify({'status':'success'})
+        return redirect(url_for('message_inbox'))
 
     def is_mobile(user_agent):
         """모바일 기기 판별"""
@@ -863,17 +1181,13 @@ def register_routes(app):
     # --- [공유하기 시스템] ---
     @app.route('/share-report', methods=['GET', 'POST'])
     def share_report():
-        if not session.get('username'):
-            return redirect(url_for('login', next=request.path))
-        
-        user = User.query.get(session['user_id'])
+        user = User.query.get(session.get('user_id')) if session.get('username') else None
         if request.method == 'POST':
             title = request.form.get('title', '').strip()
             description = request.form.get('description', '').strip()
             latitude = request.form.get('latitude', type=float)
             longitude = request.form.get('longitude', type=float)
             
-            # 사진 필수 체크
             if not latitude or not longitude:
                 return jsonify({"status": "error", "msg": "위치 수집이 필요합니다. 새로고침 후 위치 허용해주세요."}), 400
             
@@ -887,7 +1201,6 @@ def register_routes(app):
                     file.save(os.path.join(img_dir, fname))
                     image_path = f"/static/uploads/share_reports/{fname}"
             
-            # 그리기 이미지 저장
             drawing_path = None
             drawing = request.form.get('drawing_data')
             if drawing and len(drawing) > 2000:
@@ -898,39 +1211,52 @@ def register_routes(app):
                 with open(os.path.join(target_dir, fname), "wb") as f: f.write(data)
                 drawing_path = f"/static/uploads/share_reports/{fname}"
             
-            # AI 분류 + 지역 뉴스 검색
-            ai_result = ai_classify_share_report(title, description, latitude, longitude, image_path, drawing_path)
+            video_path = None
+            if 'video' in request.files:
+                file = request.files['video']
+                if file and file.filename and '.' in file.filename:
+                    ext = file.filename.rsplit('.', 1)[1].lower()
+                    if ext in ('mp4', 'avi', 'mov', 'mkv', 'webm'):
+                        img_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'share_reports')
+                        fname = f"video_{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(file.filename)}"
+                        file.save(os.path.join(img_dir, fname))
+                        video_path = f"/static/uploads/share_reports/{fname}"
             
+            from services.geocode import gps_to_town_village
+            resolved_town, resolved_village = gps_to_town_village(latitude, longitude)
+            share_town = resolved_town or (user.town if user else '')
+            share_village = resolved_village or (user.village if user else '')
+            share_address = f"경기도 양평군 {share_town} {share_village}".strip()
+
             report = ShareReport(
-                user_id=user.id,
-                author_name=user.username,
-                title=title or f"{ai_result.get('category', '공유')} - {user.town} {user.village}",
+                user_id=user.id if user else 0,
+                author_name=user.username if user else '익명',
+                title=title or '공유',
                 description=description,
                 image_path=image_path,
                 drawing_path=drawing_path,
+                video_path=video_path,
                 latitude=latitude,
                 longitude=longitude,
-                town=user.town,
-                village=user.village,
-                ai_category=ai_result.get('category', '기타'),
-                ai_summary=ai_result.get('summary', ''),
-                ai_confidence=ai_result.get('confidence', 0.5),
-                ai_region_news=ai_result.get('region_news', ''),
-                ai_news_links=ai_result.get('news_links', '[]'),
-                ai_danger_alert=ai_result.get('danger_alert', False)
+                town=share_town,
+                village=share_village,
+                address=share_address,
+                ai_category='분석중',
+                ai_summary='',
+                ai_confidence=0.5,
+                ai_region_news='',
+                ai_news_links='[]',
+                ai_danger_alert=False
             )
             db.session.add(report)
-            add_points(user.id, 50, 'share_report', '공유하기', report.id)
             db.session.commit()
-            
-            # 위험 알림 시 관리자/리더에게 알림 (나중에 구현)
-            if ai_result.get('danger_alert'):
-                # TODO: 관리자 알림 발송
-                pass
-            
-            if request.is_json:
-                return jsonify({"status": "success", "msg": "공유가 접수되었습니다.", "report_id": report.id})
-            return "<script>alert('공유가 접수되었습니다. 관리자 검토 후 게시됩니다.'); location.href='/share';</script>"
+
+            app_obj = current_app._get_current_object()
+            uid = user.id if user else 0
+            threading.Thread(target=background_process_share,
+                args=(app_obj, report.id, title, description, latitude, longitude, image_path, drawing_path, uid)).start()
+
+            return jsonify({"status": "success", "msg": "공유가 접수되었습니다.", "report_id": report.id})
         return render_template('share_report.html', user=user)
 
     @app.route('/admin/share-reports')
@@ -945,6 +1271,88 @@ def register_routes(app):
         return render_template('admin_share_reports.html', 
             reports=reports, 
             danger_reports=danger_reports)
+
+    @app.route('/admin/ramp-applications')
+    def admin_ramp_applications():
+        if session.get('role') not in ['admin', 'leader']:
+            return "권한 없음", 403
+        apps = RampApplication.query.order_by(RampApplication.created_at.desc()).all()
+        return render_template('admin_ramp_applications.html', apps=apps)
+
+    @app.route('/admin/message/send', methods=['GET', 'POST'])
+    def admin_message_send():
+        if session.get('role') not in ['admin', 'leader']:
+            return "권한 없음", 403
+        if request.method == 'POST':
+            send_type = request.form.get('send_type', 'all')
+            subject = request.form.get('subject', '').strip()
+            content = request.form.get('content', '').strip()
+            if not content:
+                return jsonify({'status':'error', 'msg':'내용을 입력하세요.'})
+            recipients = []
+            if send_type == 'all':
+                recipients = User.query.filter(User.role.notin_(['admin', 'leader'])).all()
+            elif send_type == 'individual':
+                receiver_id = request.form.get('receiver_id', type=int)
+                if receiver_id:
+                    user = User.query.get(receiver_id)
+                    if user:
+                        recipients = [user]
+            elif send_type == 'town':
+                town = request.form.get('town', '')
+                if town:
+                    recipients = User.query.filter(
+                        db.or_(User.reg_town == town, User.curr_town == town),
+                        User.role.notin_(['admin', 'leader'])
+                    ).all()
+            elif send_type == 'village':
+                town = request.form.get('town', '')
+                village = request.form.get('village', '')
+                if town and village:
+                    recipients = User.query.filter(
+                        db.or_(
+                            db.and_(User.reg_town == town, User.reg_village == village),
+                            db.and_(User.curr_town == town, User.curr_village == village)
+                        ),
+                        User.role.notin_(['admin', 'leader'])
+                    ).all()
+            elif send_type == 'group':
+                group_id = request.form.get('group_id', type=int)
+                if group_id:
+                    members = Friend.query.filter_by(group_id=group_id, status='accepted').all()
+                    recipient_ids = set()
+                    for m in members:
+                        if m.user_id != session['user_id']:
+                            recipient_ids.add(m.user_id)
+                        if m.friend_id != session['user_id']:
+                            recipient_ids.add(m.friend_id)
+                    recipients = User.query.filter(User.id.in_(recipient_ids)).all()
+            if not recipients:
+                return jsonify({'status':'error', 'msg':'발송 대상을 찾을 수 없습니다.'})
+            sender = User.query.get(session['user_id'])
+            total_cost = len(recipients) * 10
+            if sender.points < total_cost:
+                return jsonify({'status':'error', 'msg':f'닢이 부족합니다. (필요: {total_cost}닢, 보유: {sender.points}닢)'})
+            sender.points -= total_cost
+            ph = PointHistory(user_id=sender.id, change_type='message', amount=-total_cost, balance_after=sender.points, description=f'관리자 대량 쪽지 발송 ({len(recipients)}명)')
+            db.session.add(ph)
+            for user in recipients:
+                msg = Message(
+                    sender_id=sender.id,
+                    sender_name=sender.username,
+                    sender_role=sender.role or 'admin',
+                    receiver_id=user.id,
+                    subject=subject or '(제목 없음)',
+                    content=content
+                )
+                db.session.add(msg)
+            db.session.commit()
+            return jsonify({'status':'success', 'msg':f'{len(recipients)}명에게 쪽지를 발송했습니다. ({total_cost}닢 차감)'})
+        towns = list(YANGPYEONG_BOUNDS.keys())
+        villages = YANGPYEONG_VILLAGES
+        groups = FriendGroup.query.filter_by(user_id=session['user_id']).all()
+        users = User.query.order_by(User.real_name, User.username).all()
+        return render_template('admin_message.html', towns=towns, villages=villages, groups=groups, users=users)
 
     @app.route('/leader/share-reports')
     def leader_share_reports():
@@ -961,8 +1369,12 @@ def register_routes(app):
         town = request.args.get('town', '')
         village = request.args.get('village', '')
         category = request.args.get('category', '')
+        role = session.get('role', '')
         
-        query = ShareReport.query.filter_by(status='approved')
+        if role in ('admin', 'leader'):
+            query = ShareReport.query
+        else:
+            query = ShareReport.query.filter_by(status='approved')
         if town:
             query = query.filter_by(town=town)
         if village:
@@ -972,7 +1384,6 @@ def register_routes(app):
         
         reports = query.order_by(ShareReport.created_at.desc()).limit(50).all()
         
-        # 면/리 목록 조회 (필터용)
         towns = db.session.query(ShareReport.town).filter_by(status='approved').distinct().all()
         towns = [t[0] for t in towns if t[0]]
         
@@ -993,17 +1404,14 @@ def register_routes(app):
             selected_category=category
         )
 
-    @app.route('/share/detail/<int:report_id>')
-    def share_detail(report_id):
-        report = ShareReport.query.get_or_404(report_id)
-        if report.status != 'approved':
-            return "승인된 공유만 볼 수 있습니다.", 403
-        return render_template('share_detail.html', report=report)
-
     @app.route('/share/map')
     def share_map():
         category = request.args.get('category', '')
-        query = ShareReport.query.filter_by(status='approved')
+        role = session.get('role', '')
+        if role in ('admin', 'leader'):
+            query = ShareReport.query
+        else:
+            query = ShareReport.query.filter_by(status='approved')
         if category:
             query = query.filter_by(ai_category=category)
         reports = query.order_by(ShareReport.created_at.desc()).all()
@@ -1100,12 +1508,638 @@ def register_routes(app):
         db.session.commit()
         return jsonify({"status": "success", "msg": "공유가 삭제되었습니다."})
 
+    # --- [공유 댓글] ---
+    @app.route('/share/detail/<int:report_id>')
+    def share_detail(report_id):
+        report = ShareReport.query.get_or_404(report_id)
+        role = session.get('role', '')
+        if report.status != 'approved' and role not in ('admin', 'leader'):
+            return "승인된 공유만 볼 수 있습니다.", 403
+        comments = ShareComment.query.filter_by(share_id=report_id, parent_id=None).order_by(ShareComment.created_at.asc()).all()
+        return render_template('share_detail.html', report=report, comments=comments)
+
+    @app.route('/share/comment/<int:report_id>', methods=['POST'])
+    def share_add_comment(report_id):
+        if not session.get('username'):
+            return jsonify({"status": "error", "msg": "로그인이 필요합니다."}), 401
+        content = request.form.get('content', '').strip()
+        parent_id = request.form.get('parent_id', type=int)
+        if not content:
+            return jsonify({"status": "error", "msg": "내용을 입력하세요."}), 400
+        report = ShareReport.query.get_or_404(report_id)
+        if report.status != 'approved':
+            return jsonify({"status": "error", "msg": "승인된 공유만 댓글을 달 수 있습니다."}), 403
+        user = User.query.get(session['user_id'])
+        comment = ShareComment(
+            share_id=report_id,
+            user_id=user.id,
+            author=user.username,
+            content=content,
+            parent_id=parent_id
+        )
+        db.session.add(comment)
+        db.session.commit()
+        return jsonify({"status": "success", "msg": "댓글이 등록되었습니다."})
+
+    @app.route('/share/comment/delete/<int:comment_id>', methods=['POST'])
+    def share_delete_comment(comment_id):
+        if not session.get('username'):
+            return jsonify({"status": "error", "msg": "로그인이 필요합니다."}), 401
+        comment = ShareComment.query.get_or_404(comment_id)
+        if comment.user_id != session.get('user_id') and session.get('role') not in ['admin', 'leader']:
+            return jsonify({"status": "error", "msg": "삭제 권한이 없습니다."}), 403
+        ShareComment.query.filter_by(parent_id=comment_id).delete()
+        db.session.delete(comment)
+        db.session.commit()
+        return jsonify({"status": "success", "msg": "삭제되었습니다."})
+
+    # --- [양평 공사안내] ---
+    @app.route('/construction')
+    @app.route('/construction')
+    def construction():
+        notices = ConstructionNotice.query.filter_by(is_active=True).order_by(ConstructionNotice.created_at.desc()).all()
+        from config import Config
+        dg_key = getattr(Config, 'DATA_GO_KR_API_KEY', '')
+        gg_key = getattr(Config, 'GG_TRAFFIC_API_KEY', '')
+        return render_template('construction.html', notices=notices, api_key_configured=bool(dg_key), traffic_key_configured=bool(gg_key))
+
+    @app.route('/construction/refresh')
+    def construction_refresh():
+        if session.get('role') not in ('admin', 'leader'):
+            return "권한 없음", 403
+        from flask import current_app
+        from config import Config
+        dg_key = getattr(Config, 'DATA_GO_KR_API_KEY', '')
+        gg_key = getattr(Config, 'GG_TRAFFIC_API_KEY', '')
+        if not dg_key and not gg_key:
+            return "<script>alert('API 키가 설정되지 않았습니다. config.py를 확인하세요.'); history.back();</script>"
+        import threading
+        if dg_key:
+            threading.Thread(target=sync_construction_notices, args=(current_app._get_current_object(), dg_key)).start()
+        if gg_key:
+            threading.Thread(target=sync_traffic_incidents, args=(current_app._get_current_object(), gg_key)).start()
+            threading.Thread(target=sync_congestion_info, args=(current_app._get_current_object(), gg_key)).start()
+        return "<script>alert('정보 갱신이 시작되었습니다.'); location.href='/construction';</script>"
+
     # --- [상시 서비스 3종] ---
     @app.route('/service/ramp')
-    def service_ramp(): return render_template('service_ramp.html')
+    def service_ramp():
+        _cleanup_expired_posts()
+        uid = session.get('user_id')
+        role = session.get('role')
+        raw_posts = Post.query.filter(
+            Post.title.contains('경사로') | Post.content.contains('경사로') | Post.content.contains('휠체어') | Post.title.contains('휠체어')
+        ).order_by(Post.created_at.desc()).all()
+        ramp_posts = [p for p in raw_posts if not (p.total_score <= -50 and p.user_id != uid and role not in ('admin', 'leader'))]
+        waiting_count = RampApplication.query.filter_by(status='pending').count()
+        # static/videos/ramp/ 폴더의 동영상 파일 목록
+        ramp_videos = []
+        video_dir = os.path.join(current_app.root_path, 'static', 'videos', 'ramp')
+        if os.path.exists(video_dir):
+            for f in sorted(os.listdir(video_dir), reverse=True):
+                if f.lower().endswith(('.mp4', '.webm', '.mov', '.avi', '.mkv')):
+                    ramp_videos.append(f"/static/videos/ramp/{f}")
+        return render_template('service_ramp.html', ramp_posts=ramp_posts, waiting_count=waiting_count, ramp_videos=ramp_videos)
+
+    @app.route('/service/ramp/apply', methods=['POST'])
+    def service_ramp_apply():
+        name = request.form['name']
+        email = request.form['email']
+        phone = request.form['phone']
+        location = request.form['location']
+        step_height = request.form['step_height']
+        ownership = request.form['ownership']
+        agree_removal = request.form.get('agree_removal') == 'on'
+        agree_damage = request.form.get('agree_damage') == 'on'
+        from datetime import datetime
+
+        photo_path = None
+        if 'photo' in request.files:
+            file = request.files['photo']
+            if file and file.filename:
+                from werkzeug.utils import secure_filename
+                fname = f"ramp_{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(file.filename)}"
+                target_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'ramp')
+                if not os.path.exists(target_dir): os.makedirs(target_dir)
+                file.save(os.path.join(target_dir, fname))
+                photo_path = f"/static/uploads/ramp/{fname}"
+
+        appt = RampApplication(
+            name=name, email=email, phone=phone, location=location,
+            photo_path=photo_path, step_height=step_height,
+            ownership=ownership, agree_removal=agree_removal,
+            agree_damage=agree_damage, signed_at=datetime.now(),
+            status='pending'
+        )
+        db.session.add(appt)
+        db.session.commit()
+        EmailService.send(email, "[양평마을] 경사로 설치 신청이 접수되었습니다",
+            f"{name}님, 경사로 설치 신청이 접수되었습니다.\n\n접수 번호: {appt.id}번\n위치: {location}\n\n검토 후 연락드리겠습니다.\n\nhttps://test.unocum.kr")
+        return "<script>alert('신청이 접수되었습니다. 검토 후 연락드립니다. (대기자 순번: " + str(appt.id) + "번)'); location.href='/service/ramp';</script>"
+
+    @app.route('/service/ramp/volunteer', methods=['POST'])
+    def service_ramp_volunteer():
+        name = request.form.get('name', '')
+        email = request.form.get('email', '')
+        phone = request.form.get('phone', '')
+        admin_email = current_app.config.get('MAIL_FROM', 'yp@unocum.kr')
+        EmailService.send(admin_email, "[양평마을] 경사로 봉사 신청 알림",
+            f"경사로 봉사 신청이 접수되었습니다.\n\n이름: {name}\n이메일: {email}\n연락처: {phone}")
+        return "<script>alert('봉사 신청이 접수되었습니다. 될 수 있는 한 회원가입 후 신청해 주시면 감사하겠습니다. (unocumyp@gmail.com)'); location.href='/service/ramp';</script>"
 
     @app.route('/service/legal')
     def service_legal(): return render_template('service_legal.html')
 
     @app.route('/service/psycho')
     def service_psycho(): return render_template('service_psycho.html')
+
+    # --- [법률상담 게시판] ---
+    @app.route('/legal/list')
+    def legal_list():
+        posts = LegalPost.query.order_by(LegalPost.created_at.desc()).all()
+        return render_template('legal_board.html', posts=posts)
+
+    @app.route('/legal/write', methods=['GET', 'POST'])
+    def legal_write():
+        if request.method == 'POST':
+            title = request.form['title']
+            content = request.form['content']
+            password = generate_password_hash(request.form['password'])
+            email = request.form['email']
+            author_name = request.form.get('author_name', '익명') or '익명'
+            post = LegalPost(title=title, content=content, password=password, email=email, author_name=author_name)
+            db.session.add(post)
+            db.session.commit()
+            return "<script>alert('상담 글이 등록되었습니다. 답변은 이메일로 알려드립니다.'); location.href='/legal/list';</script>"
+        return render_template('legal_write.html')
+
+    @app.route('/legal/post/<int:post_id>', methods=['GET', 'POST'])
+    def legal_post(post_id):
+        post = LegalPost.query.get_or_404(post_id)
+        if request.method == 'POST':
+            if check_password_hash(post.password, request.form['password']):
+                return render_template('legal_post.html', post=post, need_password=False, error=False)
+            return render_template('legal_post.html', post=post, need_password=True, error=True)
+        return render_template('legal_post.html', post=post, need_password=True, error=False)
+
+    @app.route('/legal/admin')
+    def legal_admin():
+        if session.get('role') not in ('admin', 'leader'):
+            return "<script>alert('관리자 전용입니다.'); location.href='/service/legal';</script>"
+        pending_posts = LegalPost.query.filter_by(answer=None).order_by(LegalPost.created_at.desc()).all()
+        answered_posts = LegalPost.query.filter(LegalPost.answer.isnot(None)).order_by(LegalPost.answered_at.desc()).all()
+        pending_appts = LegalAppointment.query.filter_by(status='pending').order_by(LegalAppointment.created_at.desc()).all()
+        approved_appts = LegalAppointment.query.filter_by(status='approved').order_by(LegalAppointment.date.desc()).all()
+        schedule_rows = LawyerSchedule.query.all()
+        schedules = {str(s.day_of_week): {'is_available': s.is_available, 'start_hour': s.start_hour, 'end_hour': s.end_hour, 'slot_hours': s.slot_hours} for s in schedule_rows}
+        gc = GoogleCalendarConfig.query.first()
+        return render_template('legal_admin.html', pending_posts=pending_posts, answered_posts=answered_posts, pending_appointments=pending_appts, approved_appointments=approved_appts, schedules=schedules, gc=gc)
+
+    @app.route('/legal/admin/answer/<int:post_id>', methods=['POST'])
+    def legal_admin_answer(post_id):
+        if session.get('role') not in ('admin', 'leader'):
+            return "<script>alert('권한 없음'); history.back();</script>"
+        post = LegalPost.query.get_or_404(post_id)
+        post.answer = request.form['answer']
+        post.answered_at = datetime.now()
+        post.is_public = True
+        post.fee = int(request.form.get('fee')) if request.form.get('fee') else None
+        post.travel_allowance = int(request.form.get('travel_allowance')) if request.form.get('travel_allowance') else None
+        db.session.commit()
+        EmailService.send(post.email, f"[양평마을] 법률상담 답변이 등록되었습니다",
+            f"문의하신 '{post.title}'에 대한 답변이 등록되었습니다.\n\nhttps://test.unocum.kr/legal/post/{post.id}")
+        return "<script>alert('답변이 등록되었습니다.'); location.href='/legal/admin';</script>"
+
+    @app.route('/legal/admin/appointment/<int:appt_id>/approve', methods=['POST'])
+    def legal_appointment_approve(appt_id):
+        if session.get('role') not in ('admin', 'leader'):
+            return "<script>alert('권한 없음'); history.back();</script>"
+        appt = LegalAppointment.query.get_or_404(appt_id)
+        appt.status = 'approved'
+        appt.approved_at = datetime.now()
+        appt.approved_by = session.get('user_id')
+        appt.fee = int(request.form.get('fee')) if request.form.get('fee') else None
+        appt.travel_allowance = int(request.form.get('travel_allowance')) if request.form.get('travel_allowance') else None
+        db.session.commit()
+        EmailService.send(appt.email, "[양평마을] 법률상담 예약이 승인되었습니다",
+            f"법률상담 예약이 승인되었습니다.\n\n일시: {appt.date} {appt.time_slot}\n\nhttps://test.unocum.kr/legal/schedule")
+        return "<script>alert('예약이 승인되었습니다.'); location.href='/legal/admin';</script>"
+
+    @app.route('/legal/admin/appointment/<int:appt_id>/reject', methods=['POST'])
+    def legal_appointment_reject(appt_id):
+        if session.get('role') not in ('admin', 'leader'):
+            return "<script>alert('권한 없음'); history.back();</script>"
+        appt = LegalAppointment.query.get_or_404(appt_id)
+        appt.status = 'rejected'
+        db.session.commit()
+        return "<script>alert('예약이 거절되었습니다.'); location.href='/legal/admin';</script>"
+
+    @app.route('/legal/admin/schedule', methods=['POST'])
+    def legal_admin_schedule():
+        if session.get('role') not in ('admin', 'leader'):
+            return "<script>alert('권한 없음'); history.back();</script>"
+        for day_id in range(7):
+            key = f'day_{day_id}'
+            if key in request.form:
+                start_hour = int(request.form.get(f'start_{day_id}', 10))
+                end_hour = int(request.form.get(f'end_{day_id}', 16))
+                schedule = LawyerSchedule.query.filter_by(day_of_week=day_id).first()
+                if schedule:
+                    schedule.is_available = True
+                    schedule.start_hour = start_hour
+                    schedule.end_hour = end_hour
+                else:
+                    schedule = LawyerSchedule(day_of_week=day_id, is_available=True, start_hour=start_hour, end_hour=end_hour)
+                    db.session.add(schedule)
+            else:
+                schedule = LawyerSchedule.query.filter_by(day_of_week=day_id).first()
+                if schedule:
+                    schedule.is_available = False
+        db.session.commit()
+        return "<script>alert('상담시간이 저장되었습니다.'); location.href='/legal/admin';</script>"
+
+    @app.route('/legal/admin/google-calendar', methods=['POST'])
+    def legal_admin_google_calendar():
+        if session.get('role') not in ('admin', 'leader'):
+            return "<script>alert('권한 없음'); history.back();</script>"
+        gc = GoogleCalendarConfig.query.first()
+        if not gc:
+            gc = GoogleCalendarConfig()
+            db.session.add(gc)
+        if 'service_account_json' in request.files:
+            file = request.files['service_account_json']
+            if file and file.filename.endswith('.json'):
+                gc.service_account_json = file.read().decode('utf-8')
+        calendar_id = request.form.get('calendar_id', '').strip()
+        if calendar_id:
+            gc.calendar_id = calendar_id
+        gc.is_connected = bool(gc.service_account_json and gc.calendar_id)
+        gc.updated_at = datetime.now()
+        db.session.commit()
+        msg = '연동 저장 완료' if gc.is_connected else 'JSON 파일과 캘린더 ID를 모두 입력해야 합니다.'
+        return f"<script>alert('{msg}'); location.href='/legal/admin';</script>"
+
+    @app.route('/legal/schedule')
+    def legal_schedule():
+        from datetime import date, timedelta
+        schedule_rows = LawyerSchedule.query.filter_by(is_available=True).all()
+        available_day_ids = {s.day_of_week for s in schedule_rows}
+        time_slots_by_day = {}
+        for s in schedule_rows:
+            slots = []
+            for h in range(s.start_hour, s.end_hour, s.slot_hours):
+                slots.append(f"{h:02d}:00-{h+s.slot_hours:02d}:00")
+            time_slots_by_day[s.day_of_week] = slots
+
+        # 앞으로 60일 중 예약 가능일 계산
+        booked = db.session.query(LegalAppointment.date).filter(LegalAppointment.status.in_(['pending', 'approved'])).distinct().all()
+        booked_dates = {b[0] for b in booked}
+        available_dates = []
+        today = date.today()
+        for i in range(60):
+            d = today + timedelta(days=i)
+            if d.weekday() in available_day_ids and d not in booked_dates:
+                available_dates.append(d.isoformat())
+
+        all_slots = []
+        for s in schedule_rows:
+            for h in range(s.start_hour, s.end_hour, s.slot_hours):
+                all_slots.append(f"{h:02d}:00-{h+s.slot_hours:02d}:00")
+
+        return render_template('legal_schedule.html', available_dates=available_dates, time_slots=all_slots)
+
+    @app.route('/legal/appointment/book', methods=['POST'])
+    def legal_appointment_book():
+        name = request.form['name']
+        email = request.form['email']
+        phone = request.form.get('phone', '')
+        date_str = request.form['date']
+        time_slot = request.form['time_slot']
+        location_parts = [request.form.get('location', ''), request.form.get('location_detail', '')]
+        location = ' '.join(p for p in location_parts if p)
+        content = request.form.get('content', '')
+        from datetime import date
+        appt = LegalAppointment(
+            user_id=session.get('user_id'),
+            name=name, email=email, phone=phone,
+            date=date.fromisoformat(date_str),
+            time_slot=time_slot, location=location, content=content
+        )
+        db.session.add(appt)
+        db.session.commit()
+        return "<script>alert('예약이 신청되었습니다. 승인 후 이메일로 안내드립니다.'); location.href='/service/legal';</script>"
+
+    # --- [심리상담소] ---
+    @app.route('/psycho/list')
+    def psycho_list():
+        posts = PsychoPost.query.order_by(PsychoPost.created_at.desc()).all()
+        return render_template('psycho_board.html', posts=posts)
+
+    @app.route('/psycho/write', methods=['GET', 'POST'])
+    def psycho_write():
+        if request.method == 'POST':
+            title = request.form['title']
+            content = request.form['content']
+            password = generate_password_hash(request.form['password'])
+            email = request.form['email']
+            author_name = request.form.get('author_name', '익명') or '익명'
+            post = PsychoPost(title=title, content=content, password=password, email=email, author_name=author_name)
+            db.session.add(post)
+            db.session.commit()
+            return "<script>alert('상담 글이 등록되었습니다. 답변은 이메일로 알려드립니다.'); location.href='/psycho/list';</script>"
+        return render_template('psycho_write.html')
+
+    @app.route('/psycho/post/<int:post_id>', methods=['GET', 'POST'])
+    def psycho_post(post_id):
+        post = PsychoPost.query.get_or_404(post_id)
+        if request.method == 'POST':
+            if check_password_hash(post.password, request.form['password']):
+                return render_template('psycho_post.html', post=post, need_password=False, error=False)
+            return render_template('psycho_post.html', post=post, need_password=True, error=True)
+        return render_template('psycho_post.html', post=post, need_password=True, error=False)
+
+    @app.route('/psycho/admin')
+    def psycho_admin():
+        if session.get('role') not in ('admin', 'leader'):
+            return "<script>alert('관리자 전용입니다.'); location.href='/service/psycho';</script>"
+        pending_posts = PsychoPost.query.filter_by(answer=None).order_by(PsychoPost.created_at.desc()).all()
+        answered_posts = PsychoPost.query.filter(PsychoPost.answer.isnot(None)).order_by(PsychoPost.answered_at.desc()).all()
+        pending_appts = PsychoAppointment.query.filter_by(status='pending').order_by(PsychoAppointment.created_at.desc()).all()
+        approved_appts = PsychoAppointment.query.filter_by(status='approved').order_by(PsychoAppointment.date.desc()).all()
+        schedule_rows = PsychoDoctorSchedule.query.all()
+        schedules = {str(s.day_of_week): {'is_available': s.is_available, 'start_hour': s.start_hour, 'end_hour': s.end_hour, 'slot_hours': s.slot_hours} for s in schedule_rows}
+        gc = PsychoGoogleCalendarConfig.query.first()
+        return render_template('psycho_admin.html', pending_posts=pending_posts, answered_posts=answered_posts, pending_appointments=pending_appts, approved_appointments=approved_appts, schedules=schedules, gc=gc)
+
+    @app.route('/psycho/admin/answer/<int:post_id>', methods=['POST'])
+    def psycho_admin_answer(post_id):
+        if session.get('role') not in ('admin', 'leader'):
+            return "<script>alert('권한 없음'); history.back();</script>"
+        post = PsychoPost.query.get_or_404(post_id)
+        post.answer = request.form['answer']
+        post.answered_at = datetime.now()
+        post.is_public = True
+        post.fee = int(request.form.get('fee')) if request.form.get('fee') else None
+        post.travel_allowance = int(request.form.get('travel_allowance')) if request.form.get('travel_allowance') else None
+        db.session.commit()
+        EmailService.send(post.email, f"[양평마을] 심리상담 답변이 등록되었습니다",
+            f"문의하신 '{post.title}'에 대한 답변이 등록되었습니다.\n\nhttps://test.unocum.kr/psycho/post/{post.id}")
+        return "<script>alert('답변이 등록되었습니다.'); location.href='/psycho/admin';</script>"
+
+    @app.route('/psycho/admin/appointment/<int:appt_id>/approve', methods=['POST'])
+    def psycho_appointment_approve(appt_id):
+        if session.get('role') not in ('admin', 'leader'):
+            return "<script>alert('권한 없음'); history.back();</script>"
+        appt = PsychoAppointment.query.get_or_404(appt_id)
+        appt.status = 'approved'
+        appt.approved_at = datetime.now()
+        appt.approved_by = session.get('user_id')
+        appt.fee = int(request.form.get('fee')) if request.form.get('fee') else None
+        appt.travel_allowance = int(request.form.get('travel_allowance')) if request.form.get('travel_allowance') else None
+        db.session.commit()
+        EmailService.send(appt.email, "[양평마을] 심리상담 예약이 승인되었습니다",
+            f"심리상담 예약이 승인되었습니다.\n\n일시: {appt.date} {appt.time_slot}\n\nhttps://test.unocum.kr/psycho/schedule")
+        return "<script>alert('예약이 승인되었습니다.'); location.href='/psycho/admin';</script>"
+
+    @app.route('/psycho/admin/appointment/<int:appt_id>/reject', methods=['POST'])
+    def psycho_appointment_reject(appt_id):
+        if session.get('role') not in ('admin', 'leader'):
+            return "<script>alert('권한 없음'); history.back();</script>"
+        appt = PsychoAppointment.query.get_or_404(appt_id)
+        appt.status = 'rejected'
+        db.session.commit()
+        return "<script>alert('예약이 거절되었습니다.'); location.href='/psycho/admin';</script>"
+
+    @app.route('/psycho/admin/schedule', methods=['POST'])
+    def psycho_admin_schedule():
+        if session.get('role') not in ('admin', 'leader'):
+            return "<script>alert('권한 없음'); history.back();</script>"
+        for day_id in range(7):
+            key = f'day_{day_id}'
+            if key in request.form:
+                start_hour = int(request.form.get(f'start_{day_id}', 10))
+                end_hour = int(request.form.get(f'end_{day_id}', 16))
+                schedule = PsychoDoctorSchedule.query.filter_by(day_of_week=day_id).first()
+                if schedule:
+                    schedule.is_available = True
+                    schedule.start_hour = start_hour
+                    schedule.end_hour = end_hour
+                else:
+                    schedule = PsychoDoctorSchedule(day_of_week=day_id, is_available=True, start_hour=start_hour, end_hour=end_hour)
+                    db.session.add(schedule)
+            else:
+                schedule = PsychoDoctorSchedule.query.filter_by(day_of_week=day_id).first()
+                if schedule:
+                    schedule.is_available = False
+        db.session.commit()
+        return "<script>alert('상담시간이 저장되었습니다.'); location.href='/psycho/admin';</script>"
+
+    @app.route('/psycho/admin/google-calendar', methods=['POST'])
+    def psycho_admin_google_calendar():
+        if session.get('role') not in ('admin', 'leader'):
+            return "<script>alert('권한 없음'); history.back();</script>"
+        gc = PsychoGoogleCalendarConfig.query.first()
+        if not gc:
+            gc = PsychoGoogleCalendarConfig()
+            db.session.add(gc)
+        if 'service_account_json' in request.files:
+            file = request.files['service_account_json']
+            if file and file.filename.endswith('.json'):
+                gc.service_account_json = file.read().decode('utf-8')
+        calendar_id = request.form.get('calendar_id', '').strip()
+        if calendar_id:
+            gc.calendar_id = calendar_id
+        gc.is_connected = bool(gc.service_account_json and gc.calendar_id)
+        gc.updated_at = datetime.now()
+        db.session.commit()
+        msg = '연동 저장 완료' if gc.is_connected else 'JSON 파일과 캘린더 ID를 모두 입력해야 합니다.'
+        return f"<script>alert('{msg}'); location.href='/psycho/admin';</script>"
+
+    @app.route('/psycho/schedule')
+    def psycho_schedule():
+        from datetime import date, timedelta
+        schedule_rows = PsychoDoctorSchedule.query.filter_by(is_available=True).all()
+        available_day_ids = {s.day_of_week for s in schedule_rows}
+        for s in schedule_rows:
+            pass
+        booked = db.session.query(PsychoAppointment.date).filter(PsychoAppointment.status.in_(['pending', 'approved'])).distinct().all()
+        booked_dates = {b[0] for b in booked}
+        available_dates = []
+        today = date.today()
+        for i in range(60):
+            d = today + timedelta(days=i)
+            if d.weekday() in available_day_ids and d not in booked_dates:
+                available_dates.append(d.isoformat())
+        all_slots = []
+        for s in schedule_rows:
+            for h in range(s.start_hour, s.end_hour, s.slot_hours):
+                all_slots.append(f"{h:02d}:00-{h+s.slot_hours:02d}:00")
+        return render_template('psycho_schedule.html', available_dates=available_dates, time_slots=all_slots)
+
+    @app.route('/psycho/appointment/book', methods=['POST'])
+    def psycho_appointment_book():
+        name = request.form['name']
+        email = request.form['email']
+        phone = request.form.get('phone', '')
+        date_str = request.form['date']
+        time_slot = request.form['time_slot']
+        location_parts = [request.form.get('location', ''), request.form.get('location_detail', '')]
+        location = ' '.join(p for p in location_parts if p)
+        content = request.form.get('content', '')
+        from datetime import date
+        appt = PsychoAppointment(
+            user_id=session.get('user_id'),
+            name=name, email=email, phone=phone,
+            date=date.fromisoformat(date_str),
+            time_slot=time_slot, location=location, content=content
+        )
+        db.session.add(appt)
+        db.session.commit()
+        return "<script>alert('예약이 신청되었습니다. 승인 후 이메일로 안내드립니다.'); location.href='/service/psycho';</script>"
+
+    # --- [벗 (친구) 시스템] ---
+
+    @app.context_processor
+    def inject_friend_info():
+        uid = session.get('user_id')
+        if not uid:
+            return dict(has_friends=False, friend_count=0)
+        friend_ids = [f.receiver_id for f in Friend.query.filter_by(requester_id=uid, status='accepted').all()] + \
+                     [f.requester_id for f in Friend.query.filter_by(receiver_id=uid, status='accepted').all()]
+        return dict(has_friends=True, friend_count=len(friend_ids))
+
+    @app.route('/friends')
+    def friends():
+        uid = session.get('user_id')
+        if not uid: return redirect(url_for('login', next='/friends'))
+        friend_ids = [f.receiver_id for f in Friend.query.filter_by(requester_id=uid, status='accepted').all()] + \
+                     [f.requester_id for f in Friend.query.filter_by(receiver_id=uid, status='accepted').all()]
+        friend_users = User.query.filter(User.id.in_(friend_ids)).all() if friend_ids else []
+        pending_friends = Friend.query.filter_by(receiver_id=uid, status='pending').all()
+        pending_users = User.query.filter(User.id.in_([f.requester_id for f in pending_friends])).all() if pending_friends else []
+        my_pending = Friend.query.filter_by(requester_id=uid, status='pending').all()
+        my_pending_ids = [f.receiver_id for f in my_pending]
+        my_pending_users = User.query.filter(User.id.in_(my_pending_ids)).all() if my_pending_ids else []
+        groups = FriendGroup.query.filter_by(user_id=uid).all()
+        return render_template('friends.html', friend_users=friend_users, pending_users=pending_users,
+                               my_pending_ids=my_pending_ids, my_pending_users=my_pending_users, groups=groups)
+
+    @app.route('/friends/list')
+    def friends_list_json():
+        if not session.get('user_id'):
+            return jsonify({"friends": []})
+        uid = session['user_id']
+        friend_ids = [f.receiver_id for f in Friend.query.filter_by(requester_id=uid, status='accepted').all()] + \
+                     [f.requester_id for f in Friend.query.filter_by(receiver_id=uid, status='accepted').all()]
+        friends = User.query.filter(User.id.in_(friend_ids)).all() if friend_ids else []
+        return jsonify({"friends": [{"id": f.id, "name": f.real_name or f.username, "town": f.town or '', "village": f.village or ''} for f in friends]})
+
+    @app.route('/friends/map')
+    def friends_map():
+        if not session.get('user_id'): return redirect(url_for('login', next='/friends/map'))
+        return render_template('friends_map.html')
+
+    @app.route('/friends/request/<int:other_id>', methods=['POST'])
+    def friend_request(other_id):
+        uid = session.get('user_id')
+        if not uid: return jsonify({'status':'error','msg':'로그인 필요'}), 401
+        if uid == other_id: return jsonify({'status':'error','msg':'자기 자신에게 신청 불가'}), 400
+        existing = Friend.query.filter(
+            ((Friend.requester_id==uid) & (Friend.receiver_id==other_id)) |
+            ((Friend.requester_id==other_id) & (Friend.receiver_id==uid))
+        ).first()
+        if existing:
+            return jsonify({'status':'error','msg':'이미 신청했거나 벗 관계입니다'}), 400
+        f = Friend(requester_id=uid, receiver_id=other_id)
+        db.session.add(f)
+        requester = User.query.get(uid)
+        receiver = User.query.get(other_id)
+        # 로그인 위치 공유 동의 저장
+        requester.login_location_share = (request.form.get('share_login_location') == '1')
+        msg = Message(
+            sender_id=uid,
+            sender_name=requester.real_name or requester.username,
+            sender_role=requester.role,
+            receiver_id=other_id,
+            subject='👋 벗 신청',
+            content=f'{requester.real_name or requester.username}님이 벗 신청을 보냈습니다. "내 벗 관리" 페이지에서 수락/거절할 수 있습니다.'
+        )
+        db.session.add(msg)
+        db.session.commit()
+        return jsonify({'status':'success'})
+
+    @app.route('/friends/accept/<int:other_id>', methods=['POST'])
+    def friend_accept(other_id):
+        uid = session.get('user_id')
+        if not uid: return jsonify({'status':'error','msg':'로그인 필요'}), 401
+        f = Friend.query.filter_by(requester_id=other_id, receiver_id=uid, status='pending').first()
+        if not f: return jsonify({'status':'error','msg':'요청 없음'}), 404
+        f.status = 'accepted'
+        accepter = User.query.get(uid)
+        msg = Message(
+            sender_id=uid,
+            sender_name=accepter.real_name or accepter.username,
+            sender_role=accepter.role,
+            receiver_id=other_id,
+            subject='✅ 벗 신청 수락',
+            content=f'{accepter.real_name or accepter.username}님이 벗 신청을 수락했습니다. 이제 벗입니다!'
+        )
+        db.session.add(msg)
+        db.session.commit()
+        return jsonify({'status':'success'})
+
+    @app.route('/friends/reject/<int:other_id>', methods=['POST'])
+    def friend_reject(other_id):
+        uid = session.get('user_id')
+        if not uid: return jsonify({'status':'error','msg':'로그인 필요'}), 401
+        f = Friend.query.filter_by(requester_id=other_id, receiver_id=uid, status='pending').first()
+        if not f: return jsonify({'status':'error','msg':'요청 없음'}), 404
+        rejecter = User.query.get(uid)
+        msg = Message(
+            sender_id=uid,
+            sender_name=rejecter.real_name or rejecter.username,
+            sender_role=rejecter.role,
+            receiver_id=other_id,
+            subject='❌ 벗 신청 거절',
+            content=f'{rejecter.real_name or rejecter.username}님이 벗 신청을 거절했습니다.'
+        )
+        db.session.add(msg)
+        db.session.delete(f)
+        db.session.commit()
+        return jsonify({'status':'success'})
+
+    @app.route('/friends/remove/<int:other_id>', methods=['POST'])
+    def friend_remove(other_id):
+        uid = session.get('user_id')
+        if not uid: return jsonify({'status':'error','msg':'로그인 필요'}), 401
+        if session.get('role') not in ['admin', 'leader']:
+            return jsonify({'status':'error','msg':'관리자만 벗 관계를 삭제할 수 있습니다.'}), 403
+        f = Friend.query.filter(
+            ((Friend.requester_id==uid) & (Friend.receiver_id==other_id) & (Friend.status=='accepted')) |
+            ((Friend.requester_id==other_id) & (Friend.receiver_id==uid) & (Friend.status=='accepted'))
+        ).first()
+        if not f: return jsonify({'status':'error','msg':'벗 관계 없음'}), 404
+        db.session.delete(f)
+        db.session.commit()
+        return jsonify({'status':'success'})
+
+    @app.route('/friends/group/create', methods=['POST'])
+    def friend_group_create():
+        uid = session.get('user_id')
+        if not uid: return jsonify({'status':'error','msg':'로그인 필요'}), 401
+        name = request.form.get('name', '').strip()
+        if not name: return jsonify({'status':'error','msg':'그룹명 입력 필요'}), 400
+        g = FriendGroup(user_id=uid, name=name)
+        db.session.add(g)
+        db.session.commit()
+        return jsonify({'status':'success'})
+
+    @app.route('/friends/group/delete/<int:group_id>', methods=['POST'])
+    def friend_group_delete(group_id):
+        uid = session.get('user_id')
+        if not uid: return jsonify({'status':'error','msg':'로그인 필요'}), 401
+        g = FriendGroup.query.filter_by(id=group_id, user_id=uid).first()
+        if not g: return jsonify({'status':'error','msg':'그룹 없음'}), 404
+        db.session.delete(g)
+        db.session.commit()
+        return jsonify({'status':'success'})
