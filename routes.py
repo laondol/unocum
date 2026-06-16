@@ -95,18 +95,56 @@ def register_routes(app):
         town, village = gps_to_town_village(lat, lon)
         return jsonify({"status": "success", "town": town or '', "village": village or ''})
 
+    @app.route('/register/send-code', methods=['POST'])
+    def register_send_code():
+        email = request.form.get('email', '').strip()
+        if not email:
+            return jsonify({'status':'error','msg':'이메일을 입력해 주세요.'})
+        if User.query.filter_by(email=email).first():
+            return jsonify({'status':'error','msg':'이미 등록된 이메일입니다.'})
+        import secrets, time
+        code = ''.join(secrets.choice('0123456789') for _ in range(6))
+        session['verify_code'] = code
+        session['verify_email'] = email
+        session['verify_code_time'] = time.time()
+        from services.email_service import EmailService
+        EmailService.send(email, '[양평마을] 이메일 인증 코드',
+            f'인증 코드: {code}\n\n회원가입 페이지에서 위 코드를 입력해 주세요.\n코드는 5분간 유효합니다.')
+        return jsonify({'status':'success','msg':'인증 코드를 이메일로 발송했습니다.'})
+
+    @app.route('/register/verify-code', methods=['POST'])
+    def register_verify_code():
+        code = request.form.get('code', '').strip()
+        import time
+        if not session.get('verify_code') or not session.get('verify_email'):
+            return jsonify({'status':'error','msg':'인증 코드가 만료되었습니다. 다시 발송해 주세요.'})
+        if time.time() - session.get('verify_code_time', 0) > 300:
+            session.pop('verify_code', None)
+            session.pop('verify_email', None)
+            session.pop('verify_code_time', None)
+            return jsonify({'status':'error','msg':'인증 코드가 만료되었습니다. 다시 발송해 주세요.'})
+        if code != session.get('verify_code'):
+            return jsonify({'status':'error','msg':'인증 코드가 일치하지 않습니다.'})
+        session['email_verified_for_register'] = session['verify_email']
+        session.pop('verify_code', None)
+        session.pop('verify_code_time', None)
+        return jsonify({'status':'success','msg':'이메일 인증 완료!'})
+
     @app.route('/register', methods=['GET', 'POST'])
     def register():
         if request.method == 'POST':
-            email = request.form.get('email', '').strip()
+            verified_email = session.pop('email_verified_for_register', None)
+            if not verified_email:
+                return "<script>alert('이메일 인증을 먼저 완료해 주세요.'); location.href='/register';</script>"
             password = request.form['password']
             real_name = request.form['real_name']
             username = request.form['username']
             town = request.form['town']
             village = request.form['village']
             
-            if email and User.query.filter_by(email=email).first():
-                return "<script>alert('이미 등록된 이메일입니다.'); history.back();</script>"
+            if User.query.filter_by(email=verified_email).first():
+                session.pop('verify_email', None)
+                return "<script>alert('이미 등록된 이메일입니다.'); location.href='/register';</script>"
             if User.query.filter_by(username=username).first():
                 return "<script>alert('이미 있는 닉네임입니다.'); history.back();</script>"
 
@@ -114,7 +152,8 @@ def register_routes(app):
             now = datetime.now()
             new_user = User(
                 username=username, password=hashed_pw,
-                real_name=real_name, email=email,
+                real_name=real_name, email=verified_email,
+                email_verified=True,
                 town=town, village=village,
                 reg_town=town, reg_village=village,
                 curr_town=town, curr_village=village,
@@ -131,10 +170,9 @@ def register_routes(app):
             db.session.add(history)
             db.session.commit()
             
-            if email:
-                from services.email_service import EmailService
-                EmailService.send(email, f"[양평마을] 가입을 환영합니다, {real_name}님",
-                    f"{real_name}님, 양평마을에 가입해 주셔서 감사합니다.\n\n지금 바로 다양한 서비스를 이용해 보세요.\n- 게시글 작성 및 공유\n- 법률/심리 상담\n- 경사로 설치 신청\n- 이웃과 소통\n\nhttps://test.unocum.kr")
+            from services.email_service import EmailService
+            EmailService.send(verified_email, f"[양평마을] 가입을 환영합니다, {real_name}님",
+                f"{real_name}님, 양평마을에 가입해 주셔서 감사합니다.\n\n지금 바로 다양한 서비스를 이용해 보세요.\n- 게시글 작성 및 공유\n- 법률/심리 상담\n- 경사로 설치 신청\n- 이웃과 소통\n\nhttps://test.unocum.kr")
             
             return "<script>alert('가입 신청 완료! 로그인을 진행하세요.'); location.href='/intro';</script>"
         return render_template('register.html')
@@ -244,6 +282,7 @@ def register_routes(app):
                 existing_email_user.social_id = uid
                 existing_email_user.social_provider = provider
                 existing_email_user.social_email = email
+                existing_email_user.email_verified = True
                 db.session.commit()
                 user = existing_email_user
             else:
@@ -260,6 +299,7 @@ def register_routes(app):
                     password=hashed_pw,
                     real_name=name,
                     email=email,
+                    email_verified=True,
                     social_id=uid,
                     social_provider=provider,
                     social_email=email,

@@ -6,80 +6,100 @@
             <h3 class="fw-bold mb-3 text-center text-success">🌳 이웃 가입 신청</h3>
             <p class="text-muted text-center small mb-4">함께사는양평의 소중한 이웃이 되어주세요.</p>
             
-            <form action="/register" method="post">
+            <!-- Step 1: 이메일 인증 -->
+            <div id="step1">
                 <div class="mb-3">
-                    <label class="form-label small fw-bold">이메일 (로그인 ID)</label>
-                    <input type="email" name="email" class="form-control" placeholder="yangpyeong@example.com" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label small fw-bold">비밀번호</label>
+                    <label class="form-label small fw-bold">이메일 인증</label>
                     <div class="input-group">
-                        <input type="password" name="password" id="regPw" class="form-control" placeholder="비밀번호 입력" required>
-                        <button type="button" class="btn btn-outline-secondary" onclick="toggleRegPw()">👁</button>
+                        <input type="email" id="regEmail" class="form-control" placeholder="yangpyeong@example.com" required>
+                        <button class="btn btn-success" onclick="sendCode()">인증코드 발송</button>
                     </div>
+                    <div id="emailStatus" class="small mt-1 text-muted"></div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label small fw-bold">이름 (실명)</label>
-                    <input type="text" name="real_name" class="form-control" placeholder="홍길동" required>
+                <div class="mb-3" id="codeStep" style="display:none;">
+                    <label class="form-label small fw-bold">인증 코드 입력</label>
+                    <div class="input-group">
+                        <input type="text" id="verifyCode" class="form-control" placeholder="6자리 코드" maxlength="6">
+                        <button class="btn btn-outline-success" onclick="verifyCode()">인증 확인</button>
+                    </div>
+                    <div id="codeStatus" class="small mt-1 text-muted"></div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label small fw-bold">닉네임</label>
-                    <input type="text" name="username" class="form-control" placeholder="활동명" required>
-                </div>
-                
-                <div class="mb-4">
-                    <label class="form-label small fw-bold">주민등록상 주소 (읍/면/리)</label>
-                    <div class="row g-2">
-                        <div class="col-6">
-                            <select name="town" id="town-select" class="form-select" onchange="updateVillages()" required>
-                                <option value="">읍/면 선택</option>
-                                <option value="관외">관외 (양평 외 지역)</option>
-                                <option value="양평읍">양평읍</option>
-                                <option value="강상면">강상면</option>
-                                <option value="강하면">강하면</option>
-                                <option value="양서면">양서면</option>
-                                <option value="옥천면">옥천면</option>
-                                <option value="서종면">서종면</option>
-                                <option value="단월면">단월면</option>
-                                <option value="청운면">청운면</option>
-                                <option value="양동면">양동면</option>
-                                <option value="지평면">지평면</option>
-                                <option value="용문면">용문면</option>
-                                <option value="개군면">개군면</option>
-                            </select>
-                        </div>
-                        <div class="col-6">
-                            <select name="village" id="village-select" class="form-select" required disabled>
-                                <option value="">리 선택</option>
-                            </select>
+            </div>
+
+            <!-- Step 2: 회원정보 입력 (인증 후 표시) -->
+            <div id="step2" style="display:none;">
+                <div class="alert alert-success py-2 small mb-3">✅ 이메일 인증 완료</div>
+                <form id="regForm" action="/register" method="post">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">비밀번호</label>
+                        <div class="input-group">
+                            <input type="password" name="password" id="regPw" class="form-control" placeholder="비밀번호 입력" required>
+                            <button type="button" class="btn btn-outline-secondary" onclick="toggleRegPw()">👁</button>
                         </div>
                     </div>
-                </div>
-
-                <div class="mb-3 form-check">
-                    <input type="checkbox" class="form-check-input" id="agreeTerms" required>
-                    <label class="form-check-label small" for="agreeTerms">
-                        <a href="/terms" target="_blank" class="text-decoration-none">회원약관 및 닢 운영 규칙</a>에 동의합니다 (필수)
-                    </label>
-                </div>
-
-                <div class="card p-3 mb-3 border-0" style="background-color: #fff8e1; border-radius: 15px;">
-                    <h6 class="fw-bold mb-2" style="color: #8d6e00;">📌 중요! 다음 사항을 확인하고 동의해 주세요</h6>
-                    <div style="font-size: 0.82rem; line-height: 1.6; color: #5d4e37;">
-                        <p class="mb-1">✓ <strong>AI 콘텐츠 심사</strong> — 모든 게시글·댓글·공유는 AI 지킴이가 분석합니다.</p>
-                        <p class="mb-1">✓ <strong>이메일 인증</strong> — 투표(좋아요/나빠요)는 이메일 인증 후 가능합니다.</p>
-                        <p class="mb-1">✓ <strong>닢 선지급</strong> — 가입 시 1,000닢이 지급됩니다.</p>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">이름 (실명)</label>
+                        <input type="text" name="real_name" class="form-control" placeholder="홍길동" required>
                     </div>
-                    <div class="form-check mt-2">
-                        <input type="checkbox" class="form-check-input" id="agreeImportant" name="agree_important" required>
-                        <label class="form-check-label small fw-bold" for="agreeImportant" style="color: #8d6e00;">
-                            위 중요 사항을 모두 확인하였으며 동의합니다 (필수)
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">닉네임</label>
+                        <input type="text" name="username" class="form-control" placeholder="활동명" required>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="form-label small fw-bold">주민등록상 주소 (읍/면/리)</label>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <select name="town" id="town-select" class="form-select" onchange="updateVillages()" required>
+                                    <option value="">읍/면 선택</option>
+                                    <option value="관외">관외 (양평 외 지역)</option>
+                                    <option value="양평읍">양평읍</option>
+                                    <option value="강상면">강상면</option>
+                                    <option value="강하면">강하면</option>
+                                    <option value="양서면">양서면</option>
+                                    <option value="옥천면">옥천면</option>
+                                    <option value="서종면">서종면</option>
+                                    <option value="단월면">단월면</option>
+                                    <option value="청운면">청운면</option>
+                                    <option value="양동면">양동면</option>
+                                    <option value="지평면">지평면</option>
+                                    <option value="용문면">용문면</option>
+                                    <option value="개군면">개군면</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <select name="village" id="village-select" class="form-select" required disabled>
+                                    <option value="">리 선택</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="agreeTerms" required>
+                        <label class="form-check-label small" for="agreeTerms">
+                            <a href="/terms" target="_blank" class="text-decoration-none">회원약관 및 닢 운영 규칙</a>에 동의합니다 (필수)
                         </label>
                     </div>
-                </div>
 
-                <button class="btn btn-success w-100 p-3 fw-bold" style="font-size: 1.1rem; border-radius: 12px;">이웃 가입 신청하기</button>
-            </form>
+                    <div class="card p-3 mb-3 border-0" style="background-color: #fff8e1; border-radius: 15px;">
+                        <h6 class="fw-bold mb-2" style="color: #8d6e00;">📌 중요! 다음 사항을 확인하고 동의해 주세요</h6>
+                        <div style="font-size: 0.82rem; line-height: 1.6; color: #5d4e37;">
+                            <p class="mb-1">✓ <strong>AI 콘텐츠 심사</strong> — 모든 게시글·댓글·공유는 AI 지킴이가 분석합니다.</p>
+                            <p class="mb-1">✓ <strong>닢 선지급</strong> — 가입 시 1,000닢이 지급됩니다.</p>
+                        </div>
+                        <div class="form-check mt-2">
+                            <input type="checkbox" class="form-check-input" id="agreeImportant" name="agree_important" required>
+                            <label class="form-check-label small fw-bold" for="agreeImportant" style="color: #8d6e00;">
+                                위 중요 사항을 모두 확인하였으며 동의합니다 (필수)
+                            </label>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-success w-100 p-3 fw-bold" style="font-size: 1.1rem; border-radius: 12px;">이웃 가입 신청하기</button>
+                </form>
+            </div>
+            
             <div class="text-center mt-3">
                 <span class="text-muted small">이미 회원이신가요? </span>
                 <a href="/login" class="text-success fw-bold small text-decoration-none">로그인</a>
@@ -110,8 +130,7 @@ function updateVillages() {
     if (selectedTown === "" || selectedTown === "관외") { villageSelect.disabled = true; return; }
     const villages = yangpyeongData[selectedTown];
     villages.forEach(function(v) {
-        const option = document.createElement('option');
-        option.value = v; option.text = v;
+        const option = document.createElement('option'); option.value = v; option.text = v;
         villageSelect.appendChild(option);
     });
     villageSelect.disabled = false;
@@ -119,6 +138,34 @@ function updateVillages() {
 function toggleRegPw() {
     var i = document.getElementById('regPw');
     i.type = i.type === 'password' ? 'text' : 'password';
+}
+function sendCode() {
+    const email = document.getElementById('regEmail').value.trim();
+    if (!email) { alert('이메일을 입력해 주세요.'); return; }
+    document.getElementById('emailStatus').innerHTML = '발송 중...';
+    fetch('/register/send-code', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'email='+encodeURIComponent(email)})
+    .then(r=>r.json()).then(d=>{
+        if (d.status==='success') {
+            document.getElementById('emailStatus').innerHTML = '<span class="text-success">✅ 인증 코드를 발송했습니다. 메일함을 확인해 주세요.</span>';
+            document.getElementById('codeStep').style.display = 'block';
+        } else {
+            document.getElementById('emailStatus').innerHTML = '<span class="text-danger">❌ ' + d.msg + '</span>';
+        }
+    });
+}
+function verifyCode() {
+    const code = document.getElementById('verifyCode').value.trim();
+    if (!code) { alert('인증 코드를 입력해 주세요.'); return; }
+    document.getElementById('codeStatus').innerHTML = '확인 중...';
+    fetch('/register/verify-code', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'code='+encodeURIComponent(code)})
+    .then(r=>r.json()).then(d=>{
+        if (d.status==='success') {
+            document.getElementById('step1').style.display = 'none';
+            document.getElementById('step2').style.display = 'block';
+        } else {
+            document.getElementById('codeStatus').innerHTML = '<span class="text-danger">❌ ' + d.msg + '</span>';
+        }
+    });
 }
 </script>
 {% endblock %}
