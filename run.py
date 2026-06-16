@@ -592,9 +592,6 @@ def create_app():
                 __import__('services.rag', fromlist=['rebuild_index']).rebuild_index(app)
             ), daemon=True)
             t.start()
-            threading.Thread(target=lambda: (
-                __import__('services.rag', fromlist=['_get_embedder'])._get_embedder()
-            ), daemon=True).start()
         except Exception as e:
             print(f"[RAG] 인덱스 재구축 스킵: {e}")
 
