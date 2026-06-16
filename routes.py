@@ -796,8 +796,6 @@ def register_routes(app):
     def news_like(news_id):
         if not session.get('username'):
             return jsonify({"status": "error", "msg": "로그인이 필요합니다."}), 401
-        if not check_email_verified(session['user_id']):
-            return jsonify({"status": "error", "msg": "이메일 인증 후 투표가 가능합니다."}), 403
         article = NewsArticle.query.get_or_404(news_id)
         article.like_count += 1
         add_points(session['user_id'], 5, 'like', '뉴스 좋아요', news_id)
@@ -808,8 +806,6 @@ def register_routes(app):
     def news_dislike(news_id):
         if not session.get('username'):
             return jsonify({"status": "error", "msg": "로그인이 필요합니다."}), 401
-        if not check_email_verified(session['user_id']):
-            return jsonify({"status": "error", "msg": "이메일 인증 후 투표가 가능합니다."}), 403
         article = NewsArticle.query.get_or_404(news_id)
         article.dislike_count += 1
         db.session.commit()
@@ -1041,8 +1037,6 @@ def register_routes(app):
     def post_like(post_id):
         uid = session.get('user_id')
         if not uid: return jsonify({'status':'error','msg':'로그인 필요'}), 401
-        if not check_email_verified(uid):
-            return jsonify({'status':'error','msg':'이메일 인증 후 투표가 가능합니다. 마이페이지에서 인증해 주세요.'}), 403
         existing = PostVote.query.filter_by(post_id=post_id, user_id=uid).first()
         if existing:
             return jsonify({'status':'error','msg':'이미 투표했습니다'}), 400
@@ -1090,8 +1084,6 @@ def register_routes(app):
     def post_dislike(post_id):
         uid = session.get('user_id')
         if not uid: return jsonify({'status':'error','msg':'로그인 필요'}), 401
-        if not check_email_verified(uid):
-            return jsonify({'status':'error','msg':'이메일 인증 후 투표가 가능합니다. 마이페이지에서 인증해 주세요.'}), 403
         existing = PostVote.query.filter_by(post_id=post_id, user_id=uid).first()
         if existing:
             return jsonify({'status':'error','msg':'이미 투표했습니다'}), 400
