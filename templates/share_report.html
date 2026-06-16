@@ -17,7 +17,6 @@
             <form id="shareForm" enctype="multipart/form-data">
                 <!-- 사진 촬영 (카메라) -->
                 <div class="mb-3" id="cameraSection">
-                    <label class="form-label fw-bold small">📸 사진 촬영</label>
                     <input type="file" name="camera_image" class="form-control" accept="image/*" capture="environment" onchange="previewImage(this, 'cameraPreview')">
                     <div id="cameraPreview" class="mt-2" style="display:none;">
                         <img src="#" alt="사진 미리보기" style="width:100%; border-radius:12px; border:1px solid #eee;">
@@ -27,7 +26,7 @@
 
                 <!-- 파일 올리기 -->
                 <div class="mb-3">
-                    <label class="form-label fw-bold small">📁 파일 선택</label>
+                    <label class="form-label fw-bold small">📸 사진촬영</label>
                     <input type="file" name="image" class="form-control" accept="image/*" onchange="previewImage(this, 'filePreview')">
                     <div id="filePreview" class="mt-2" style="display:none;">
                         <img src="#" alt="파일 미리보기" style="width:100%; border-radius:12px; border:1px solid #eee;">
@@ -36,7 +35,6 @@
 
                 <!-- 동영상 올리기 -->
                 <div class="mb-3">
-                    <label class="form-label fw-bold small">🎬 동영상 올리기</label>
                     <input type="file" name="video" class="form-control" accept="video/mp4,video/avi,video/mov,video/mkv,video/webm" onchange="previewVideo(this)">
                     <div id="videoPreview" class="mt-2" style="display:none;">
                         <video src="#" controls style="width:100%; border-radius:12px; border:1px solid #eee;"></video>
