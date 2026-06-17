@@ -33,7 +33,7 @@ def create_app():
     import json as _json
     app.jinja_env.filters['fromjson'] = lambda s: _json.loads(s) if s else []
     from markupsafe import Markup
-    app.jinja_env.globals['nip'] = lambda: Markup('<span class="nip-symbol">N</span>')
+    app.jinja_env.globals['nip'] = lambda: Markup('<svg class="nip-symbol" viewBox="0 0 24 28" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><text x="3" y="22" font-weight="800" font-size="22" font-family="inherit" fill="currentColor" stroke="none">N</text><line x1="4" y1="5" x2="20" y2="5"/><line x1="12" y1="5" x2="12" y2="15"/><line x1="4" y1="15" x2="20" y2="15"/></svg>')
 
     # 웹 경로 등록
     register_routes(app)
