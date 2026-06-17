@@ -20,7 +20,7 @@ def register_routes(app):
     @app.route('/')
     @app.route('/intro')
     def intro():
-        selected_news = NewsArticle.query.filter_by(is_selected=True).order_by(NewsArticle.updated_at.desc()).limit(6).all()
+        selected_news = NewsArticle.query.filter(NewsArticle.is_selected == True, NewsArticle.category.in_(['세계뉴스', '환경뉴스', '건강정보', '복지정보', '농업정보', '관광소식'])).order_by(NewsArticle.updated_at.desc()).limit(6).all()
         return render_template('intro.html', selected_news=selected_news)
 
     @app.route('/presentation')
@@ -955,7 +955,7 @@ def register_routes(app):
     @app.route('/world-news')
     def world_news():
         page = request.args.get('page', 1, type=int)
-        news_list = NewsArticle.query.filter_by(is_selected=True).order_by(NewsArticle.like_count.desc(), NewsArticle.created_at.desc()).paginate(page=page, per_page=12, error_out=False)
+        news_list = NewsArticle.query.filter(NewsArticle.is_selected == True, NewsArticle.category.in_(['세계뉴스', '환경뉴스', '건강정보', '복지정보', '농업정보', '관광소식'])).order_by(NewsArticle.like_count.desc(), NewsArticle.created_at.desc()).paginate(page=page, per_page=12, error_out=False)
         return render_template('world_news.html', news_list=_get_news_with_recs(news_list), title="세계 뉴스")
 
     @app.route('/yp-news')
