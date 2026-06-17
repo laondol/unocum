@@ -1,4 +1,4 @@
-import json, os, base64, threading
+import json, os, base64, threading, subprocess, tempfile
 from datetime import datetime, timedelta
 from openai import OpenAI
 from models import db, Post, User, ShareReport
@@ -132,6 +132,57 @@ JSON: {"flagged": true/false, "reason": "이유", "category": "person/violence/a
 
 VALUABLE_CATEGORIES = {'사건', '풍경', '장소', '맛집'}
 
+def extract_video_frames(video_path, max_frames=3):
+    frames = []
+    try:
+        import subprocess as sp
+        duration_cmd = ['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+                        '-of', 'csv=p=0', video_path]
+        dur = sp.check_output(duration_cmd).decode().strip()
+        try:
+            duration = float(dur)
+        except:
+            return frames
+        if duration < 1:
+            return frames
+        intervals = [duration * i / (max_frames + 1) for i in range(1, max_frames + 1)]
+        for i, ts in enumerate(intervals):
+            fd, tmp = tempfile.mkstemp(suffix='.jpg')
+            os.close(fd)
+            sp.run(['ffmpeg', '-y', '-ss', str(ts), '-i', video_path,
+                    '-vframes', '1', '-q:v', '2', tmp],
+                   capture_output=True, timeout=15)
+            with open(tmp, 'rb') as f:
+                frames.append(base64.b64encode(f.read()).decode())
+            try: os.remove(tmp)
+            except: pass
+    except Exception as e:
+        print(f"[VIDEO FRAMES] error: {e}")
+    return frames
+
+def moderate_video_frames(video_path, app=None):
+    if not video_path or not os.path.exists(video_path):
+        return False, ""
+    frames = extract_video_frames(video_path)
+    if not frames:
+        return False, ""
+    system = "당신은 양평군 공유 동영상 방역관입니다."
+    user = """다음 동영상에서 추출한 장면 이미지입니다. 아래 기준에 해당하는지 판단해주세요.
+1. 인물 사진 (얼굴 전체 및 일부, 신체 일부 포함)
+2. 폭력적/혐오적 내용
+3. 선정적/음란적 내용
+4. 개인정보 노출 (주민등록증, 번호판 등)
+5. 불법 촬영물
+6. 스팸/광고성 이미지
+※ 1번(인물 사진)은 단체 사진, 뒷모습, 흐릿한 실루엣, 셀카, 프로필 사진, 얼굴이 조금이라도 나온 모든 사진 포함. 인물이 전혀 없는 풍경/사물/음식/동물 장면만 허용.
+위 내용이 하나라도 해당되면 flagged=true, 아니면 false.
+JSON: {"flagged": true/false, "reason": "이유", "category": "person/violence/adult/privacy/illegal/spam/clean"}"""
+    for b64 in frames:
+        data = _groq_vision(system, user, b64)
+        if data.get('flagged', False):
+            return True, data.get('reason', '')
+    return False, ""
+
 def background_process_share(app, report_id, title, description, latitude, longitude, image_path=None, drawing_path=None, user_id=0):
     with app.app_context():
         report = ShareReport.query.get(report_id)
@@ -169,6 +220,14 @@ def background_process_share(app, report_id, title, description, latitude, longi
                 flagged = True
                 reason = r
                 break
+        if not flagged:
+            v_path = getattr(report, 'video_path', None)
+            if v_path:
+                abs_v = os.path.join(app.root_path, '..', v_path.lstrip('/')).replace('/', os.sep)
+                f, r = moderate_video_frames(abs_v, app)
+                if f:
+                    flagged = True
+                    reason = r
 
         report.is_moderated = True
         report.moderation_at = datetime.now()
