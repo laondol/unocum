@@ -179,9 +179,10 @@ def register_routes(app):
 
     @app.route('/login', methods=['GET', 'POST'])
     def login():
-        next_url = request.args.get('next') or request.form.get('next') or url_for('index')
+        default_next = request.referrer if request.referrer and request.referrer.startswith(request.host_url) else url_for('intro')
+        next_url = request.args.get('next') or request.form.get('next') or default_next
         if next_url and not next_url.startswith('/'):
-            next_url = url_for('index')
+            next_url = url_for('intro')
         if request.method == 'POST':
             login_id = request.form['username']
             u = User.query.filter_by(username=login_id).first()
