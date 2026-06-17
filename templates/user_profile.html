@@ -14,8 +14,8 @@
                     <h3 class="fw-bold mb-1">{{ profile_user.real_name + ' (' + profile_user.username + ')' if profile_user.real_name else profile_user.username }}</h3>
                     <div class="text-muted small">
                         <span class="badge bg-light text-dark me-1">{{ profile_user.town }} {{ profile_user.village }}</span>
-                        {% if profile_user.is_verified_resident %}
-                        <span class="badge bg-success">인증 이웃</span>
+                        {% if profile_user.is_neighbor %}
+                        <span class="badge bg-success">이웃주민</span>
                         {% else %}
                         <span class="badge bg-secondary">미인증</span>
                         {% endif %}
@@ -35,7 +35,7 @@
                 {% if is_own %}
                 <div class="col-auto text-end">
                     <div class="fs-1 fw-bold text-success">{{ profile_user.points }}</div>
-                    <small class="text-muted">닢</small>
+                    <small class="text-muted">{{ nip() }}</small>
                 </div>
                 {% endif %}
             </div>
@@ -72,11 +72,9 @@
             <div class="row g-3">
                 <div class="col-md-6">
                     <div class="p-3 bg-light rounded">
-                        <small class="text-muted d-block">가입 시 위치</small>
-                        <span class="fw-bold">{{ profile_user.reg_town or profile_user.town }} {{ profile_user.reg_village or profile_user.village }}</span>
-                        {% if profile_user.reg_latitude and profile_user.reg_longitude %}
-                        <small class="d-block text-muted">({{ profile_user.reg_latitude|round(4) }}, {{ profile_user.reg_longitude|round(4) }})</small>
-                        {% endif %}
+                        <small class="text-muted d-block">기본 주소</small>
+                        <span id="addressDisplay" class="fw-bold">{{ profile_user.town }} {{ profile_user.village }}</span>
+                        <button class="btn btn-sm btn-outline-secondary ms-2" onclick="showAddressEdit()">✏️</button>
                     </div>
                 </div>
                 <div class="col-md-6">
@@ -92,14 +90,37 @@
                     </div>
                 </div>
             </div>
+            <div id="addressEditForm" class="mt-2 p-3 bg-light rounded" style="display:none;">
+                <form id="addressForm" onsubmit="updateAddress(event)">
+                    <div class="row g-2">
+                        <div class="col-md-5">
+                            <select name="town" class="form-select form-select-sm" id="editTown" required onchange="updateVillageOptions(this.value)">
+                                <option value="">읍/면 선택</option>
+                                {% for t in ['양평읍','강상면','강하면','양서면','옥천면','서종면','단월면','청운면','양동면','지평면','용문면','개군면','관외'] %}
+                                <option value="{{ t }}" {{ 'selected' if profile_user.town == t }}>{{ t }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-5">
+                            <select name="village" class="form-select form-select-sm" id="editVillage">
+                                <option value="">리 선택</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-sm btn-success w-100">저장</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
             <div id="locationStatus" class="small mt-2"></div>
             <div id="locationGuide" class="mt-2 p-3 bg-warning bg-opacity-10 rounded" style="display:none;">
                 <strong>⚠️ 위치 권한 필요</strong>
                 <p class="small mb-2">브라우저가 위치 정보를 차단했습니다. 아래 버튼을 눌러 설정을 변경해주세요.</p>
                 <button class="btn btn-sm btn-warning" onclick="openLocationSettings()">🔐 브라우저 위치 권한 설정</button>
             </div>
-            <div class="mt-2">
-                <div class="form-check form-switch">
+            <div class="mt-2 d-flex gap-2 flex-wrap">
+                <button class="btn btn-sm btn-outline-success" onclick="neighborVerify()">🏠 이웃주민 인증 (GPS)</button>
+                <div class="form-check form-switch ms-auto">
                     <input class="form-check-input" type="checkbox" id="locationShareToggle" {{ 'checked' if profile_user.location_share }} onchange="toggleLocationShare(this.checked)">
                     <label class="form-check-label small" for="locationShareToggle">내 위치를 벗에게 공유하기</label>
                 </div>

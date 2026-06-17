@@ -20,6 +20,10 @@
         .nav-spacer { width: 24px; }
         .dropdown-header-custom { font-size: 0.7rem; font-weight: 700; color: var(--yp-green); text-transform: uppercase; letter-spacing: 1px; padding: 6px 16px 2px; }
         .nav-separator { width: 1px; height: 24px; background: #ddd; margin: 0 8px; }
+        .nip-symbol { position: relative; display: inline-block; font-weight: 800; font-size: 1.05em; line-height: 1; }
+        .nip-symbol::before, .nip-symbol::after { content: ''; position: absolute; left: 2px; width: calc(100% - 4px); height: 2px; background: currentColor; border-radius: 1px; }
+        .nip-symbol::before { top: 30%; }
+        .nip-symbol::after { top: 58%; }
     </style>
 </head>
 <body>

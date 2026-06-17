@@ -32,6 +32,8 @@ def create_app():
     # Jinja2 커스텀 필터 등록
     import json as _json
     app.jinja_env.filters['fromjson'] = lambda s: _json.loads(s) if s else []
+    from markupsafe import Markup
+    app.jinja_env.globals['nip'] = lambda: Markup('<span class="nip-symbol">N</span>')
 
     # 웹 경로 등록
     register_routes(app)
