@@ -117,13 +117,15 @@ def moderate_image(image_path, app=None):
         return False, ""
     system = "당신은 양평군 공유 이미지 방역관입니다."
     user = """다음 이미지가 아래 기준에 해당하는지 판단해주세요.
-1. 폭력적/혐오적 내용
-2. 선정적/음란적 내용
-3. 개인정보 노출 (얼굴, 번호판, 주민등록증 등)
-4. 불법 촬영물
-5. 스팸/광고성 이미지
+1. 인물 사진 (얼굴 전체 및 일부, 신체 일부 포함)
+2. 폭력적/혐오적 내용
+3. 선정적/음란적 내용
+4. 개인정보 노출 (주민등록증, 번호판 등)
+5. 불법 촬영물
+6. 스팸/광고성 이미지
+※ 1번(인물 사진)은 단체 사진, 뒷모습, 흐릿한 실루엣, 셀카, 프로필 사진, 얼굴이 조금이라도 나온 모든 사진 포함. 인물이 전혀 없는 풍경/사물/음식/동물 사진만 허용.
 위 내용이 하나라도 해당되면 flagged=true, 아니면 false.
-JSON: {"flagged": true/false, "reason": "이유", "category": "violence/hate/adult/privacy/illegal/spam/clean"}"""
+JSON: {"flagged": true/false, "reason": "이유", "category": "person/violence/adult/privacy/illegal/spam/clean"}"""
     data = _groq_vision(system, user, b64)
     flagged = data.get('flagged', False)
     return flagged, data.get('reason', '') if flagged else ""
