@@ -17,7 +17,7 @@
             <form id="shareForm" enctype="multipart/form-data">
                 <!-- 사진촬영 (모바일 카메라 / 데스크탑 파일선택) -->
                 <div class="mb-3">
-                    <input type="file" id="cameraInput" accept="image/*" capture="environment" onchange="previewImage(this, 'filePreview')" style="display:none;">
+                    <input type="file" name="image" id="cameraInput" accept="image/*" capture="environment" onchange="previewImage(this, 'filePreview')" style="display:none;">
                     <button type="button" id="cameraBtn" class="btn btn-success w-100 py-3 fw-bold" style="border-radius:12px; font-size:1.1rem;" onclick="document.getElementById('cameraInput').click()">
                         📸 사진촬영
                     </button>
@@ -29,7 +29,7 @@
 
                 <!-- 파일 업로드 -->
                 <div class="mb-3">
-                    <input type="file" name="file_upload" class="form-control" onchange="previewFile(this)">
+                    <input type="file" name="image" class="form-control" onchange="previewFile(this)">
                     <div id="fileUploadPreview" class="mt-2" style="display:none;"></div>
                 </div>
 
