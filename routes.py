@@ -1253,8 +1253,8 @@ def register_routes(app):
             return jsonify({"status": "error", "msg": "로그인이 필요합니다."}), 401
         user = User.query.get(session['user_id'])
         data = request.get_json() or {}
-        lat = data.get('lat', type=float)
-        lon = data.get('lon', type=float)
+        lat = float(data.get('lat', 0))
+        lon = float(data.get('lon', 0))
         if not lat or not lon:
             return jsonify({"status": "error", "msg": "GPS 위치가 필요합니다."}), 400
         town, village = gps_to_town_village(lat, lon)
