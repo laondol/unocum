@@ -114,7 +114,7 @@ def background_ai_judge(app, post_id):
 def moderate_image(image_path, app=None):
     b64 = _image_to_base64(image_path)
     if not b64:
-        return False, ""
+        return False, "", "clean"
     system = "당신은 양평군 공유 이미지 방역관입니다."
     user = """다음 이미지가 아래 기준에 해당하는지 판단해주세요.
 1. 인물 사진 (얼굴 전체 및 일부, 신체 일부 포함)
@@ -128,7 +128,8 @@ def moderate_image(image_path, app=None):
 JSON: {"flagged": true/false, "reason": "이유", "category": "person/violence/adult/privacy/illegal/spam/clean"}"""
     data = _groq_vision(system, user, b64)
     flagged = data.get('flagged', False)
-    return flagged, data.get('reason', '') if flagged else ""
+    category = data.get('category', 'clean')
+    return flagged, data.get('reason', '') if flagged else "", category
 
 VALUABLE_CATEGORIES = {'사건', '풍경', '장소', '맛집'}
 
@@ -162,10 +163,10 @@ def extract_video_frames(video_path, max_frames=3):
 
 def moderate_video_frames(video_path, app=None):
     if not video_path or not os.path.exists(video_path):
-        return False, ""
+        return False, "", "clean"
     frames = extract_video_frames(video_path)
     if not frames:
-        return False, ""
+        return False, "", "clean"
     system = "당신은 양평군 공유 동영상 방역관입니다."
     user = """다음 동영상에서 추출한 장면 이미지입니다. 아래 기준에 해당하는지 판단해주세요.
 1. 인물 사진 (얼굴 전체 및 일부, 신체 일부 포함)
@@ -180,8 +181,8 @@ JSON: {"flagged": true/false, "reason": "이유", "category": "person/violence/a
     for b64 in frames:
         data = _groq_vision(system, user, b64)
         if data.get('flagged', False):
-            return True, data.get('reason', '')
-    return False, ""
+            return True, data.get('reason', ''), data.get('category', '')
+    return False, "", "clean"
 
 def background_process_share(app, report_id, title, description, latitude, longitude, image_path=None, drawing_path=None, user_id=0):
     with app.app_context():
@@ -211,27 +212,49 @@ def background_process_share(app, report_id, title, description, latitude, longi
 
         flagged = False
         reason = ""
+        mod_category = "clean"
         for path_key in ['image_path', 'drawing_path']:
             rel_path = getattr(report, path_key, None)
             if not rel_path: continue
             abs_path = os.path.join(app.root_path, '..', rel_path.lstrip('/')).replace('/', os.sep)
-            f, r = moderate_image(abs_path, app)
+            f, r, c = moderate_image(abs_path, app)
             if f:
                 flagged = True
                 reason = r
+                mod_category = c
                 break
         if not flagged:
             v_path = getattr(report, 'video_path', None)
             if v_path:
                 abs_v = os.path.join(app.root_path, '..', v_path.lstrip('/')).replace('/', os.sep)
-                f, r = moderate_video_frames(abs_v, app)
+                f, r, c = moderate_video_frames(abs_v, app)
                 if f:
                     flagged = True
                     reason = r
+                    mod_category = c
 
         report.is_moderated = True
         report.moderation_at = datetime.now()
-        if flagged:
+        if flagged and mod_category == 'person':
+            report.moderation_result = 'person'
+            report.moderation_reason = reason
+            report.status = 'pending_person'
+            if user_id:
+                from models import User, Message
+                uploader = User.query.get(user_id)
+                admin_user = User.query.filter(User.role == 'admin').first()
+                if uploader and admin_user:
+                    accept_url = f"{app.config.get('SITE_URL', 'https://test.unocum.kr')}/share-report/accept-person/{report.id}"
+                    msg = Message(
+                        sender_id=admin_user.id,
+                        sender_name=admin_user.username,
+                        sender_role='admin',
+                        receiver_id=uploader.id,
+                        subject='⚠️ 공유 이미지에 인물이 포함되어 있습니다',
+                        content=f'{uploader.real_name or uploader.username}님, 올리신 공유글(#{report.id})에 인물 사진이 포함되어 있습니다.\n\n게시를 원하시면 아래 링크에서 모든 책임을 지겠다는 데 동의해 주세요.\n{accept_url}\n\n동의하지 않으시면 별도 조치 없이 게시가 보류됩니다.'
+                    )
+                    db.session.add(msg)
+        elif flagged:
             report.moderation_result = 'flagged'
             report.moderation_reason = reason
             report.status = 'flagged'

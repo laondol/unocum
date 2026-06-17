@@ -90,6 +90,10 @@
                         <td>
                             {% if r.is_moderated and r.moderation_result == 'flagged' %}
                             <span class="badge bg-danger">🚫</span>
+                            {% elif r.is_moderated and r.moderation_result == 'person' %}
+                            <span class="badge bg-warning text-dark">👤</span>
+                            {% elif r.is_moderated and r.moderation_result == 'person_accepted' %}
+                            <span class="badge bg-info">👤✅</span>
                             {% elif r.is_moderated and r.moderation_result == 'clean' %}
                             <span class="badge bg-success">✅</span>
                             {% elif r.is_moderated and r.moderation_result == 'pending' %}
@@ -105,13 +109,15 @@
                             <span class="badge bg-danger">반려</span>
                             {% elif r.status == 'flagged' %}
                             <span class="badge bg-danger">차단</span>
+                            {% elif r.status == 'pending_person' %}
+                            <span class="badge bg-warning text-dark">👤 인물</span>
                             {% else %}
                             <span class="badge bg-warning text-dark">대기</span>
                             {% endif %}
                         </td>
                         <td class="text-muted">{{ r.created_at.strftime('%m/%d %H:%M') }}</td>
                         <td>
-                            {% if r.status == 'pending' %}
+                            {% if r.status == 'pending' or r.status == 'pending_person' %}
                             <a href="/share-report/toggle/{{ r.id }}/approve" class="btn btn-sm btn-success me-1">승인</a>
                             <a href="/share-report/toggle/{{ r.id }}/reject" class="btn btn-sm btn-outline-danger me-1" onclick="return confirm('반려하시겠습니까?')">반려</a>
                             {% elif r.status == 'approved' %}

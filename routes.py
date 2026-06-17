@@ -366,6 +366,56 @@ def register_routes(app):
         db.session.commit()
         return "<script>alert('✅ 이메일 인증이 완료되었습니다. 이제 모든 기능을 이용하실 수 있습니다.'); location.href='/main';</script>"
 
+    # --- [주소 수정] ---
+    @app.route('/user/update-address', methods=['POST'])
+    def user_update_address():
+        uid = session.get('user_id')
+        if not uid: return jsonify({'status':'error','msg':'로그인 필요'}), 401
+        user = User.query.get(uid)
+        if not user: return jsonify({'status':'error','msg':'사용자 없음'}), 404
+        town = request.form.get('town', '').strip()
+        village = request.form.get('village', '').strip()
+        if not town:
+            return jsonify({'status':'error','msg':'읍/면을 선택해주세요.'})
+        if town != '관외' and village:
+            pass  # 리까지 입력
+        user.town = town
+        user.village = village
+        db.session.commit()
+        return jsonify({'status':'success','msg':'주소가 수정되었습니다.'})
+
+    # --- [이웃주민 위치인증] ---
+    @app.route('/neighbor/verify', methods=['POST'])
+    def neighbor_verify():
+        uid = session.get('user_id')
+        if not uid: return jsonify({'status':'error','msg':'로그인 필요'}), 401
+        user = User.query.get(uid)
+        if not user: return jsonify({'status':'error','msg':'사용자 없음'}), 404
+        if user.is_neighbor:
+            return jsonify({'status':'error','msg':'이미 이웃주민 인증되었습니다.'})
+        lat = request.form.get('lat', type=float)
+        lon = request.form.get('lon', type=float)
+        if not lat or not lon:
+            return jsonify({'status':'error','msg':'위치 정보가 필요합니다.'})
+        from services.geocode import gps_to_town_village, is_in_yangpyeong
+        if not is_in_yangpyeong(lat, lon):
+            return jsonify({'status':'error','msg':'현재 위치가 양평군 관외입니다. 양평군 내에서 인증해 주세요.'})
+        town, village = gps_to_town_village(lat, lon)
+        if not town:
+            return jsonify({'status':'error','msg':'위치를 확인할 수 없습니다.'})
+        user.is_neighbor = True
+        user.town = town
+        user.village = village or ''
+        user.reg_town = town
+        user.reg_village = village or ''
+        user.curr_latitude = lat
+        user.curr_longitude = lon
+        user.curr_town = town
+        user.curr_village = village or ''
+        user.location_updated_at = datetime.now()
+        db.session.commit()
+        return jsonify({'status':'success','msg':'이웃주민 인증 완료!', 'town': town, 'village': village or ''})
+
     # --- [초고속 제안 제출] 0.1초 즉시 등록 및 백그라운드 AI 스레드 작동 ---
     @app.route('/submit', methods=['POST'])
     def submit():
@@ -1671,6 +1721,22 @@ def register_routes(app):
         db.session.delete(report)
         db.session.commit()
         return jsonify({"status": "success", "msg": "공유가 삭제되었습니다."})
+
+    @app.route('/share-report/accept-person/<int:report_id>')
+    def share_accept_person(report_id):
+        uid = session.get('user_id')
+        if not uid:
+            return "<script>alert('로그인이 필요합니다.'); location.href='/login';</script>"
+        report = ShareReport.query.get_or_404(report_id)
+        if report.user_id != uid:
+            return "<script>alert('본인의 공유만 동의할 수 있습니다.'); location.href='/main';</script>"
+        if report.status != 'pending_person':
+            return "<script>alert('현재 상태에서 동의할 수 없습니다.'); location.href='/main';</script>"
+        report.moderation_result = 'person_accepted'
+        report.status = 'approved'
+        report.moderation_reason = (report.moderation_reason or '') + ' | 회원 책임 동의함'
+        db.session.commit()
+        return "<script>alert('✅ 책임 동의가 완료되었습니다. 공유글이 게시되었습니다.'); location.href='/share/detail/"+str(report_id)+"';</script>"
 
     # --- [공유 댓글] ---
     @app.route('/share/detail/<int:report_id>')

@@ -58,11 +58,14 @@
 
             <div class="mb-3">
                 <label class="form-label small fw-bold">제목 (선택)</label>
-                <input type="text" name="subject" class="form-control" placeholder="쪽지 제목">
+                <input type="text" name="subject" id="msgSubject" class="form-control" placeholder="쪽지 제목">
             </div>
             <div class="mb-3">
                 <label class="form-label small fw-bold">내용</label>
-                <textarea name="content" class="form-control" rows="6" required placeholder="발송할 내용을 입력하세요. (1인당 10P 차감)"></textarea>
+                <textarea name="content" id="msgContent" class="form-control" rows="6" required placeholder="발송할 내용을 입력하세요. (1인당 10P 차감)"></textarea>
+            </div>
+            <div class="mb-3 d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-sm btn-outline-warning" onclick="fillPersonWarning()">⚠️ 인물 사진 경고 템플릿</button>
             </div>
             <div class="text-muted small mb-3">⚠️ 수신자 1명당 10닢이 차감됩니다.</div>
             <button type="submit" class="btn btn-success w-100 fw-bold py-2">쪽지 발송</button>
@@ -72,6 +75,11 @@
 </div>
 
 <script>
+function fillPersonWarning() {
+    document.getElementById('msgSubject').value = '⚠️ 공유 이미지에 인물이 포함되어 있습니다';
+    document.getElementById('msgContent').value = '${이름}님, 올리신 공유글(공유번호 #${번호})에 인물 사진이 포함되어 있습니다.\n\n게시를 원하시면 아래 링크에서 모든 책임을 지겠다는 데 동의해 주세요.\nhttps://test.unocum.kr/share-report/accept-person/${번호}\n\n동의하지 않으시면 별도 조치 없이 게시가 보류됩니다.';
+    document.getElementById('msgContent').focus();
+}
 function toggleTargets() {
     const v = document.getElementById('sendType').value;
     document.getElementById('individualSelect').style.display = v === 'individual' ? '' : 'none';

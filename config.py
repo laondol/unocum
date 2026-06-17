@@ -28,6 +28,7 @@ class Config:
     SMTP_USERNAME = os.getenv('SMTP_USERNAME', '')
     SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', '')
     MAIL_FROM = os.getenv('MAIL_FROM', 'yp@unocum.kr')
+    SITE_URL = os.getenv('SITE_URL', 'https://test.unocum.kr')
 
     # OAuth2
     KAKAO_REST_API_KEY = os.getenv('KAKAO_REST_API_KEY', '')
