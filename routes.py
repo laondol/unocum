@@ -179,7 +179,7 @@ def register_routes(app):
 
     @app.route('/login', methods=['GET', 'POST'])
     def login():
-        default_next = request.referrer if request.referrer and request.referrer.startswith(request.host_url) else url_for('intro')
+        default_next = request.referrer if request.referrer and request.referrer.startswith(request.host_url) and request.referrer != url_for('login', _external=True) else url_for('world_news')
         next_url = request.args.get('next') or request.form.get('next') or default_next
         if next_url and not next_url.startswith('/'):
             next_url = url_for('intro')
@@ -328,9 +328,9 @@ def register_routes(app):
         elif not user.last_payout:
             user.last_payout = now
         db.session.commit()
-        next_url = request.args.get('next') or url_for('index')
+        next_url = request.args.get('next') or url_for('world_news')
         if not next_url.startswith('/'):
-            next_url = url_for('index')
+            next_url = url_for('world_news')
         return redirect(next_url)
 
     # --- [이메일 인증] ---
