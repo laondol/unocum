@@ -1894,37 +1894,42 @@ def register_routes(app):
         if report.status != 'approved' and role not in ('admin', 'leader'):
             return "승인된 공유만 볼 수 있습니다.", 403
         comments = ShareComment.query.filter_by(share_id=report_id, parent_id=None).order_by(ShareComment.created_at.asc()).all()
-        # 관련 공유 썸네일 조회 (ai_news_links가 ID 배열이면 조회)
-        related_shares = []
-        if report.ai_news_links and report.ai_news_links not in ('[]', ''):
-            try:
-                parsed = json.loads(report.ai_news_links)
-                if parsed and isinstance(parsed[0], int):
-                    ids = parsed
-                    related_shares = ShareReport.query.filter(ShareReport.id.in_(ids)).all()
-            except:
-                pass
-        # 위치 기반 가까운 공유 (거리순)
+        uid = session.get('user_id')
+        # 위치 기반 가까운 공유 (정렬: 내글→같은리→같은면→같은군)
         nearby_shares = []
-        if report.latitude and report.longitude:
+        if report.latitude and report.longitude and report.town:
             from services.geocode import haversine
             all_approved = ShareReport.query.filter(
                 ShareReport.status == 'approved',
                 ShareReport.id != report_id,
                 ShareReport.latitude.isnot(None),
-                ShareReport.longitude.isnot(None)
+                ShareReport.longitude.isnot(None),
+                ShareReport.town.isnot(None)
             ).all()
-            with_dist = []
+            scored = []
             for s in all_approved:
                 try:
                     d = haversine(report.latitude, report.longitude, s.latitude, s.longitude)
-                    if d <= 20:
-                        with_dist.append((s, round(d, 1)))
+                    if d > 20:
+                        continue
+                    # 정렬 점수: 내글=0, 같은리=1, 같은면=2, 같은군=3
+                    same_village = s.town == report.town and s.village and s.village == report.village
+                    same_town = s.town == report.town
+                    me_first = (s.user_id == uid)
+                    if me_first:
+                        priority = 0
+                    elif same_village:
+                        priority = 1
+                    elif same_town:
+                        priority = 2
+                    else:
+                        priority = 3
+                    scored.append((priority, d, s))
                 except:
                     pass
-            with_dist.sort(key=lambda x: x[1])
-            nearby_shares = with_dist[:5]
-        return render_template('share_detail.html', report=report, comments=comments, related_shares=related_shares, nearby_shares=nearby_shares)
+            scored.sort(key=lambda x: (x[0], x[1]))
+            nearby_shares = [(s, round(d, 1)) for p, d, s in scored[:10]]
+        return render_template('share_detail.html', report=report, comments=comments, nearby_shares=nearby_shares)
 
     @app.route('/share/comment/<int:report_id>', methods=['POST'])
     def share_add_comment(report_id):
