@@ -2016,9 +2016,13 @@ def register_routes(app):
         naver_secret = Config.NAVER_SEARCH_CLIENT_SECRET or Config.NAVER_CLIENT_SECRET
         dep = None
         dest = None
-        from services.transit import reverse_geocode, geocode_address, estimate_transit_time_rough, haversine_km
+        from services.transit import reverse_geocode, geocode_address, estimate_transit_time_rough, haversine_km, lookup_village_coords
         dep = reverse_geocode(from_lat, from_lng, kakao_key, naver_id, naver_secret)
         dest = geocode_address(to_address, kakao_key, naver_id, naver_secret)
+        if not dest or not dest.get("lat"):
+            lc = lookup_village_coords(user.curr_town, user.curr_village)
+            if lc:
+                dest = {"lat": lc[0], "lng": lc[1], "address": to_address}
         result = {
             "departure": dep or {"lat": from_lat, "lng": from_lng, "address": f"{from_lat:.5f}, {from_lng:.5f}"},
             "destination": dest or {"lat": 0, "lng": 0, "address": to_address},
