@@ -1979,7 +1979,7 @@ def register_routes(app):
         db.session.commit()
         return jsonify({"status": "success", "msg": "삭제되었습니다."})
 
-    # --- [양평 공사안내] ---
+    # --- [위치기반안내] ---
     @app.route('/construction')
     @app.route('/construction')
     def construction():
@@ -2073,6 +2073,20 @@ def register_routes(app):
         if not user or not user.curr_village:
             return jsonify({"error": "등록된 주소가 없습니다."}), 400
         from services.transit import suggest_optimal_departure, lookup_village_coords, haversine_km
+        from services.geocode import gps_to_town_village
+        gps_result = gps_to_town_village(from_lat, from_lng)
+        same_village = False
+        if gps_result and gps_result.get("town") == user.curr_town and gps_result.get("village") == user.curr_village:
+            same_village = True
+        if same_village:
+            return jsonify({
+                "already_home": True,
+                "message": f"현재 위치가 등록된 주소({user.curr_town} {user.curr_village})와 동일합니다. 막차 안내가 필요하지 않습니다.",
+                "current_town": gps_result.get("town"),
+                "current_village": gps_result.get("village"),
+                "home_town": user.curr_town,
+                "home_village": user.curr_village,
+            })
         suggestion = suggest_optimal_departure(from_lat, from_lng, user.curr_town, user.curr_village)
         if not suggestion:
             return jsonify({"error": "경로를 찾을 수 없습니다."}), 404
@@ -2085,6 +2099,7 @@ def register_routes(app):
             ), 1)
         suggestion["home_town"] = user.curr_town
         suggestion["home_village"] = user.curr_village
+        suggestion["already_home"] = False
         from urllib.parse import quote
         sc = suggestion["station_coords"]
         sname = quote(suggestion["transfer_station"])
