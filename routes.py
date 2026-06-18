@@ -1933,13 +1933,16 @@ def register_routes(app):
         # 지역 소식 (외부 사이트 스크래핑)
         local_news = []
         local_links = []
+        heritage = []
         try:
-            from services.local_sources import get_local_news, get_quick_links
+            from services.local_sources import get_local_news, get_quick_links, get_nearby_heritage
             local_news = get_local_news(town=report.town, village=report.village)
             local_links = get_quick_links(town=report.town, village=report.village)
+            if report.latitude and report.longitude:
+                heritage = get_nearby_heritage(report.latitude, report.longitude, max_km=5)
         except:
             pass
-        return render_template('share_detail.html', report=report, comments=comments, nearby_shares=nearby_shares, local_news=local_news, local_links=local_links)
+        return render_template('share_detail.html', report=report, comments=comments, nearby_shares=nearby_shares, local_news=local_news, local_links=local_links, heritage=heritage)
 
     @app.route('/share/comment/<int:report_id>', methods=['POST'])
     def share_add_comment(report_id):

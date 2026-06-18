@@ -108,3 +108,35 @@ def get_quick_links(town=None, village=None):
         {"name": "인스타그램", "url": "https://www.instagram.com/explore/tags/양평/"},
     ]
     return links
+
+def get_nearby_heritage(lat, lng, max_km=5):
+    import xml.etree.ElementTree as ET
+    from math import radians, sin, cos, sqrt, atan2
+    def _dist(lat1, lng1, lat2, lng2):
+        R = 6371
+        dlat = radians(lat2 - lat1)
+        dlng = radians(lng2 - lng1)
+        a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlng/2)**2
+        return R * 2 * atan2(sqrt(a), sqrt(1-a))
+    try:
+        r = requests.get("https://www.cha.go.kr/cha/SearchKindOpenapiList.do?pageUnit=1000&ccbaCtcd=31", timeout=15)
+        root = ET.fromstring(r.content)
+        items = root.findall(".//item")
+        nearby = []
+        for item in items:
+            try:
+                ilat = float(item.findtext("latitude", "0") or "0")
+                ilng = float(item.findtext("longitude", "0") or "0")
+                if ilat == 0 or ilng == 0:
+                    continue
+                d = _dist(lat, lng, ilat, ilng)
+                if d <= max_km:
+                    name = item.findtext("ccbaMnm1", "")
+                    ctype = item.findtext("ccmaName", "")
+                    city = item.findtext("ccsiName", "")
+                    nearby.append({"name": name, "type": ctype, "city": city, "lat": round(ilat, 6), "lng": round(ilng, 6), "dist": round(d, 1)})
+            except: pass
+        nearby.sort(key=lambda x: x["dist"])
+        return nearby[:10]
+    except:
+        return []
