@@ -9,30 +9,54 @@ def haversine_km(lat1, lng1, lat2, lng2):
     a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlng/2)**2
     return R * 2 * atan2(sqrt(a), sqrt(1-a))
 
-def reverse_geocode(lat, lng, kakao_key):
-    url = "https://dapi.kakao.com/v2/local/geo/coord2address.json"
-    headers = {"Authorization": f"KakaoAK {kakao_key}"}
+def reverse_geocode(lat, lng, kakao_key=None):
+    if kakao_key:
+        url = "https://dapi.kakao.com/v2/local/geo/coord2address.json"
+        headers = {"Authorization": f"KakaoAK {kakao_key}"}
+        try:
+            r = requests.get(url, headers=headers, params={"x": lng, "y": lat}, timeout=10)
+            if r.status_code == 200:
+                docs = r.json().get("documents", [])
+                if docs:
+                    addr = docs[0].get("road_address") or docs[0].get("address")
+                    if addr:
+                        return {"lat": lat, "lng": lng, "address": addr.get("address_name", "")}
+        except:
+            pass
+    url = "https://nominatim.openstreetmap.org/reverse"
     try:
-        r = requests.get(url, headers=headers, params={"x": lng, "y": lat}, timeout=10)
+        r = requests.get(url, params={"lat": lat, "lon": lng, "format": "json", "accept-language": "ko"},
+                         headers={"User-Agent": "YangpyeongApp/1.0"}, timeout=10)
         if r.status_code == 200:
-            docs = r.json().get("documents", [])
-            if docs:
-                addr = docs[0].get("road_address") or docs[0].get("address")
-                if addr:
-                    return {"lat": lat, "lng": lng, "address": addr.get("address_name", "")}
+            data = r.json()
+            addr = data.get("display_name", "")
+            parts = addr.split(",")
+            short = ",".join(parts[:3]) if len(parts) > 3 else addr
+            return {"lat": lat, "lng": lng, "address": short.strip()}
     except:
         pass
     return None
 
-def geocode_address(address, kakao_key):
-    url = "https://dapi.kakao.com/v2/local/search/address.json"
-    headers = {"Authorization": f"KakaoAK {kakao_key}"}
+def geocode_address(address, kakao_key=None):
+    if kakao_key:
+        url = "https://dapi.kakao.com/v2/local/search/address.json"
+        headers = {"Authorization": f"KakaoAK {kakao_key}"}
+        try:
+            r = requests.get(url, headers=headers, params={"query": address}, timeout=10)
+            if r.status_code == 200:
+                docs = r.json().get("documents", [])
+                if docs:
+                    return {"lat": float(docs[0]["y"]), "lng": float(docs[0]["x"]), "address": docs[0]["address_name"]}
+        except:
+            pass
+    url = "https://nominatim.openstreetmap.org/search"
     try:
-        r = requests.get(url, headers=headers, params={"query": address}, timeout=10)
+        r = requests.get(url, params={"q": address, "format": "json", "limit": 1, "accept-language": "ko"},
+                         headers={"User-Agent": "YangpyeongApp/1.0"}, timeout=10)
         if r.status_code == 200:
-            docs = r.json().get("documents", [])
-            if docs:
-                return {"lat": float(docs[0]["y"]), "lng": float(docs[0]["x"]), "address": docs[0]["address_name"]}
+            data = r.json()
+            if data:
+                return {"lat": float(data[0]["lat"]), "lng": float(data[0]["lon"]), "address": data[0].get("display_name", address)}
     except:
         pass
     return None
