@@ -82,20 +82,6 @@
             </div>
             {% endif %}
 
-            {% if heritage %}
-            <div class="mb-4 p-3 bg-light rounded border-start border-5 border-success">
-                <h6 class="fw-bold mb-2">🏛️ 가까운 국가유산</h6>
-                {% for h in heritage %}
-                <div class="d-flex align-items-center gap-2 mb-1 pb-1 border-bottom border-light">
-                    <span class="badge bg-success small" style="font-size:0.65rem;">{{ h.type }}</span>
-                    <span class="small flex-grow-1">{{ h.name }}</span>
-                    <small class="text-muted flex-shrink-0">{{ h.dist }}km</small>
-                </div>
-                {% endfor %}
-                <small class="text-muted d-block mt-1">출처: 국가유산청 공간정보</small>
-            </div>
-            {% endif %}
-
             {% if report.ai_danger_alert %}
             <div class="mb-4 p-3 bg-danger bg-opacity-10 rounded border border-danger">
                 <strong class="text-danger">🚨 위험/긴급 상황 감지</strong><br>

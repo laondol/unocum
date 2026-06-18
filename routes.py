@@ -1933,16 +1933,13 @@ def register_routes(app):
         # 지역 소식 (외부 사이트 스크래핑)
         local_news = []
         local_links = []
-        heritage = []
         try:
-            from services.local_sources import get_local_news, get_quick_links, get_nearby_heritage
+            from services.local_sources import get_local_news, get_quick_links
             local_news = get_local_news(town=report.town, village=report.village)
             local_links = get_quick_links(town=report.town, village=report.village)
-            if report.latitude and report.longitude:
-                heritage = get_nearby_heritage(report.latitude, report.longitude, max_km=5)
         except:
             pass
-        return render_template('share_detail.html', report=report, comments=comments, nearby_shares=nearby_shares, local_news=local_news, local_links=local_links, heritage=heritage)
+        return render_template('share_detail.html', report=report, comments=comments, nearby_shares=nearby_shares, local_news=local_news, local_links=local_links)
 
     @app.route('/share/comment/<int:report_id>', methods=['POST'])
     def share_add_comment(report_id):
@@ -1988,6 +1985,15 @@ def register_routes(app):
         dg_key = getattr(Config, 'DATA_GO_KR_API_KEY', '')
         gg_key = getattr(Config, 'GG_TRAFFIC_API_KEY', '')
         return render_template('construction.html', notices=notices, api_key_configured=bool(dg_key), traffic_key_configured=bool(gg_key))
+
+    @app.route('/construction/heritage')
+    def construction_heritage():
+        lat = request.args.get('lat', type=float)
+        lng = request.args.get('lng', type=float)
+        if not lat or not lng:
+            return jsonify([])
+        from services.local_sources import get_nearby_heritage
+        return jsonify(get_nearby_heritage(lat, lng, max_km=5))
 
     @app.route('/construction/refresh')
     def construction_refresh():
