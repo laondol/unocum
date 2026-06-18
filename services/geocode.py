@@ -131,14 +131,17 @@ def gps_to_town_village(lat, lon, kakao_key=None):
             res = requests.get(url, headers=headers, timeout=5)
             if res.status_code == 200:
                 data = res.json()
+                town, village = '', ''
                 for doc in data.get('documents', []):
-                    region_type = doc.get('region_type', '')
-                    if region_type == 'H':
-                        region_3 = doc.get('region_3', '')
-                        region_4 = doc.get('region_4', '')
-                        if region_4:
-                            return region_3, region_4
-                        return region_3, ''
+                    rt = doc.get('region_type', '')
+                    r3 = doc.get('region_3', '')
+                    r4 = doc.get('region_4', '')
+                    if rt == 'B' and r3:
+                        town, village = r3, r4 or village
+                    elif rt == 'H' and r3 and not town:
+                        town = r3
+                if town:
+                    return town, village or ''
             print(f"[Geocode] Kakao API error: {res.status_code}")
         except Exception as e:
             print(f"[Geocode] Kakao API exception: {e}")
