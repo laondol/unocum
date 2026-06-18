@@ -26,16 +26,19 @@
                         {% if a.source_url %}
                         <a href="{{ a.source_url }}" target="_blank" class="btn btn-sm btn-outline-success">🔗 원문보기</a>
                         {% endif %}
+                        <button onclick="showContent({{ a.id }})" class="btn btn-sm btn-outline-primary">📄 본문보기</button>
                     </div>
-                    <!-- 채자 승인 상태 표시 -->
+                    <!-- 승인 상태 표시 (관리자만) -->
+                    {% if session.get('role') in ('admin','leader') %}
                     <div class="d-flex gap-1 mt-2">
-                        <span class="badge {{ 'bg-success' if a.world_ai_approved else 'bg-secondary' }}" title="AI 승인">
-                            🤖 {% if a.world_ai_approved %}승인{% else %}대기{% endif %}
+                        <span class="badge {{ 'bg-success' if a.world_ai_approved or a.kr_yp_ai_approved else 'bg-secondary' }}" title="AI 승인">
+                            🤖 {% if a.world_ai_approved or a.kr_yp_ai_approved %}승인{% else %}대기{% endif %}
                         </span>
-                        <span class="badge {{ 'bg-primary' if a.world_admin_approved else 'bg-secondary' }}" title="책임자 승인">
-                            👑 {% if a.world_admin_approved %}승인{% else %}대기{% endif %}
+                        <span class="badge {{ 'bg-primary' if a.world_admin_approved or a.kr_yp_admin_approved else 'bg-secondary' }}" title="책임자 승인">
+                            👑 {% if a.world_admin_approved or a.kr_yp_admin_approved %}승인{% else %}대기{% endif %}
                         </span>
                     </div>
+                    {% endif %}
                     <!-- 승인된 추천링크 표시 -->
                     {% if a.recs %}
                     <div class="mt-2 pt-2 border-top">
@@ -75,7 +78,35 @@
     {% endif %}
 </div>
 
+<!-- 본문보기 모달 -->
+<div class="modal fade" id="contentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius: 18px;">
+            <div class="modal-header">
+                <h5 class="fw-bold" id="modalTitle"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modalBody" style="line-height: 1.8;"></div>
+            <div class="modal-footer">
+                <small class="text-muted" id="modalCategory"></small>
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">닫기</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
+function showContent(id) {
+    fetch('/api/news/content/' + id)
+    .then(r=>r.json())
+    .then(d=>{
+        document.getElementById('modalTitle').textContent = d.title;
+        document.getElementById('modalBody').innerHTML = d.content;
+        document.getElementById('modalCategory').textContent = d.category;
+        new bootstrap.Modal(document.getElementById('contentModal')).show();
+    }).catch(e=>alert('오류: '+e));
+}
+
 function voteNews(id, type) {
     if (!confirm(type === 'like' ? '좋아요 하시겠습니까?' : '싫어요 하시겠습니까?')) return;
     fetch('/news/' + type + '/' + id, {method:'POST'})

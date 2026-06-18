@@ -73,3 +73,28 @@ def ai_summarize_url(text):
 }}
 내용: {text[:3000]}"""
     return _groq_text(system, prompt, format_json=True)
+
+def clean_cjk_text(title, summary='', content=''):
+    """한자/일본어를 한국어로 변환. 불가피하면 괄호에 한국어 발음 추가."""
+    texts = []
+    if title: texts.append(f"제목: {title}")
+    if summary: texts.append(f"요약: {summary}")
+    if content: texts.append(f"본문: {content}")
+    if not texts:
+        return title, summary, content
+    combined = '\n\n'.join(texts)
+    system = "당신은 한국어 전문 편집자입니다. 다음 원칙을 따라 텍스트를 수정하세요:\n1. 모든 한자(중국 한자)는 한국어로 바꾸세요. (예: 幸福→행복, 大統領→대통령)\n2. 모든 일본어는 한국어로 바꾸세요.\n3. 불가피하게 한자/일본어를 써야 한다면, 바로 뒤 괄호에 한국어 발음을 추가하세요. (예: 東京(도쿄))\n4. 결과는 자연스러운 한국어로만 작성하세요.\n5. JSON 형식으로만 출력하세요."
+    prompt = f"""다음 텍스트에서 한자와 일본어를 위 원칙대로 처리해 주세요:
+
+{combined}
+
+JSON 형식:
+{{"title": "수정된 제목", "summary": "수정된 요약", "content": "수정된 본문"}}"""
+    result = _groq_text(system, prompt, format_json=True)
+    if not result:
+        return title, summary, content
+    return (
+        result.get('title', title),
+        result.get('summary', summary),
+        result.get('content', content)
+    )

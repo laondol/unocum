@@ -713,6 +713,20 @@ def register_routes(app):
                     created_by=session.get('user_id'),
                     source_name=news_source
                 )
+                # 한자/일본어 정리
+                try:
+                    from services.news_service import clean_cjk_text
+                    cleaned_title, cleaned_summary, cleaned_content = clean_cjk_text(article.title, article.summary, article.content)
+                    article.title = cleaned_title or article.title
+                    article.summary = cleaned_summary or article.summary
+                    article.content = cleaned_content or article.content
+                except:
+                    pass
+                # AI 승인 자동 True
+                if tab == 'world':
+                    article.world_ai_approved = True
+                elif tab == 'kr_yp':
+                    article.kr_yp_ai_approved = True
                 db.session.add(article)
                 count += 1
         db.session.commit()
@@ -888,6 +902,20 @@ def register_routes(app):
             is_ai_generated=True,
             created_by=session.get('user_id')
         )
+        # 한자/일본어 정리
+        try:
+            from services.news_service import clean_cjk_text
+            cleaned_title, cleaned_summary, cleaned_content = clean_cjk_text(article.title, article.summary, article.content)
+            article.title = cleaned_title or article.title
+            article.summary = cleaned_summary or article.summary
+            article.content = cleaned_content or article.content
+        except:
+            pass
+        # AI 승인 자동 True
+        if tab == 'world':
+            article.world_ai_approved = True
+        elif tab == 'kr_yp':
+            article.kr_yp_ai_approved = True
         db.session.add(article)
         db.session.commit()
         return jsonify({"status": "success", "news_id": article.id})
@@ -976,6 +1004,16 @@ def register_routes(app):
     def news_comments_fragment(news_id):
         comments = NewsComment.query.filter_by(news_id=news_id).order_by(NewsComment.created_at.asc()).all()
         return render_template('news_comment_item.html', comments=comments)
+
+    @app.route('/api/news/content/<int:news_id>')
+    def api_news_content(news_id):
+        a = NewsArticle.query.get_or_404(news_id)
+        return jsonify({
+            'title': a.title,
+            'content': a.content or '본문 내용이 없습니다.',
+            'category': a.category,
+            'summary': a.summary or ''
+        })
 
     def _get_news_with_recs(news_list):
         """각 뉴스에 승인된 추천링크 로드"""
