@@ -1,6 +1,61 @@
 import requests
 from math import radians, sin, cos, sqrt, atan2
 
+try:
+    from pyproj import Transformer
+    _wgs_to_utm = Transformer.from_crs("EPSG:4326", "EPSG:5179")
+    _utm_to_wgs = Transformer.from_crs("EPSG:5179", "EPSG:4326")
+    _HAS_PROJ = True
+except:
+    _HAS_PROJ = False
+
+def wgs84_to_utm(lat, lng):
+    if not _HAS_PROJ:
+        return None
+    x, y = _wgs_to_utm.transform(lat, lng)
+    return round(x, 6), round(y, 6)
+
+def get_last_transit(from_lat, from_lng, to_lat, to_lng, api_key):
+    if not _HAS_PROJ or not api_key:
+        return None
+    utm_from = wgs84_to_utm(from_lat, from_lng)
+    utm_to = wgs84_to_utm(to_lat, to_lng)
+    if not utm_from or not utm_to:
+        return None
+    url = "http://apis.data.go.kr/1613000/TmsRoutInfoService/getRoutInfo"
+    params = {
+        "serviceKey": api_key,
+        "startX": utm_from[0], "startY": utm_from[1],
+        "endX": utm_to[0], "endY": utm_to[1],
+        "count": 5, "output": "json"
+    }
+    try:
+        r = requests.get(url, params=params, timeout=15)
+        if r.status_code == 200:
+            data = r.json()
+            items = data.get("response", {}).get("body", {}).get("items", [])
+            if isinstance(items, dict):
+                items = [items.get("item", {})]
+            elif isinstance(items, list):
+                items = [item for sub in items for item in (sub.get("item", []) if isinstance(sub, dict) else [sub])]
+            if not items:
+                return None
+            routes = []
+            for item in items[:3]:
+                total_min = item.get("totalTime", 0)
+                fare = item.get("totalFare", 0)
+                transfers = item.get("transferCount", 0)
+                first_dep = item.get("firstStartTime", "")
+                last_end = item.get("lastEndTime", "")
+                routes.append({
+                    "total_min": total_min, "fare": fare, "transfers": transfers,
+                    "first_dep": str(first_dep), "last_end": str(last_end)
+                })
+            return routes
+    except:
+        pass
+    return None
+
 def haversine_km(lat1, lng1, lat2, lng2):
     R = 6371
     dlat = radians(lat2 - lat1)
