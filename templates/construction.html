@@ -198,15 +198,23 @@ function renderTransit(data, loc) {
         const lt = data.last_transit[0];
         const h = Math.floor(lt.total_min / 60);
         const m = lt.total_min % 60;
-        html += '<div class="p-2 bg-success bg-opacity-10 rounded mb-2"><strong>⏱ 소요시간</strong> 약 ' + (h > 0 ? h + '시간 ' : '') + m + '분';
-        if (lt.fare) html += ' · 💰 ' + Number(lt.fare).toLocaleString() + '원';
-        html += '</div>';
-        if (lt.transfers > 0) html += '<div class="small text-muted mb-2">🔄 환승 ' + lt.transfers + '회</div>';
-        if (lt.last_end) {
-            html += '<div class="alert alert-danger py-2 mb-2" style="font-size:0.85rem;">⏰ <strong>막차 도착시간:</strong> ' + lt.last_end + '</div>';
-        }
-        if (lt.first_dep) {
-            html += '<div class="small text-muted mb-2">🕐 첫차: ' + lt.first_dep + '</div>';
+        html += '<div class="p-2 bg-success bg-opacity-10 rounded mb-2"><strong>⏱ 소요시간</strong> 약 ' + (h > 0 ? h + '시간 ' : '') + m + '분</div>';
+        if (lt.last_dep) {
+            html += '<div class="alert alert-danger py-2 mb-2" style="font-size:0.85rem;">⏰ <strong>예상 막차 출발:</strong> ' + lt.last_dep + ' (이 시간 이후 대중교통 없음)</div>';
+            // 현재시간과 비교
+            const now = new Date();
+            const [lh, lm] = lt.last_dep.split(':').map(Number);
+            const lastMin = lh * 60 + lm;
+            const nowMin = now.getHours() * 60 + now.getMinutes();
+            if (nowMin > lastMin) {
+                html += '<div class="alert alert-warning py-1 small">⚠️ 이미 막차 시간이 지났습니다. 택시나 다른 방법을 이용하세요.</div>';
+            } else if (lastMin - nowMin <= 60) {
+                html += '<div class="alert alert-warning py-1 small">⚠️ 막차가 곧 출발합니다! 서두르세요.</div>';
+            } else {
+                const remH = Math.floor((lastMin - nowMin) / 60);
+                const remM = (lastMin - nowMin) % 60;
+                html += '<div class="small text-muted mb-2">⏳ 막차까지 ' + (remH > 0 ? remH + '시간 ' : '') + remM + '분 남음</div>';
+            }
         }
     } else if (data.rough_estimate_min) {
         const est = data.rough_estimate_min;

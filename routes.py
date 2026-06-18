@@ -2037,13 +2037,12 @@ def register_routes(app):
             from services.transit import estimate_transit_time_rough
             rough_min = estimate_transit_time_rough(from_lat, from_lng, (dest or {}).get("lat") or from_lat, (dest or {}).get("lng") or from_lng)
             result["rough_estimate_min"] = rough_min
-        # 대중교통 막차 정보 조회 (국토교통부 API)
+        # 대중교통 막차 정보 (추정)
         if dest and dest.get("lat"):
-            from services.transit import get_last_transit
-            dg_key = Config.DATA_GO_KR_API_KEY
-            last_routes = get_last_transit(from_lat, from_lng, dest["lat"], dest["lng"], dg_key)
-            if last_routes:
-                result["last_transit"] = last_routes
+            from services.transit import estimate_last_transit
+            last_info = estimate_last_transit(from_lat, from_lng, dest["lat"], dest["lng"])
+            if last_info:
+                result["last_transit"] = [last_info]
         if dest and dest.get("lng"):
             dep_addr = quote(dep["address"] if dep else f"{from_lat},{from_lng}")
             dest_addr = quote(dest["address"])
