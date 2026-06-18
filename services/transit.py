@@ -140,3 +140,80 @@ def lookup_village_coords(town, village):
     total = len(vilist)
     offset = (idx - (total - 1) / 2) * 0.005
     return round(base_lat + offset, 6), round(base_lng + offset * 0.7, 6)
+
+TRANSIT_HUBS = [
+    {"name": "양평역", "lat": 37.4918, "lng": 127.4913, "type": "train", "line": "경의중앙선",
+     "last_toward_seoul": "23:10", "last_toward_jipyeong": "00:10",
+     "towns": {"양평읍", "강상면", "강하면", "개군면"}},
+    {"name": "용문역", "lat": 37.4815, "lng": 127.5946, "type": "train", "line": "경의중앙선",
+     "last_toward_seoul": "22:50", "last_toward_jipyeong": "00:20",
+     "towns": {"용문면", "단월면", "청운면", "양동면"}},
+    {"name": "옥천역", "lat": 37.5180, "lng": 127.5083, "type": "train", "line": "경의중앙선",
+     "last_toward_seoul": "23:30", "last_toward_jipyeong": "00:00",
+     "towns": {"옥천면", "양서면", "서종면"}},
+    {"name": "지평역", "lat": 37.4460, "lng": 127.6210, "type": "train", "line": "경의중앙선",
+     "last_toward_seoul": "22:40", "last_toward_jipyeong": "00:25",
+     "towns": {"지평면"}},
+    {"name": "원덕역", "lat": 37.4900, "lng": 127.5050, "type": "train", "line": "경의중앙선",
+     "last_toward_seoul": "23:15", "last_toward_jipyeong": "00:14",
+     "towns": set()},
+    {"name": "아신역", "lat": 37.5134, "lng": 127.5105, "type": "train", "line": "경의중앙선",
+     "last_toward_seoul": "23:25", "last_toward_jipyeong": "00:05",
+     "towns": set()},
+]
+
+def _hm_to_min(t):
+    h, m = int(t.split(":")[0]), int(t.split(":")[1])
+    if h < 6:
+        h += 24
+    return h * 60 + m
+
+def find_best_hubs(from_lat, from_lng, home_town):
+    serving = [h for h in TRANSIT_HUBS if home_town in h["towns"]]
+    if not serving:
+        serving = sorted(TRANSIT_HUBS, key=lambda h: haversine_km(from_lat, from_lng, h["lat"], h["lng"]))[:3]
+    results = []
+    for hub in serving:
+        dist = haversine_km(from_lat, from_lng, hub["lat"], hub["lng"])
+        time_min = int(dist * 3 + 15)
+        home_coords = YANGPYEONG_CENTERS.get(home_town)
+        if home_coords and home_coords[1] >= hub["lng"]:
+            last_dep = hub["last_toward_jipyeong"]
+            direction = "용문/지평 방면"
+        else:
+            last_dep = hub["last_toward_seoul"]
+            direction = "서울/덕소 방면"
+        results.append({
+            "station": hub["name"], "lat": hub["lat"], "lng": hub["lng"],
+            "type": hub["type"], "line": hub["line"],
+            "distance_km": round(dist, 1), "time_to_station_min": time_min,
+            "last_transit_dep": last_dep, "direction": direction,
+            "last_transit_total_min": _hm_to_min(last_dep),
+        })
+    results.sort(key=lambda r: r["distance_km"])
+    return results
+
+def suggest_optimal_departure(from_lat, from_lng, home_town, home_village):
+    hubs = find_best_hubs(from_lat, from_lng, home_town)
+    if not hubs:
+        return None
+    best = hubs[0]
+    last_min = best["last_transit_total_min"]
+    time_to_station = best["time_to_station_min"]
+    buffer_min = 10
+    optimal_dep_min = last_min - time_to_station - buffer_min
+    optimal_hour = optimal_dep_min // 60
+    optimal_min = optimal_dep_min % 60
+    return {
+        "transfer_station": best["station"],
+        "station_coords": {"lat": best["lat"], "lng": best["lng"]},
+        "station_type": best["type"], "line": best["line"],
+        "distance_to_station_km": best["distance_km"],
+        "time_to_station_min": time_to_station,
+        "last_transit_from_station": best["last_transit_dep"],
+        "direction": best["direction"],
+        "buffer_min": buffer_min,
+        "optimal_departure": f"{optimal_hour:02d}:{optimal_min:02d}",
+        "estimate": True,
+        "all_options": hubs,
+    }

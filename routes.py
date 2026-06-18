@@ -2059,6 +2059,41 @@ def register_routes(app):
             }
         return jsonify(result)
 
+    @app.route('/construction/transit/suggest')
+    def construction_transit_suggest():
+        from_lat = request.args.get('from_lat', type=float)
+        from_lng = request.args.get('from_lng', type=float)
+        if not from_lat or not from_lng:
+            return jsonify({"error": "출발 위치가 필요합니다."}), 400
+        uid = session.get('user_id')
+        if not uid:
+            return jsonify({"error": "로그인이 필요합니다."}), 401
+        from models import User
+        user = User.query.get(uid)
+        if not user or not user.curr_village:
+            return jsonify({"error": "등록된 주소가 없습니다."}), 400
+        from services.transit import suggest_optimal_departure, lookup_village_coords, haversine_km
+        suggestion = suggest_optimal_departure(from_lat, from_lng, user.curr_town, user.curr_village)
+        if not suggestion:
+            return jsonify({"error": "경로를 찾을 수 없습니다."}), 404
+        home_coords = lookup_village_coords(user.curr_town, user.curr_village)
+        if home_coords:
+            suggestion["home_coords"] = {"lat": home_coords[0], "lng": home_coords[1]}
+            suggestion["home_distance_km"] = round(haversine_km(
+                suggestion["station_coords"]["lat"], suggestion["station_coords"]["lng"],
+                home_coords[0], home_coords[1]
+            ), 1)
+        suggestion["home_town"] = user.curr_town
+        suggestion["home_village"] = user.curr_village
+        from urllib.parse import quote
+        sc = suggestion["station_coords"]
+        sname = quote(suggestion["transfer_station"])
+        suggestion["deep_links"] = {
+            "kakao": f"https://map.kakao.com/?sX={from_lng}&sY={from_lat}&eX={sc['lng']}&eY={sc['lat']}&eName={sname}",
+            "naver": f"https://map.naver.com/index.nhn?slat={from_lat}&slng={from_lng}&elat={sc['lat']}&elng={sc['lng']}&etitle={sname}&pathType=1"
+        }
+        return jsonify(suggestion)
+
     @app.route('/api/user/location')
     def api_user_location():
         uid = session.get('user_id')
