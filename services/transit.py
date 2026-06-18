@@ -8,7 +8,26 @@ def haversine_km(lat1, lng1, lat2, lng2):
     a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlng/2)**2
     return R * 2 * atan2(sqrt(a), sqrt(1-a))
 
-def reverse_geocode(lat, lng, kakao_key=None):
+def reverse_geocode(lat, lng, kakao_key=None, naver_id=None, naver_secret=None):
+    if naver_id and naver_secret:
+        url = "https://naveropenapi.apigw.ntruss.com/map-reversegeocode/v2/gc"
+        headers = {"X-NCP-APIGW-API-KEY-ID": naver_id, "X-NCP-APIGW-API-KEY": naver_secret}
+        try:
+            r = requests.get(url, headers=headers, params={"coords": f"{lng},{lat}", "output": "json", "orders": "addr"}, timeout=10)
+            if r.status_code == 200:
+                data = r.json()
+                results = data.get("results", [])
+                if results:
+                    region = results[0].get("region", {})
+                    area1 = region.get("area1", {}).get("name", "")
+                    area2 = region.get("area2", {}).get("name", "")
+                    area3 = region.get("area3", {}).get("name", "")
+                    area4 = region.get("area4", {}).get("name", "")
+                    addr = f"{area1} {area2} {area3} {area4}".strip()
+                    if addr:
+                        return {"lat": lat, "lng": lng, "address": addr}
+        except:
+            pass
     if kakao_key:
         url = "https://dapi.kakao.com/v2/local/geo/coord2address.json"
         headers = {"Authorization": f"KakaoAK {kakao_key}"}
@@ -36,7 +55,19 @@ def reverse_geocode(lat, lng, kakao_key=None):
         pass
     return None
 
-def geocode_address(address, kakao_key=None):
+def geocode_address(address, kakao_key=None, naver_id=None, naver_secret=None):
+    if naver_id and naver_secret:
+        url = "https://naveropenapi.apigw.ntruss.com/map-geocode/v2/geocode"
+        headers = {"X-NCP-APIGW-API-KEY-ID": naver_id, "X-NCP-APIGW-API-KEY": naver_secret}
+        try:
+            r = requests.get(url, headers=headers, params={"query": address}, timeout=10)
+            if r.status_code == 200:
+                data = r.json()
+                addrs = data.get("addresses", [])
+                if addrs:
+                    return {"lat": float(addrs[0]["y"]), "lng": float(addrs[0]["x"]), "address": addrs[0].get("jibunAddress", addrs[0].get("roadAddress", address))}
+        except:
+            pass
     if kakao_key:
         url = "https://dapi.kakao.com/v2/local/search/address.json"
         headers = {"Authorization": f"KakaoAK {kakao_key}"}

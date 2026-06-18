@@ -2012,16 +2012,13 @@ def register_routes(app):
         to_address = f"경기 양평군 {user.curr_town or ''} {user.curr_village}"
         from config import Config
         kakao_key = Config.KAKAO_REST_API_KEY
+        naver_id = Config.NAVER_SEARCH_CLIENT_ID or Config.NAVER_CLIENT_ID
+        naver_secret = Config.NAVER_SEARCH_CLIENT_SECRET or Config.NAVER_CLIENT_SECRET
         dep = None
         dest = None
-        if kakao_key:
-            from services.transit import reverse_geocode, geocode_address, estimate_transit_time_rough, haversine_km
-            dep = reverse_geocode(from_lat, from_lng, kakao_key)
-            dest = geocode_address(to_address, kakao_key)
-        else:
-            from services.transit import reverse_geocode, geocode_address, estimate_transit_time_rough, haversine_km
-            dep = reverse_geocode(from_lat, from_lng)
-            dest = geocode_address(to_address)
+        from services.transit import reverse_geocode, geocode_address, estimate_transit_time_rough, haversine_km
+        dep = reverse_geocode(from_lat, from_lng, kakao_key, naver_id, naver_secret)
+        dest = geocode_address(to_address, kakao_key, naver_id, naver_secret)
         result = {
             "departure": dep or {"lat": from_lat, "lng": from_lng, "address": f"{from_lat:.5f}, {from_lng:.5f}"},
             "destination": dest or {"lat": 0, "lng": 0, "address": to_address},
