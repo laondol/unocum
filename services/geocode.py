@@ -134,8 +134,8 @@ def gps_to_town_village(lat, lon, kakao_key=None):
                 town, village = '', ''
                 for doc in data.get('documents', []):
                     rt = doc.get('region_type', '')
-                    r3 = doc.get('region_3', '')
-                    r4 = doc.get('region_4', '')
+                    r3 = doc.get('region_3depth_name', '')
+                    r4 = doc.get('region_4depth_name', '')
                     if rt == 'B' and r3:
                         town, village = r3, r4 or village
                     elif rt == 'H' and r3 and not town:
