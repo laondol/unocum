@@ -1904,7 +1904,27 @@ def register_routes(app):
                     related_shares = ShareReport.query.filter(ShareReport.id.in_(ids)).all()
             except:
                 pass
-        return render_template('share_detail.html', report=report, comments=comments, related_shares=related_shares)
+        # 위치 기반 가까운 공유 (거리순)
+        nearby_shares = []
+        if report.latitude and report.longitude:
+            from services.geocode import haversine
+            all_approved = ShareReport.query.filter(
+                ShareReport.status == 'approved',
+                ShareReport.id != report_id,
+                ShareReport.latitude.isnot(None),
+                ShareReport.longitude.isnot(None)
+            ).all()
+            with_dist = []
+            for s in all_approved:
+                try:
+                    d = haversine(report.latitude, report.longitude, s.latitude, s.longitude)
+                    if d <= 20:
+                        with_dist.append((s, round(d, 1)))
+                except:
+                    pass
+            with_dist.sort(key=lambda x: x[1])
+            nearby_shares = with_dist[:5]
+        return render_template('share_detail.html', report=report, comments=comments, related_shares=related_shares, nearby_shares=nearby_shares)
 
     @app.route('/share/comment/<int:report_id>', methods=['POST'])
     def share_add_comment(report_id):

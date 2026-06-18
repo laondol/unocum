@@ -37,7 +37,28 @@
             
             <hr>
             
-            {% if report.ai_region_news and report.ai_region_news != '특별한 내용이 없습니다.' and report.ai_region_news != '관련 뉴스 없음' %}
+            {% if nearby_shares %}
+            <div class="mb-4 p-3 bg-light rounded border-start border-5 border-primary">
+                <h6 class="fw-bold mb-2">📍 가까운 소식 ({{ nearby_shares|length }})</h6>
+                {% if report.ai_region_news and report.ai_region_news != '특별한 내용이 없습니다.' and report.ai_region_news != '관련 뉴스 없음' %}
+                <p class="mb-2 small text-muted">{{ report.ai_region_news[:100] }}</p>
+                {% endif %}
+                {% for s, dist in nearby_shares %}
+                <div class="d-flex align-items-center gap-2 mb-2 pb-2 border-bottom border-light">
+                    {% if s.image_path %}
+                    <a href="/share/detail/{{ s.id }}">
+                        <img src="{{ s.image_path }}" class="rounded" style="width:50px;height:50px;object-fit:cover;" alt="">
+                    </a>
+                    {% endif %}
+                    <div class="flex-grow-1 min-w-0">
+                        <a href="/share/detail/{{ s.id }}" class="text-dark text-decoration-none fw-medium small d-block text-truncate">{{ s.title or '제목 없음' }}</a>
+                        <span class="text-muted small">{{ s.town }} {{ s.village }} · {{ dist }}km</span>
+                    </div>
+                    <a href="/user/{{ s.user_id }}" class="btn btn-sm btn-outline-primary flex-shrink-0" title="벗 신청">👤</a>
+                </div>
+                {% endfor %}
+            </div>
+            {% elif report.ai_region_news and report.ai_region_news != '특별한 내용이 없습니다.' and report.ai_region_news != '관련 뉴스 없음' %}
             <div class="mb-4 p-3 bg-light rounded border-start border-5 border-primary">
                 <h6 class="fw-bold mb-2">📍 양평 소식</h6>
                 <p class="mb-2">{{ report.ai_region_news }}</p>
@@ -46,7 +67,7 @@
                 <div class="d-flex gap-2 mt-2 flex-wrap">
                     {% for s in related_shares[:3] %}
                     {% if s.image_path %}
-                    <a href="/share/detail/{{ s.id }}" class="text-decoration-none">
+                    <a href="/share/detail/{{ s.id }}">
                         <img src="{{ s.image_path }}" class="rounded" style="width:80px;height:80px;object-fit:cover;" alt="{{ s.title }}" title="{{ s.title }}">
                     </a>
                     {% endif %}
@@ -54,7 +75,7 @@
                 </div>
                 {% endif %}
             </div>
-            {% elif report.ai_region_news == '특별한 내용이 없습니다.' and report.town %}
+            {% elif report.town %}
             <div class="mb-4 p-3 bg-light rounded border-start border-5 border-secondary">
                 <h6 class="fw-bold mb-2">📍 양평 소식</h6>
                 <p class="mb-2 text-muted small">이 지역의 최근 다른 소식이 없습니다.</p>
@@ -69,11 +90,24 @@
             {% endif %}
             
             <div class="d-flex justify-content-between small text-muted">
-                <span>공유자: <strong>{{ report.author_name }}</strong></span>
+                <span>공유자:
+                    {% if report.user_id and session.get('user_id') and report.user_id != session.get('user_id') %}
+                    <a href="/user/{{ report.user_id }}" class="text-decoration-none fw-medium">{{ report.author_name }}</a>
+                    {% else %}
+                    <strong>{{ report.author_name }}</strong>
+                    {% endif %}
+                </span>
                 <span>{{ report.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
             </div>
             <div class="d-flex justify-content-between small text-muted">
-                <span>위치: {{ report.address or (report.latitude|round(6) ~ ', ' ~ report.longitude|round(6)) }}</span>
+                <span>위치:
+                  {% if report.town %}
+                    양평군 {{ report.town }}{% if report.village %} {{ report.village }}{% endif %}
+                    {% if report.address and report.town not in report.address %}({{ report.address }}){% endif %}
+                  {% else %}
+                    {{ report.address or (report.latitude|round(6) ~ ', ' ~ report.longitude|round(6)) }}
+                  {% endif %}
+                </span>
                 {% if report.ai_confidence %}
                 <span>AI 신뢰도: {{ (report.ai_confidence * 100)|round(0) }}%</span>
                 {% endif %}
