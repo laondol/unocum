@@ -1930,7 +1930,16 @@ def register_routes(app):
                     pass
             scored.sort(key=lambda x: (x[0], x[1], x[2]))
             nearby_shares = [(s, round(d, 1)) for p, cp, d, s in scored[:10]]
-        return render_template('share_detail.html', report=report, comments=comments, nearby_shares=nearby_shares)
+        # 지역 소식 (외부 사이트 스크래핑)
+        local_news = []
+        local_links = []
+        try:
+            from services.local_sources import get_local_news, get_quick_links
+            local_news = get_local_news(town=report.town, village=report.village)
+            local_links = get_quick_links(town=report.town, village=report.village)
+        except:
+            pass
+        return render_template('share_detail.html', report=report, comments=comments, nearby_shares=nearby_shares, local_news=local_news, local_links=local_links)
 
     @app.route('/share/comment/<int:report_id>', methods=['POST'])
     def share_add_comment(report_id):
