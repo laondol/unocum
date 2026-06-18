@@ -383,6 +383,8 @@ def register_routes(app):
             pass  # 리까지 입력
         user.town = town
         user.village = village
+        user.curr_town = town
+        user.curr_village = village
         db.session.commit()
         return jsonify({'status':'success','msg':'주소가 수정되었습니다.'})
 

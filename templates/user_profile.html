@@ -208,6 +208,95 @@
 
 {% if is_own %}
 <script>
+const VILLAGE_DATA = {
+    '양평읍': ['양근리','오빈리','신애리','덕평리','봉성리','원덕리','도곡리','백안리','송학리','대흥리','회현리','공흥리','사송리'],
+    '강상면': ['병산리','교평리','세월리','운심리','신화리','송학리','화양리','대석리','강하리'],
+    '강하면': ['전수리','왕창리','운심리','성덕리','동오리','공세리','항금리'],
+    '양서면': ['양수리','용담리','대심리','신원리','목왕리','증동리','가동리','도곡리','부평리','삼회리'],
+    '옥천면': ['옥천리','용천리','신복리','아신리','삼합리','후곡리'],
+    '서종면': ['서후리','문호리','정배리','수능리','도장리','금사리','내수리','노문리'],
+    '단월면': ['봉상리','향양리','보룡리','부안리','석산리','명성리','삼가리','덕수리'],
+    '청운면': ['용두리','가현리','여물리','도원리','갈운리','비룡리','신론리','삼성리'],
+    '양동면': ['쌍학리','매월리','석정리','금왕리','고송리','계정리'],
+    '지평면': ['지평리','월산리','송현리','무왕리','대평리','수곡리','일신리'],
+    '용문면': ['용문리','마룡리','금곡리','망미리','삼성리','화전리','다문리','조현리','오촌리','연수리','덕촌리','중원리'],
+    '개군면': ['주읍리','내리','석장리','하자포리','부리','공세리','양동리','구미리','향리','계전리'],
+};
+
+function showAddressEdit() {
+    const form = document.getElementById('addressEditForm');
+    form.style.display = form.style.display === 'none' ? '' : 'none';
+    if (form.style.display !== 'none') {
+        const town = document.getElementById('editTown').value;
+        if (town) updateVillageOptions(town);
+    }
+}
+
+function updateVillageOptions(town) {
+    const sel = document.getElementById('editVillage');
+    sel.innerHTML = '<option value="">리 선택</option>';
+    (VILLAGE_DATA[town] || []).forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = v;
+        if (v === '{{ profile_user.village }}') opt.selected = true;
+        sel.appendChild(opt);
+    });
+}
+
+function updateAddress(event) {
+    event.preventDefault();
+    const form = document.getElementById('addressForm');
+    const fd = new FormData(form);
+    fetch('/user/update-address', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(d => {
+        if (d.status === 'success') {
+            document.getElementById('addressDisplay').textContent =
+                (fd.get('town') || '') + ' ' + (fd.get('village') || '');
+            document.getElementById('addressEditForm').style.display = 'none';
+            alert(d.msg);
+        } else {
+            alert(d.msg);
+        }
+    })
+    .catch(() => alert('저장 중 오류가 발생했습니다.'));
+}
+
+function neighborVerify() {
+    if (!navigator.geolocation) {
+        alert('이 브라우저는 위치정보를 지원하지 않습니다.');
+        return;
+    }
+    if (!confirm('현재 위치로 이웃주민 인증을 진행합니다.\nGPS가 켜져 있어야 합니다.\n\n계속하시겠습니까?')) return;
+    const status = document.getElementById('locationStatus');
+    status.innerHTML = '📍 GPS 위치 확인 중...';
+    status.className = 'small mt-2 text-primary';
+    navigator.geolocation.getCurrentPosition(pos => {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        const fd = new FormData();
+        fd.append('lat', lat);
+        fd.append('lon', lon);
+        fetch('/neighbor/verify', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(d => {
+            if (d.status === 'success') {
+                status.innerHTML = '✅ ' + d.msg + ' (' + d.town + ' ' + d.village + ')';
+                status.className = 'small mt-2 text-success';
+                location.reload();
+            } else {
+                status.innerHTML = '❌ ' + d.msg;
+                status.className = 'small mt-2 text-danger';
+            }
+        })
+        .catch(() => status.innerHTML = '❌ 서버 오류');
+    }, err => {
+        status.innerHTML = '⚠️ GPS 오류: ' + err.message;
+        status.className = 'small mt-2 text-warning';
+    }, { enableHighAccuracy: true, timeout: 15000 });
+}
+
 function updateLocationDisplay(data) {
     const display = document.getElementById('currLocationDisplay');
     if (display) display.textContent = (data.town || '양평') + ' ' + (data.village || '');
