@@ -809,6 +809,15 @@ def register_routes(app):
                 article.ai_score = ai_res.get('score', 0)
             except:
                 article.ai_score = 0
+            # 한자/일본어 정리
+            try:
+                from services.news_service import clean_cjk_text
+                cleaned_title, cleaned_summary, cleaned_content = clean_cjk_text(article.title, article.summary, article.content)
+                article.title = cleaned_title or article.title
+                article.summary = cleaned_summary or article.summary
+                article.content = cleaned_content or article.content
+            except:
+                pass
             db.session.add(article)
             db.session.commit()
             return redirect(url_for('admin_news'))
@@ -842,9 +851,47 @@ def register_routes(app):
                 article.ai_score = ai_res.get('score', 0)
             except:
                 article.ai_score = 0
+            # 한자/일본어 정리
+            try:
+                from services.news_service import clean_cjk_text
+                cleaned_title, cleaned_summary, cleaned_content = clean_cjk_text(article.title, article.summary, article.content)
+                article.title = cleaned_title or article.title
+                article.summary = cleaned_summary or article.summary
+                article.content = cleaned_content or article.content
+            except:
+                pass
             db.session.commit()
             return redirect(url_for('admin_news'))
         return render_template('admin_news_create.html', article=article)
+
+    @app.route('/admin/news/clean-cjk', methods=['POST'])
+    def admin_news_clean_cjk():
+        if session.get('role') not in ['admin', 'leader']:
+            return jsonify({"status": "error", "msg": "권한 없음"}), 403
+        from services.news_service import clean_cjk_text
+        tab = request.form.get('tab', 'all')
+        query = NewsArticle.query
+        if tab == 'world':
+            query = query.filter(NewsArticle.category.in_(['세계뉴스', '환경뉴스', '건강정보', '복지정보', '농업정보', '관광소식']))
+        elif tab == 'kr_yp':
+            query = query.filter(NewsArticle.category.in_(['대한민국뉴스', '양평소식', '정책정보', '지역소식']))
+        articles = query.all()
+        count = 0
+        for a in articles:
+            try:
+                cleaned_title, cleaned_summary, cleaned_content = clean_cjk_text(a.title, a.summary, a.content)
+                if cleaned_title and cleaned_title != a.title:
+                    a.title = cleaned_title
+                if cleaned_summary and cleaned_summary != a.summary:
+                    a.summary = cleaned_summary
+                if cleaned_content and cleaned_content != a.content:
+                    a.content = cleaned_content
+                a.updated_at = datetime.now()
+                count += 1
+            except:
+                pass
+        db.session.commit()
+        return jsonify({"status": "success", "count": count, "msg": f"✅ 뉴스 {count}개 한자/일본어 정리 완료"})
 
     @app.route('/admin/news/import-url', methods=['POST'])
     def admin_news_import_url():
