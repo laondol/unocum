@@ -8,7 +8,7 @@
         <div class="card-body p-4">
             <div class="d-flex gap-2 flex-wrap mb-3">
                 <span class="badge bg-info">{{ report.ai_category }}</span>
-                <span class="badge bg-light text-dark">{{ report.town }} {{ report.village }}</span>
+                <span class="badge bg-light text-dark">{{ '군외' if not report.town else (report.town + ' ' + (report.village or '')) }}</span>
             </div>
             <h3 class="fw-bold mb-3">{{ report.title }}</h3>
             
@@ -49,7 +49,11 @@
                     {% endif %}
                     <div class="flex-grow-1 min-w-0">
                         <a href="/share/detail/{{ s.id }}" class="text-dark text-decoration-none fw-medium small d-block text-truncate">{{ s.title or '제목 없음' }}</a>
-                        <span class="text-muted small">{{ s.town }} {{ s.village }} · {{ dist }}km</span>
+                        <span class="text-muted small">{{ s.town }} {{ s.village }} · {{ dist }}km
+                        {% if s.ai_category in ('사건','풍경','맛집') %}
+                        <span class="badge bg-{{ 'danger' if s.ai_category=='사건' else 'success' if s.ai_category=='풍경' else 'warning' }} bg-opacity-10 text-{{ 'danger' if s.ai_category=='사건' else 'success' if s.ai_category=='풍경' else 'warning' }} ms-1">{{ s.ai_category }}</span>
+                        {% endif %}
+                        </span>
                     </div>
                     {% if s.user_id and session.get('user_id') and s.user_id != session.get('user_id') %}
                     <a href="/user/{{ s.user_id }}" class="btn btn-sm btn-outline-primary flex-shrink-0" title="벗 신청">👤</a>
@@ -82,7 +86,7 @@
                     양평군 {{ report.town }}{% if report.village %} {{ report.village }}{% endif %}
                     {% if report.address and report.town not in report.address %}({{ report.address }}){% endif %}
                   {% else %}
-                    {{ report.address or (report.latitude|round(6) ~ ', ' ~ report.longitude|round(6)) }}
+                    군외{% if report.address %} ({{ report.address }}){% endif %}
                   {% endif %}
                 </span>
                 {% if report.ai_confidence %}
@@ -175,8 +179,24 @@
                             <p class="mb-0 mt-1">{{ r.content }}</p>
                         </div>
                         {% endfor %}
-                    </div>
-                    {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- ⚠️ 실종자 알림 (준비 중) -->
+            {% if report.town and false %}
+            <div class="mb-4 p-3 bg-danger bg-opacity-10 rounded border border-danger">
+                <h6 class="fw-bold text-danger mb-2">⚠️ 실종자</h6>
+                <p class="mb-0 small">이 지역의 실종자 정보가 없습니다.</p>
+            </div>
+            {% endif %}
+
+            <!-- 🤝 돌봄 필요 이웃 (준비 중) -->
+            {% if report.town and false %}
+            <div class="mb-4 p-3 bg-warning bg-opacity-10 rounded border border-warning">
+                <h6 class="fw-bold text-warning mb-2">🤝 돌봄이 필요한 이웃</h6>
+                <p class="mb-0 small">이 지역의 돌봄 정보가 없습니다.</p>
+            </div>
+            {% endif %}
                 </div>
                 {% endfor %}
             </div>

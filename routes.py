@@ -1907,12 +1907,12 @@ def register_routes(app):
                 ShareReport.town.isnot(None)
             ).all()
             scored = []
+            cat_order = {'사건': 0, '풍경': 1, '맛집': 2, '장소': 3, '기타': 4}
             for s in all_approved:
                 try:
                     d = haversine(report.latitude, report.longitude, s.latitude, s.longitude)
                     if d > 20:
                         continue
-                    # 정렬 점수: 내글=0, 같은리=1, 같은면=2, 같은군=3
                     same_village = s.town == report.town and s.village and s.village == report.village
                     same_town = s.town == report.town
                     me_first = (s.user_id == uid)
@@ -1924,11 +1924,12 @@ def register_routes(app):
                         priority = 2
                     else:
                         priority = 3
-                    scored.append((priority, d, s))
+                    cat_pri = cat_order.get(s.ai_category, 4)
+                    scored.append((priority, cat_pri, d, s))
                 except:
                     pass
-            scored.sort(key=lambda x: (x[0], x[1]))
-            nearby_shares = [(s, round(d, 1)) for p, d, s in scored[:10]]
+            scored.sort(key=lambda x: (x[0], x[1], x[2]))
+            nearby_shares = [(s, round(d, 1)) for p, cp, d, s in scored[:10]]
         return render_template('share_detail.html', report=report, comments=comments, nearby_shares=nearby_shares)
 
     @app.route('/share/comment/<int:report_id>', methods=['POST'])
