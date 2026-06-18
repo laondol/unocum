@@ -23,6 +23,7 @@
         <li class="nav-item"><a class="nav-link" href="#" data-type="building">🏗️ 건축공사</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-type="heritage">🏛️ 국가유산</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-type="transit">🚌 대중교통</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" data-type="localstore">🏪 동네가게</a></li>
     </ul>
     
     {% if notices %}
@@ -77,6 +78,14 @@
             </div>
         </div>
     </div>
+
+    <div id="localStoresSection" style="display:none;">
+        <div id="localStoresContent">
+            <div class="text-center py-5 text-muted">
+                <span class="spinner-border spinner-border-sm"></span> 불러오는 중...
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -92,6 +101,7 @@ document.querySelectorAll('#infoTabs .nav-link').forEach(tab => {
         const type = this.dataset.type;
         document.getElementById('heritageSection').style.display = 'none';
         document.getElementById('transitSection').style.display = 'none';
+        document.getElementById('localStoresSection').style.display = 'none';
         document.querySelectorAll('.notice-item').forEach(item => item.style.display = '');
         if (type === 'heritage') {
             document.querySelectorAll('.notice-item').forEach(item => item.style.display = 'none');
@@ -101,6 +111,10 @@ document.querySelectorAll('#infoTabs .nav-link').forEach(tab => {
             document.querySelectorAll('.notice-item').forEach(item => item.style.display = 'none');
             document.getElementById('transitSection').style.display = '';
             loadTransit();
+        } else if (type === 'localstore') {
+            document.querySelectorAll('.notice-item').forEach(item => item.style.display = 'none');
+            document.getElementById('localStoresSection').style.display = '';
+            loadLocalStores();
         } else {
             document.querySelectorAll('.notice-item').forEach(item => {
                 if (type === 'all') { item.style.display = ''; return; }
@@ -393,6 +407,51 @@ function scheduleAlarm(diffMin) {
                 '<span class="text-danger fw-bold">🔔 출발 시간! 지금 출발하세요!</span>';
         }, diffMin * 60 * 1000);
     }
+}
+
+function loadLocalStores() {
+    const el = document.getElementById('localStoresContent');
+    el.innerHTML = '<div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> 동네가게 불러오는 중...</div>';
+    fetch('/api/user/location')
+        .then(r => r.json())
+        .then(loc => {
+            if (loc.error || !loc.village) {
+                el.innerHTML = '<div class="alert alert-warning">등록된 주소(리)가 없습니다. 마이페이지에서 설정해 주세요.</div>';
+                return;
+            }
+            fetch('/construction/local-stores')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.error) {
+                        el.innerHTML = '<div class="alert alert-warning">' + data.error + '</div>';
+                        return;
+                    }
+                    if (!data.stores || data.stores.length === 0) {
+                        el.innerHTML = '<div class="text-center py-5 text-muted"><div class="fs-1 mb-3">🏪</div><p>같은 리(' + data.town + ' ' + data.village + ')에 등록된 가게가 없습니다.</p><p class="small"><a href="/share-report">공유마당에 가게 등록하기</a></p></div>';
+                        return;
+                    }
+                    let html = '<div class="mb-3"><span class="badge bg-primary">' + data.town + ' ' + data.village + '</span> <small class="text-muted">가게 ' + data.stores.length + '곳</small></div>';
+                    html += '<div class="row g-3">';
+                    data.stores.forEach(s => {
+                        html += '<div class="col-6 col-md-4">';
+                        html += '<a href="/share/detail/' + s.id + '" class="text-decoration-none">';
+                        html += '<div class="card border-0 shadow-sm h-100" style="border-radius:16px;">';
+                        if (s.image_path) {
+                            html += '<img src="' + s.image_path + '" class="card-img-top" style="height:140px;object-fit:cover;border-radius:16px 16px 0 0;" alt="' + s.title + '" onerror="this.src=\'https://placehold.co/300x200/e9ecef/6c757d?text=No+Image\'">';
+                        } else {
+                            html += '<div class="bg-light d-flex align-items-center justify-content-center" style="height:140px;border-radius:16px 16px 0 0;font-size:2rem;">🏪</div>';
+                        }
+                        html += '<div class="card-body p-2 text-center">';
+                        html += '<p class="small fw-bold text-dark mb-0" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + s.title + '</p>';
+                        html += '</div></div></a></div>';
+                    });
+                    html += '</div>';
+                    html += '<div class="text-center mt-3"><a href="/share-report" class="btn btn-sm btn-outline-primary">내 가게도 등록하기</a></div>';
+                    el.innerHTML = html;
+                })
+                .catch(() => el.innerHTML = '<div class="alert alert-danger">불러오기 실패</div>');
+        })
+        .catch(() => el.innerHTML = '<div class="alert alert-danger">사용자 정보를 불러올 수 없습니다.</div>');
 }
 </script>
 {% endblock %}

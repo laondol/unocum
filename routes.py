@@ -2121,6 +2121,32 @@ def register_routes(app):
         summary = traffic_summary()
         return jsonify(summary)
 
+    @app.route('/construction/local-stores')
+    def construction_local_stores():
+        uid = session.get('user_id')
+        if not uid:
+            return jsonify({"error": "로그인이 필요합니다."}), 401
+        user = User.query.get(uid)
+        if not user or not user.curr_town or not user.curr_village:
+            return jsonify({"error": "등록된 주소(리)가 없습니다."}), 400
+        stores = ShareReport.query.filter_by(
+            town=user.curr_town,
+            village=user.curr_village,
+            status='approved'
+        ).order_by(ShareReport.created_at.desc()).limit(30).all()
+        result = {
+            "town": user.curr_town,
+            "village": user.curr_village,
+            "stores": [{
+                "id": s.id,
+                "title": s.title or "제목없음",
+                "image_path": s.image_path,
+                "description": (s.description or "")[:100],
+                "created_at": s.created_at.strftime("%Y-%m-%d %H:%M") if s.created_at else "",
+            } for s in stores],
+        }
+        return jsonify(result)
+
     @app.route('/api/user/location')
     def api_user_location():
         uid = session.get('user_id')
