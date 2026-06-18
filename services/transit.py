@@ -1,5 +1,4 @@
 import requests
-import json
 from math import radians, sin, cos, sqrt, atan2
 
 def haversine_km(lat1, lng1, lat2, lng2):
@@ -57,42 +56,6 @@ def geocode_address(address, kakao_key=None):
             data = r.json()
             if data:
                 return {"lat": float(data[0]["lat"]), "lng": float(data[0]["lon"]), "address": data[0].get("display_name", address)}
-    except:
-        pass
-    return None
-
-def get_naver_transit(from_lat, from_lng, to_lat, to_lng, client_id, client_secret):
-    url = "https://naveropenapi.apigw.ntruss.com/map-direction-15/v1/publicTransit"
-    headers = {"X-NCP-APIGW-API-KEY-ID": client_id, "X-NCP-APIGW-API-KEY": client_secret}
-    params = {"startX": from_lng, "startY": from_lat, "endX": to_lng, "endY": to_lat, "count": 3}
-    try:
-        r = requests.get(url, headers=headers, params=params, timeout=10)
-        if r.status_code == 200:
-            data = r.json()
-            routes = []
-            for route in data.get("route", []):
-                total_min = route.get("totalTime", 0)
-                fare = route.get("totalFare", 0)
-                transfers = route.get("transferCount", 0)
-                first_dep = route.get("firstStartTime", "")
-                last_dep = route.get("lastEndTime", "")
-                legs = []
-                for sub in route.get("path", []):
-                    ttype = sub.get("trafficType", "")
-                    st_name = sub.get("startName", "")
-                    en_name = sub.get("endName", "")
-                    sec_min = sub.get("sectionTime", 0)
-                    dist_m = sub.get("distance", 0)
-                    line_info = ""
-                    if ttype in ("BUS", "SUBWAY"):
-                        lanes = sub.get("lanes", [])
-                        if lanes:
-                            line_info = lanes[0].get("name", "") or lanes[0].get("busNo", "")
-                    legs.append({"type": ttype, "line": line_info, "from": st_name, "to": en_name, "time": sec_min, "distance": dist_m})
-                routes.append({"total_min": total_min, "fare": fare, "transfers": transfers, "first_dep": first_dep, "last_dep": last_dep, "legs": legs})
-            return routes
-        elif r.status_code == 401:
-            return None
     except:
         pass
     return None

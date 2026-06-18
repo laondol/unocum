@@ -2012,14 +2012,16 @@ def register_routes(app):
         to_address = f"경기 양평군 {user.curr_town or ''} {user.curr_village}"
         from config import Config
         kakao_key = Config.KAKAO_REST_API_KEY
-        naver_id = Config.NAVER_SEARCH_CLIENT_ID or Config.NAVER_CLIENT_ID
-        naver_secret = Config.NAVER_SEARCH_CLIENT_SECRET or Config.NAVER_CLIENT_SECRET
         dep = None
         dest = None
         if kakao_key:
-            from services.transit import reverse_geocode, geocode_address, get_naver_transit, estimate_transit_time_rough, haversine_km
+            from services.transit import reverse_geocode, geocode_address, estimate_transit_time_rough, haversine_km
             dep = reverse_geocode(from_lat, from_lng, kakao_key)
             dest = geocode_address(to_address, kakao_key)
+        else:
+            from services.transit import reverse_geocode, geocode_address, estimate_transit_time_rough, haversine_km
+            dep = reverse_geocode(from_lat, from_lng)
+            dest = geocode_address(to_address)
         result = {
             "departure": dep or {"lat": from_lat, "lng": from_lng, "address": f"{from_lat:.5f}, {from_lng:.5f}"},
             "destination": dest or {"lat": 0, "lng": 0, "address": to_address},
@@ -2028,11 +2030,6 @@ def register_routes(app):
         if dest and dest["lat"]:
             from services.transit import haversine_km
             result["distance_km"] = round(haversine_km(from_lat, from_lng, dest["lat"], dest["lng"]), 1)
-        if dest and dest["lat"] and naver_id and naver_secret:
-            from services.transit import get_naver_transit
-            routes = get_naver_transit(from_lat, from_lng, dest["lat"], dest["lng"], naver_id, naver_secret)
-            if routes:
-                result["transit_routes"] = routes
         if not result.get("transit_routes"):
             from services.transit import estimate_transit_time_rough
             rough_min = estimate_transit_time_rough(from_lat, from_lng, (dest or {}).get("lat") or from_lat, (dest or {}).get("lng") or from_lng)
