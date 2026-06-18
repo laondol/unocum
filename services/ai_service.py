@@ -2,7 +2,7 @@ import json, os, base64, threading, subprocess, tempfile
 from datetime import datetime, timedelta
 from openai import OpenAI
 from models import db, Post, User, ShareReport
-from services.naver_news import get_news_for_share
+from services.naver_news import get_local_share_context
 from services.geocode import gps_to_town_village
 
 HAAR_FACE = None
@@ -247,9 +247,9 @@ def background_process_share(app, report_id, title, description, latitude, longi
 
         if latitude and longitude:
             tw, vl = gps_to_town_village(latitude, longitude)
-            news_summary, news_links = get_news_for_share(title, description, tw, vl)
+            news_summary, news_links, _ = get_local_share_context(title, description, tw, vl, exclude_id=report_id)
         else:
-            news_summary, news_links = get_news_for_share(title, description, '', '')
+            news_summary, news_links, _ = get_local_share_context(title, description, '', '', exclude_id=report_id)
         report.ai_region_news = news_summary or ''
         report.ai_news_links = news_links or '[]'
 

@@ -1894,7 +1894,17 @@ def register_routes(app):
         if report.status != 'approved' and role not in ('admin', 'leader'):
             return "승인된 공유만 볼 수 있습니다.", 403
         comments = ShareComment.query.filter_by(share_id=report_id, parent_id=None).order_by(ShareComment.created_at.asc()).all()
-        return render_template('share_detail.html', report=report, comments=comments)
+        # 관련 공유 썸네일 조회 (ai_news_links가 ID 배열이면 조회)
+        related_shares = []
+        if report.ai_news_links and report.ai_news_links not in ('[]', ''):
+            try:
+                parsed = json.loads(report.ai_news_links)
+                if parsed and isinstance(parsed[0], int):
+                    ids = parsed
+                    related_shares = ShareReport.query.filter(ShareReport.id.in_(ids)).all()
+            except:
+                pass
+        return render_template('share_detail.html', report=report, comments=comments, related_shares=related_shares)
 
     @app.route('/share/comment/<int:report_id>', methods=['POST'])
     def share_add_comment(report_id):

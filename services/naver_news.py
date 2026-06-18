@@ -3,6 +3,7 @@ import json
 import re
 import xml.etree.ElementTree as ET
 from flask import current_app
+from datetime import datetime, timedelta
 
 NAVER_NEWS_URL = "https://openapi.naver.com/v1/search/news.json"
 GOOGLE_NEWS_RSS = "https://news.google.com/rss/search?hl=ko&gl=KR&ceid=KR:ko"
@@ -75,25 +76,40 @@ def search_news(query, display=5, language='ko'):
         source = '구글뉴스'
     return results, source
 
-def build_news_query(title, description, town, village):
-    keywords = []
-    if title:
-        keywords.append(title)
-    if description:
-        short_desc = description[:50]
-        keywords.append(short_desc)
-    if town:
-        keywords.append(f"양평 {town} {village or ''}")
-    else:
-        keywords.append("양평군")
-    base = " ".join(keywords)
-    return base.strip()
-
-def get_news_for_share(title, description, town, village):
-    query = build_news_query(title, description, town, village)
-    items, _ = search_news(query, display=5, language='ko')
-    if items:
-        summary = "; ".join([f"{i['title']}" for i in items[:3]])
-        links = json.dumps([{"title": i['title'], "url": i['url']} for i in items], ensure_ascii=False)
-        return summary, links
-    return None, "[]"
+def get_local_share_context(title, description, town, village, exclude_id=0):
+    """같은 리(읍/면)의 다른 회원 공유마당 내용을 중심으로 지역 소식 생성"""
+    if not town:
+        return "특별한 내용이 없습니다.", "[]", []
+    from models import ShareReport
+    cutoff = datetime.now() - timedelta(days=30)
+    nearby = ShareReport.query.filter(
+        ShareReport.town == town,
+        ShareReport.status == 'approved',
+        ShareReport.id != exclude_id,
+        ShareReport.created_at >= cutoff
+    ).order_by(ShareReport.created_at.desc()).limit(10).all()
+    if not nearby:
+        return "특별한 내용이 없습니다.", "[]", []
+    # 최대 3개 이미지 선정
+    with_image = [s for s in nearby if s.image_path][:3]
+    # AI 요약 생성
+    context_lines = []
+    for s in nearby[:5]:
+        loc = f"{s.town} {s.village or ''}" if s.town else '위치미상'
+        context_lines.append(f"- [{loc}] {s.title or '제목없음'}: {s.description or ''}")
+    ai_text = "; ".join(context_lines)
+    try:
+        from openai import OpenAI
+        key = current_app.config.get("GROQ_API_KEY", "")
+        client = OpenAI(api_key=key, base_url="https://api.groq.com/openai/v1")
+        sys_p = "당신은 양평군 지역 공유 콘텐츠 큐레이터입니다. 아래 이웃주민들이 공유한 내용을 분석하여 2~3줄로 요약하세요. 같은 지역의 다양한 소식을 자연스럽게 연결하세요. 내용이 충분하지 않으면 '특별한 내용이 없습니다.'라고만 출력하세요."
+        resp = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role":"system","content":sys_p},{"role":"user","content":f"양평군 {town} {village or ''} 지역 최근 공유 내용:\n{ai_text[:2000]}"}],
+            timeout=30
+        )
+        summary = resp.choices[0].message.content.strip()
+    except:
+        summary = f"양평군 {town} {village or ''} 지역에 최근 공유된 소식입니다."
+    ids_json = json.dumps([s.id for s in with_image], ensure_ascii=False)
+    return summary, ids_json, [s.id for s in with_image]
