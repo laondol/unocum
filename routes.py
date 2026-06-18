@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from sqlalchemy import or_
+from urllib.parse import quote
 import json, base64, os, threading, requests
 
 from models import db, User, Post, Comment, NewsArticle, NewsComment, NewsRecommendation, NewsVote, PointHistory, ShareReport, Message, ShareComment, ConstructionNotice, LegalPost, LegalAppointment, LawyerSchedule, GoogleCalendarConfig, PsychoPost, PsychoAppointment, PsychoDoctorSchedule, PsychoGoogleCalendarConfig, RampApplication, Friend, FriendGroup, PostVote
@@ -2036,15 +2037,21 @@ def register_routes(app):
             from services.transit import estimate_transit_time_rough
             rough_min = estimate_transit_time_rough(from_lat, from_lng, (dest or {}).get("lat") or from_lat, (dest or {}).get("lng") or from_lng)
             result["rough_estimate_min"] = rough_min
-        if dest and dest["lat"]:
-            from urllib.parse import quote
-            dep_addr = quote(dep["address"] if dep else f"{from_lat},{from_lng}")
-            dest_addr = quote(dest["address"])
-            result["deep_links"] = {
-                "kakao": f"https://map.kakao.com/?sX={from_lng}&sY={from_lat}&sName={dep_addr}&eX={dest['lng']}&eY={dest['lat']}&eName={dest_addr}",
-                "naver": f"https://map.naver.com/index.nhn?slat={from_lat}&slng={from_lng}&stitle={dep_addr}&elat={dest['lat']}&elng={dest['lng']}&etitle={dest_addr}&pathType=1"
-            }
-        return jsonify(result)
+    if dest and dest.get("lng"):
+        dep_addr = quote(dep["address"] if dep else f"{from_lat},{from_lng}")
+        dest_addr = quote(dest["address"])
+        result["deep_links"] = {
+            "kakao": f"https://map.kakao.com/?sX={from_lng}&sY={from_lat}&sName={dep_addr}&eX={dest['lng']}&eY={dest['lat']}&eName={dest_addr}",
+            "naver": f"https://map.naver.com/index.nhn?slat={from_lat}&slng={from_lng}&stitle={dep_addr}&elat={dest['lat']}&elng={dest['lng']}&etitle={dest_addr}&pathType=1"
+        }
+    else:
+        dep_addr = quote(dep["address"] if dep else f"{from_lat},{from_lng}")
+        dest_addr = quote(to_address)
+        result["deep_links"] = {
+            "kakao": f"https://map.kakao.com/?sName={dep_addr}&eName={dest_addr}",
+            "naver": f"https://map.naver.com/index.nhn?stitle={dep_addr}&etitle={dest_addr}&pathType=1"
+        }
+    return jsonify(result)
 
     @app.route('/api/user/location')
     def api_user_location():
