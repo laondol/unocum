@@ -2075,15 +2075,15 @@ def register_routes(app):
         from services.transit import suggest_optimal_departure, lookup_village_coords, haversine_km
         from services.geocode import gps_to_town_village
         gps_result = gps_to_town_village(from_lat, from_lng)
-        same_village = False
-        if gps_result and gps_result.get("town") == user.curr_town and gps_result.get("village") == user.curr_village:
-            same_village = True
+        gps_town = gps_result[0] if gps_result else ""
+        gps_village = gps_result[1] if gps_result else ""
+        same_village = bool(gps_town and gps_town == user.curr_town and gps_village == user.curr_village)
         if same_village:
             return jsonify({
                 "already_home": True,
                 "message": f"현재 위치가 등록된 주소({user.curr_town} {user.curr_village})와 동일합니다. 막차 안내가 필요하지 않습니다.",
-                "current_town": gps_result.get("town"),
-                "current_village": gps_result.get("village"),
+                "current_town": gps_town,
+                "current_village": gps_village,
                 "home_town": user.curr_town,
                 "home_village": user.curr_village,
             })
