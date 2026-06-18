@@ -159,6 +159,14 @@ class NewsRecommendation(db.Model):
     approved_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.now)
 
+class NewsVote(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    news_id = db.Column(db.Integer, db.ForeignKey('news_article.id'), nullable=False)
+    vote = db.Column(db.String(10), default='like')  # 'like' or 'dislike'
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    __table_args__ = (db.UniqueConstraint('user_id', 'news_id'),)
+
 class PointHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)

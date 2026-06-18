@@ -5,7 +5,7 @@ from werkzeug.utils import secure_filename
 from sqlalchemy import or_
 import json, base64, os, threading, requests
 
-from models import db, User, Post, Comment, NewsArticle, NewsComment, NewsRecommendation, PointHistory, ShareReport, Message, ShareComment, ConstructionNotice, LegalPost, LegalAppointment, LawyerSchedule, GoogleCalendarConfig, PsychoPost, PsychoAppointment, PsychoDoctorSchedule, PsychoGoogleCalendarConfig, RampApplication, Friend, FriendGroup, PostVote
+from models import db, User, Post, Comment, NewsArticle, NewsComment, NewsRecommendation, NewsVote, PointHistory, ShareReport, Message, ShareComment, ConstructionNotice, LegalPost, LegalAppointment, LawyerSchedule, GoogleCalendarConfig, PsychoPost, PsychoAppointment, PsychoDoctorSchedule, PsychoGoogleCalendarConfig, RampApplication, Friend, FriendGroup, PostVote
 from services.oauth import oauth
 from services.security import save_village_file
 from services.ai_service import call_ai_judge, call_ai_debate, background_ai_judge, moderate_image, background_process_share
@@ -20,7 +20,7 @@ def register_routes(app):
     @app.route('/')
     @app.route('/intro')
     def intro():
-        selected_news = NewsArticle.query.filter(NewsArticle.is_selected == True, NewsArticle.category.in_(['세계뉴스', '환경뉴스', '건강정보', '복지정보', '농업정보', '관광소식'])).order_by(NewsArticle.updated_at.desc()).limit(6).all()
+        selected_news = NewsArticle.query.filter(NewsArticle.is_selected == True, NewsArticle.world_admin_approved == True, NewsArticle.category.in_(['세계뉴스', '환경뉴스', '건강정보', '복지정보', '농업정보', '관광소식'])).order_by(NewsArticle.updated_at.desc()).limit(6).all()
         return render_template('intro.html', selected_news=selected_news)
 
     @app.route('/presentation')
@@ -657,7 +657,16 @@ def register_routes(app):
         if session.get('role') not in ['admin', 'leader']:
             return jsonify({"status": "error", "msg": "권한 없음"}), 403
         tab = request.form.get('tab', 'world')
-        suggestions = ai_search_news(news_type=tab)
+        # 회원들이 많이 추천한 인기 카테고리/키워드 수집
+        trending_context = ''
+        try:
+            top_cats = db.session.query(NewsArticle.category, db.func.count(NewsVote.id)).join(NewsVote, NewsVote.news_id == NewsArticle.id).filter(NewsVote.vote == 'like').group_by(NewsArticle.category).order_by(db.func.count(NewsVote.id).desc()).limit(3).all()
+            if top_cats:
+                cats = [c[0] for c in top_cats if c[0]]
+                trending_context = ', '.join(cats)
+        except:
+            pass
+        suggestions = ai_search_news(news_type=tab, trending_context=trending_context)
         if not suggestions:
             return jsonify({"status": "error", "msg": "AI 주제 제안 실패. Groq 서버를 확인하세요."})
         from services.naver_news import search_news
@@ -887,9 +896,20 @@ def register_routes(app):
     def news_like(news_id):
         if not session.get('username'):
             return jsonify({"status": "error", "msg": "로그인이 필요합니다."}), 401
+        uid = session['user_id']
         article = NewsArticle.query.get_or_404(news_id)
-        article.like_count += 1
-        add_points(session['user_id'], 5, 'like', '뉴스 좋아요', news_id)
+        existing = NewsVote.query.filter_by(user_id=uid, news_id=news_id).first()
+        if existing:
+            if existing.vote == 'like':
+                return jsonify({"status": "success", "msg": "이미 추천했습니다.", "likes": article.like_count, "dislikes": article.dislike_count})
+            existing.vote = 'like'
+            article.like_count += 1
+            article.dislike_count = max(0, article.dislike_count - 1)
+            add_points(uid, 5, 'like', '뉴스 좋아요', news_id)
+        else:
+            db.session.add(NewsVote(user_id=uid, news_id=news_id, vote='like'))
+            article.like_count += 1
+            add_points(uid, 5, 'like', '뉴스 좋아요', news_id)
         db.session.commit()
         return jsonify({"status": "success", "likes": article.like_count, "dislikes": article.dislike_count})
 
@@ -897,8 +917,18 @@ def register_routes(app):
     def news_dislike(news_id):
         if not session.get('username'):
             return jsonify({"status": "error", "msg": "로그인이 필요합니다."}), 401
+        uid = session['user_id']
         article = NewsArticle.query.get_or_404(news_id)
-        article.dislike_count += 1
+        existing = NewsVote.query.filter_by(user_id=uid, news_id=news_id).first()
+        if existing:
+            if existing.vote == 'dislike':
+                return jsonify({"status": "success", "msg": "이미 싫어요했습니다.", "likes": article.like_count, "dislikes": article.dislike_count})
+            existing.vote = 'dislike'
+            article.dislike_count += 1
+            article.like_count = max(0, article.like_count - 1)
+        else:
+            db.session.add(NewsVote(user_id=uid, news_id=news_id, vote='dislike'))
+            article.dislike_count += 1
         db.session.commit()
         return jsonify({"status": "success", "likes": article.like_count, "dislikes": article.dislike_count})
 
@@ -956,13 +986,13 @@ def register_routes(app):
     @app.route('/world-news')
     def world_news():
         page = request.args.get('page', 1, type=int)
-        news_list = NewsArticle.query.filter(NewsArticle.is_selected == True, NewsArticle.category.in_(['세계뉴스', '환경뉴스', '건강정보', '복지정보', '농업정보', '관광소식'])).order_by(NewsArticle.like_count.desc(), NewsArticle.created_at.desc()).paginate(page=page, per_page=12, error_out=False)
+        news_list = NewsArticle.query.filter(NewsArticle.is_selected == True, NewsArticle.world_admin_approved == True, NewsArticle.category.in_(['세계뉴스', '환경뉴스', '건강정보', '복지정보', '농업정보', '관광소식'])).order_by(NewsArticle.like_count.desc(), NewsArticle.created_at.desc()).paginate(page=page, per_page=12, error_out=False)
         return render_template('world_news.html', news_list=_get_news_with_recs(news_list), title="세계 뉴스")
 
     @app.route('/yp-news')
     def yp_news():
         page = request.args.get('page', 1, type=int)
-        news_list = NewsArticle.query.filter_by(is_selected=True).order_by(NewsArticle.like_count.desc(), NewsArticle.created_at.desc()).paginate(page=page, per_page=12, error_out=False)
+        news_list = NewsArticle.query.filter(NewsArticle.is_selected == True, db.or_(NewsArticle.world_admin_approved == True, NewsArticle.kr_yp_admin_approved == True)).order_by(NewsArticle.like_count.desc(), NewsArticle.created_at.desc()).paginate(page=page, per_page=12, error_out=False)
         return render_template('yp_news.html', news_list=_get_news_with_recs(news_list), title="양평 소식")
 
     @app.route('/kr-yp-news')
@@ -970,6 +1000,7 @@ def register_routes(app):
         page = request.args.get('page', 1, type=int)
         news_list = NewsArticle.query.filter(
             NewsArticle.is_selected == True,
+            NewsArticle.kr_yp_admin_approved == True,
             NewsArticle.category.in_(['대한민국뉴스', '양평소식', '정책정보', '지역소식'])
         ).order_by(NewsArticle.like_count.desc(), NewsArticle.created_at.desc()).paginate(page=page, per_page=12, error_out=False)
         return render_template('kr_yp_news.html', news_list=_get_news_with_recs(news_list), title="대한민국과양평")
@@ -1109,7 +1140,8 @@ def register_routes(app):
                 db.or_(ShareReport.title.ilike(f'%{q}%'), ShareReport.description.ilike(f'%{q}%'))
             ).order_by(ShareReport.created_at.desc()).limit(20).all()
             results['news'] = NewsArticle.query.filter(
-                db.or_(NewsArticle.title.ilike(f'%{q}%'), NewsArticle.summary.ilike(f'%{q}%'))
+                db.or_(NewsArticle.title.ilike(f'%{q}%'), NewsArticle.summary.ilike(f'%{q}%')),
+                db.or_(NewsArticle.world_admin_approved == True, NewsArticle.kr_yp_admin_approved == True)
             ).order_by(NewsArticle.created_at.desc()).limit(20).all()
         return render_template('search.html', q=q, results=results)
 
