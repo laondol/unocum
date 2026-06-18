@@ -6,7 +6,7 @@ from sqlalchemy import or_
 from urllib.parse import quote
 import json, base64, os, threading, requests
 
-from models import db, User, Post, Comment, NewsArticle, NewsComment, NewsRecommendation, NewsVote, PointHistory, ShareReport, Message, ShareComment, ConstructionNotice, LegalPost, LegalAppointment, LawyerSchedule, GoogleCalendarConfig, PsychoPost, PsychoAppointment, PsychoDoctorSchedule, PsychoGoogleCalendarConfig, RampApplication, Friend, FriendGroup, PostVote
+from models import db, User, Post, Comment, NewsArticle, NewsComment, NewsRecommendation, NewsVote, PointHistory, ShareReport, Message, ShareComment, ConstructionNotice, VillageAlert, LegalPost, LegalAppointment, LawyerSchedule, GoogleCalendarConfig, PsychoPost, PsychoAppointment, PsychoDoctorSchedule, PsychoGoogleCalendarConfig, RampApplication, Friend, FriendGroup, PostVote
 from services.oauth import oauth
 from services.security import save_village_file
 from services.ai_service import call_ai_judge, call_ai_debate, background_ai_judge, moderate_image, background_process_share
@@ -1984,10 +1984,11 @@ def register_routes(app):
     @app.route('/construction')
     def construction():
         notices = ConstructionNotice.query.filter_by(is_active=True).order_by(ConstructionNotice.created_at.desc()).all()
+        alerts = VillageAlert.query.filter_by(is_active=True).order_by(VillageAlert.created_at.desc()).limit(20).all()
         from config import Config
         dg_key = getattr(Config, 'DATA_GO_KR_API_KEY', '')
         gg_key = getattr(Config, 'GG_TRAFFIC_API_KEY', '')
-        return render_template('construction.html', notices=notices, api_key_configured=bool(dg_key), traffic_key_configured=bool(gg_key))
+        return render_template('construction.html', notices=notices, alerts=alerts, api_key_configured=bool(dg_key), traffic_key_configured=bool(gg_key))
 
     @app.route('/construction/heritage')
     def construction_heritage():
@@ -2146,6 +2147,117 @@ def register_routes(app):
             } for s in stores],
         }
         return jsonify(result)
+
+    @app.route('/construction/local-scenery')
+    def construction_local_scenery():
+        uid = session.get('user_id')
+        if not uid:
+            return jsonify({"error": "로그인이 필요합니다."}), 401
+        user = User.query.get(uid)
+        if not user or not user.curr_town or not user.curr_village:
+            return jsonify({"error": "등록된 주소(리)가 없습니다."}), 400
+        now = datetime.now()
+        cur_month = now.month
+        season_months = {1,2,12} if cur_month in (1,2,12) else {3,4,5} if cur_month in (3,4,5) else {6,7,8} if cur_month in (6,7,8) else {9,10,11}
+        season_name = '겨울' if cur_month in (1,2,12) else '봄' if cur_month in (3,4,5) else '여름' if cur_month in (6,7,8) else '가을'
+        all_approved = ShareReport.query.filter_by(
+            town=user.curr_town,
+            village=user.curr_village,
+            status='approved'
+        ).order_by(ShareReport.created_at.desc()).all()
+        scenery = []
+        for s in all_approved:
+            if not s.image_path:
+                continue
+            if s.created_at and s.created_at.month in season_months and s.id:
+                # 같은 게시물이 scenery와 stores에 모두 나오는 것 방지: 
+                # ai_category가 'store'/'가게'면 건너뛰기
+                cat = (s.ai_category or '').lower()
+                if cat in ('store','가게','상점','마트','음식점','식당','카페'):
+                    continue
+                scenery.append(s)
+        return jsonify({
+            "town": user.curr_town,
+            "village": user.curr_village,
+            "season": season_name,
+            "sceneries": [{
+                "id": s.id,
+                "title": s.title or "제목없음",
+                "image_path": s.image_path,
+                "description": (s.description or "")[:100],
+                "created_at": s.created_at.strftime("%Y-%m-%d") if s.created_at else "",
+            } for s in scenery[:30]],
+        })
+
+    @app.route('/admin/alerts')
+    def admin_alerts():
+        if session.get('role') not in ('admin', 'leader', 'village_leader'):
+            return "권한 없음", 403
+        role = session.get('role')
+        user_town = session.get('town', '')
+        user_village = session.get('village', '')
+        if role == 'admin':
+            alerts = VillageAlert.query.order_by(VillageAlert.created_at.desc()).all()
+        elif role == 'leader':
+            alerts = VillageAlert.query.filter_by(town=user_town).order_by(VillageAlert.created_at.desc()).all()
+        else:
+            alerts = VillageAlert.query.filter_by(town=user_town, village=user_village).order_by(VillageAlert.created_at.desc()).all()
+        return render_template('admin_alerts.html', alerts=alerts, role=role, town=user_town, village=user_village)
+
+    @app.route('/admin/alerts/new', methods=['GET', 'POST'])
+    def admin_alerts_new():
+        if session.get('role') not in ('admin', 'leader', 'village_leader'):
+            return "권한 없음", 403
+        if request.method == 'POST':
+            title = request.form.get('title', '').strip()
+            content = request.form.get('content', '').strip()
+            alert_type = request.form.get('alert_type', 'general')
+            urgency = request.form.get('urgency', 'normal')
+            town = request.form.get('town', '').strip()
+            village = request.form.get('village', '').strip()
+            if not title:
+                return "<script>alert('제목을 입력하세요.'); history.back();</script>"
+            alert = VillageAlert(
+                title=title, content=content, alert_type=alert_type, urgency=urgency,
+                town=town, village=village,
+                author_id=session.get('user_id'),
+                author_name=session.get('username', '')
+            )
+            db.session.add(alert)
+            db.session.commit()
+            return redirect('/admin/alerts')
+        user_town = session.get('town', '')
+        user_village = session.get('village', '')
+        towns = db.session.query(VillageAlert.town).distinct().all() if session.get('role') == 'admin' else [(user_town,)]
+        return render_template('admin_alerts_new.html', town=user_town, village=user_village, role=session.get('role'), towns=[t[0] for t in towns if t[0]])
+
+    @app.route('/admin/alerts/edit/<int:alert_id>', methods=['GET', 'POST'])
+    def admin_alerts_edit(alert_id):
+        if session.get('role') not in ('admin', 'leader', 'village_leader'):
+            return "권한 없음", 403
+        alert = VillageAlert.query.get_or_404(alert_id)
+        if request.method == 'POST':
+            alert.title = request.form.get('title', '').strip()
+            alert.content = request.form.get('content', '').strip()
+            alert.alert_type = request.form.get('alert_type', 'general')
+            alert.urgency = request.form.get('urgency', 'normal')
+            alert.is_active = request.form.get('is_active') == '1'
+            if session.get('role') == 'admin':
+                alert.town = request.form.get('town', '').strip()
+                alert.village = request.form.get('village', '').strip()
+            alert.updated_at = datetime.now()
+            db.session.commit()
+            return redirect('/admin/alerts')
+        return render_template('admin_alerts_edit.html', alert=alert, role=session.get('role'))
+
+    @app.route('/admin/alerts/delete/<int:alert_id>', methods=['POST'])
+    def admin_alerts_delete(alert_id):
+        if session.get('role') not in ('admin', 'leader', 'village_leader'):
+            return "권한 없음", 403
+        alert = VillageAlert.query.get_or_404(alert_id)
+        db.session.delete(alert)
+        db.session.commit()
+        return redirect('/admin/alerts')
 
     @app.route('/api/user/location')
     def api_user_location():

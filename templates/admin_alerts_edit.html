@@ -1,0 +1,61 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container mt-4" style="max-width: 600px;">
+    <a href="/admin/alerts" class="btn btn-sm btn-outline-secondary mb-3">← 알림 목록으로</a>
+    <h3 class="fw-bold mb-4">✏️ 알림 수정</h3>
+
+    <form method="POST">
+        <div class="mb-3">
+            <label class="form-label">제목 <span class="text-danger">*</span></label>
+            <input type="text" name="title" class="form-control" required value="{{ alert.title }}">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">내용</label>
+            <textarea name="content" class="form-control" rows="5">{{ alert.content or '' }}</textarea>
+        </div>
+        <div class="row mb-3">
+            <div class="col-4">
+                <label class="form-label">알림 유형</label>
+                <select name="alert_type" class="form-select">
+                    {% for t in [('general','일반'),('missing','실종'),('disaster','재난'),('safety','안전'),('traffic','교통')] %}
+                    <option value="{{ t[0] }}" {% if alert.alert_type == t[0] %}selected{% endif %}>{{ t[1] }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-4">
+                <label class="form-label">긴급도</label>
+                <select name="urgency" class="form-select">
+                    {% for u in [('normal','일반'),('important','중요'),('urgent','긴급')] %}
+                    <option value="{{ u[0] }}" {% if alert.urgency == u[0] %}selected{% endif %}>{{ u[1] }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-4">
+                <label class="form-label">상태</label>
+                <select name="is_active" class="form-select">
+                    <option value="1" {% if alert.is_active %}selected{% endif %}>활성</option>
+                    <option value="0" {% if not alert.is_active %}selected{% endif %}>비활성</option>
+                </select>
+            </div>
+        </div>
+        {% if role == 'admin' %}
+        <div class="row mb-3">
+            <div class="col-6">
+                <label class="form-label">읍/면</label>
+                <input type="text" name="town" class="form-control" value="{{ alert.town or '' }}">
+            </div>
+            <div class="col-6">
+                <label class="form-label">리</label>
+                <input type="text" name="village" class="form-control" value="{{ alert.village or '' }}">
+            </div>
+        </div>
+        {% else %}
+        <div class="mb-3 small text-muted">📍 {{ alert.town or '' }} {{ alert.village or '' }}</div>
+        {% endif %}
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary flex-grow-1">저장</button>
+            <a href="/admin/alerts" class="btn btn-outline-secondary">취소</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -287,6 +287,29 @@ def create_app():
                     '''))
                     print('[OK] construction_notice table created')
 
+            # VillageAlert 테이블 생성
+            try:
+                va_cols = [c['name'] for c in inspector.get_columns('village_alert')]
+            except:
+                with db.engine.connect() as conn:
+                    conn.execute(db.text('''
+                        CREATE TABLE village_alert (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            title VARCHAR(200) NOT NULL,
+                            content TEXT,
+                            town VARCHAR(50),
+                            village VARCHAR(50),
+                            alert_type VARCHAR(30) DEFAULT 'general',
+                            urgency VARCHAR(20) DEFAULT 'normal',
+                            author_id INTEGER REFERENCES user(id),
+                            author_name VARCHAR(50),
+                            is_active BOOLEAN DEFAULT 1,
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        )
+                    '''))
+                    print('[OK] village_alert table created')
+
             # LegalPost 테이블 생성 (fee/travel_allowance 누락 방지)
             try:
                 cols = [c['name'] for c in inspector.get_columns('legal_post')]

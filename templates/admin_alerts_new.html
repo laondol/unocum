@@ -1,0 +1,55 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container mt-4" style="max-width: 600px;">
+    <a href="/admin/alerts" class="btn btn-sm btn-outline-secondary mb-3">← 알림 목록으로</a>
+    <h3 class="fw-bold mb-4">🚨 새 알림 등록</h3>
+
+    <form method="POST">
+        <div class="mb-3">
+            <label class="form-label">제목 <span class="text-danger">*</span></label>
+            <input type="text" name="title" class="form-control" required placeholder="예: OO리 실종자 발생">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">내용</label>
+            <textarea name="content" class="form-control" rows="5" placeholder="상세 내용을 입력하세요..."></textarea>
+        </div>
+        <div class="row mb-3">
+            <div class="col-6">
+                <label class="form-label">알림 유형</label>
+                <select name="alert_type" class="form-select">
+                    <option value="general">일반</option>
+                    <option value="missing">실종</option>
+                    <option value="disaster">재난</option>
+                    <option value="safety">안전</option>
+                    <option value="traffic">교통</option>
+                </select>
+            </div>
+            <div class="col-6">
+                <label class="form-label">긴급도</label>
+                <select name="urgency" class="form-select">
+                    <option value="normal">일반</option>
+                    <option value="important">중요</option>
+                    <option value="urgent">긴급</option>
+                </select>
+            </div>
+        </div>
+        {% if role == 'admin' %}
+        <div class="row mb-3">
+            <div class="col-6">
+                <label class="form-label">읍/면</label>
+                <input type="text" name="town" class="form-control" value="{{ town }}" placeholder="예: 양평읍">
+            </div>
+            <div class="col-6">
+                <label class="form-label">리</label>
+                <input type="text" name="village" class="form-control" value="{{ village }}" placeholder="예: 양근리">
+            </div>
+        </div>
+        {% else %}
+        <input type="hidden" name="town" value="{{ town }}">
+        <input type="hidden" name="village" value="{{ village }}">
+        <div class="mb-3 small text-muted">📍 {{ town }} {{ village }}</div>
+        {% endif %}
+        <button type="submit" class="btn btn-danger w-100">🚨 알림 등록</button>
+    </form>
+</div>
+{% endblock %}
