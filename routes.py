@@ -1995,6 +1995,68 @@ def register_routes(app):
         from services.local_sources import get_nearby_heritage
         return jsonify(get_nearby_heritage(lat, lng, max_km=5))
 
+    @app.route('/construction/transit')
+    def construction_transit():
+        from_lat = request.args.get('from_lat', type=float)
+        from_lng = request.args.get('from_lng', type=float)
+        if not from_lat or not from_lng:
+            return jsonify({"error": "출발 위치가 필요합니다."}), 400
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({"error": "로그인이 필요합니다."}), 401
+        from models import User
+        user = User.query.get(user_id)
+        if not user or not user.curr_village:
+            return jsonify({"error": "등록된 주소(리)가 없습니다."}), 400
+        to_address = f"경기 양평군 {user.curr_town or ''} {user.curr_village}"
+        from config import Config
+        kakao_key = Config.KAKAO_REST_API_KEY
+        naver_id = Config.NAVER_SEARCH_CLIENT_ID or Config.NAVER_CLIENT_ID
+        naver_secret = Config.NAVER_SEARCH_CLIENT_SECRET or Config.NAVER_CLIENT_SECRET
+        dep = None
+        dest = None
+        if kakao_key:
+            from services.transit import reverse_geocode, geocode_address, get_naver_transit, estimate_transit_time_rough, haversine_km
+            dep = reverse_geocode(from_lat, from_lng, kakao_key)
+            dest = geocode_address(to_address, kakao_key)
+        result = {
+            "departure": dep or {"lat": from_lat, "lng": from_lng, "address": f"{from_lat:.5f}, {from_lng:.5f}"},
+            "destination": dest or {"lat": 0, "lng": 0, "address": to_address},
+            "distance_km": 0,
+        }
+        if dest and dest["lat"]:
+            from services.transit import haversine_km
+            result["distance_km"] = round(haversine_km(from_lat, from_lng, dest["lat"], dest["lng"]), 1)
+        if dest and dest["lat"] and naver_id and naver_secret:
+            from services.transit import get_naver_transit
+            routes = get_naver_transit(from_lat, from_lng, dest["lat"], dest["lng"], naver_id, naver_secret)
+            if routes:
+                result["transit_routes"] = routes
+        if not result.get("transit_routes"):
+            from services.transit import estimate_transit_time_rough
+            rough_min = estimate_transit_time_rough(from_lat, from_lng, (dest or {}).get("lat") or from_lat, (dest or {}).get("lng") or from_lng)
+            result["rough_estimate_min"] = rough_min
+        if dest and dest["lat"]:
+            from urllib.parse import quote
+            dep_addr = quote(dep["address"] if dep else f"{from_lat},{from_lng}")
+            dest_addr = quote(dest["address"])
+            result["deep_links"] = {
+                "kakao": f"https://map.kakao.com/?sX={from_lng}&sY={from_lat}&sName={dep_addr}&eX={dest['lng']}&eY={dest['lat']}&eName={dest_addr}",
+                "naver": f"https://map.naver.com/index.nhn?slat={from_lat}&slng={from_lng}&stitle={dep_addr}&elat={dest['lat']}&elng={dest['lng']}&etitle={dest_addr}&pathType=1"
+            }
+        return jsonify(result)
+
+    @app.route('/api/user/location')
+    def api_user_location():
+        uid = session.get('user_id')
+        if not uid:
+            return jsonify({"error": "login"}), 401
+        from models import User
+        user = User.query.get(uid)
+        if not user:
+            return jsonify({"error": "not_found"}), 404
+        return jsonify({"town": user.curr_town or "", "village": user.curr_village or ""})
+
     @app.route('/construction/refresh')
     def construction_refresh():
         if session.get('role') not in ('admin', 'leader'):
