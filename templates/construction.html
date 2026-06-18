@@ -198,9 +198,9 @@ function renderTransit(data, loc) {
 
     if (suggestData && suggestData.already_home) {
         html += '<div class="card border-0 shadow-sm mb-3 border-start border-4 border-success" style="border-radius:16px;">';
-        html += '<div class="card-body p-3">';
-        html += '<h6 class="fw-bold text-success mb-2" style="font-size:0.9rem;">🏠 현재 위치 = 등록 주소</h6>';
-        html += '<div class="small text-muted">' + (suggestData.message || '현재 등록된 주소와 동일한 위치입니다. 막차 안내가 필요하지 않습니다.') + '</div>';
+        html += '<div class="card-body p-3 text-center">';
+        html += '<h6 class="fw-bold text-success mb-2" style="font-size:0.9rem;">🚶 귀가를 위해 지켜야 하는 출발시간</h6>';
+        html += '<p class="fw-bold text-success mb-0" style="font-size:1.2rem;">걸어간다면 언제든 가능</p>';
         html += '</div></div>';
     } else if (suggestData && suggestData.optimal_departure) {
         const sd = suggestData;
@@ -213,9 +213,9 @@ function renderTransit(data, loc) {
 
         html += '<div class="card border-0 shadow-sm mb-3 border-start border-4 border-danger" style="border-radius:16px;">';
         html += '<div class="card-body p-3">';
-        html += '<h6 class="fw-bold text-danger mb-2" style="font-size:0.9rem;">🚇 막차 환승 제안</h6>';
+        html += '<h6 class="fw-bold text-danger mb-2" style="font-size:0.9rem;">🚇 귀가를 위해 지켜야 하는 출발시간</h6>';
         html += '<div class="small">';
-        html += '<div class="d-flex align-items-center gap-2 mb-1"><span class="badge bg-danger" style="font-size:0.65rem;">막차</span>';
+        html += '<div class="d-flex align-items-center gap-2 mb-1"><span class="badge bg-danger" style="font-size:0.65rem;">환승역</span>';
         html += '<strong>' + sd.transfer_station + '</strong> <span class="text-muted">(' + sd.line + ')</span></div>';
         html += '<div class="mb-1">🕐 <strong>막차 출발:</strong> ' + sd.last_transit_from_station + ' (' + sd.direction + ')</div>';
         if (sd.home_distance_km) {
@@ -224,7 +224,10 @@ function renderTransit(data, loc) {
         html += '<div class="mb-1">🚶 <strong>내 위치→역:</strong> 약 ' + sd.time_to_station_min + '분 소요예상</div>';
         html += '<div class="mb-1">⏱️ <strong>역 도착 희망:</strong> 막차 ' + sd.buffer_min + '분 전 (' + (lh) + ':' + String(lm - sd.buffer_min).padStart(2,'0') + ')</div>';
         html += '<hr class="my-2">';
-        html += '<div class="fw-bold text-danger" style="font-size:1.1rem;">⏰ <strong>최적 출발 시간: ' + sd.optimal_departure + '</strong></div>';
+        html += '<div class="text-center py-2 bg-danger bg-opacity-10 rounded mb-2">';
+        html += '<div class="fw-bold text-danger" style="font-size:1.3rem;">⏰ ' + sd.optimal_departure + '</div>';
+        html += '<small class="text-muted">이 시간까지 출발하면 막차를 탈 수 있습니다</small>';
+        html += '</div>';
         if (nowMin > lastMin) {
             html += '<div class="alert alert-warning py-1 mt-1 small">⚠️ 이미 막차 시간이 지났습니다. 택시 이용을 고려하세요.</div>';
         } else if (nowMin > optMin) {
