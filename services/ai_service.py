@@ -5,6 +5,49 @@ from models import db, Post, User, ShareReport
 from services.naver_news import get_news_for_share
 from services.geocode import gps_to_town_village
 
+HAAR_FACE = None
+def _get_face_cascade():
+    global HAAR_FACE
+    if HAAR_FACE is None:
+        try:
+            import cv2
+            path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+            if os.path.exists(path):
+                HAAR_FACE = cv2.CascadeClassifier(path)
+        except: pass
+    return HAAR_FACE
+
+def mosaic_image_faces(image_path):
+    try:
+        import cv2
+        from PIL import Image as PILImage
+    except:
+        return None
+    cascade = _get_face_cascade()
+    if cascade is None:
+        return None
+    img = cv2.imread(image_path)
+    if img is None:
+        return None
+    h, w = img.shape[:2]
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    faces = cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+    if len(faces) == 0:
+        return None
+    for (x, y, fw, fh) in faces:
+        x = max(0, x - int(fw * 0.2))
+        y = max(0, y - int(fh * 0.2))
+        fw = min(w - x, int(fw * 1.4))
+        fh = min(h - y, int(fh * 1.4))
+        face_roi = img[y:y+fh, x:x+fw]
+        small = cv2.resize(face_roi, (max(8, fw // 12), max(8, fh // 12)), interpolation=cv2.INTER_LINEAR)
+        mosaic = cv2.resize(small, (fw, fh), interpolation=cv2.INTER_NEAREST)
+        img[y:y+fh, x:x+fw] = mosaic
+    base, ext = os.path.splitext(image_path)
+    mosaic_path = f"{base}_mosaic{ext}"
+    cv2.imwrite(mosaic_path, img, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
+    return mosaic_path
+
 GROQ_MODEL = "llama-3.3-70b-versatile"
 GROQ_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 

@@ -85,6 +85,16 @@
     </div>
     {% endif %}
 
+    <!-- AI 모자이크 (작성자/관리자 전용) -->
+    {% if report.image_path and not report.video_path and (session.get('user_id') == report.user_id or session.get('role') in ('admin','leader')) %}
+    <div class="text-center mb-3">
+        <button onclick="mosaicShare({{ report.id }})" class="btn btn-sm btn-warning">
+            🎭 AI 모자이크 처리
+        </button>
+        <small class="d-block text-muted mt-1">얼굴/번호판을 자동으로 모자이크합니다</small>
+    </div>
+    {% endif %}
+
     <!-- 좋아요/나빠요 -->
     <div class="d-flex gap-2 justify-content-center mb-4">
         <button onclick="voteShare({{ report.id }}, 'like')" class="btn btn-outline-success btn-lg px-4">👍 좋아요 {{ report.like_count }}</button>
@@ -164,6 +174,16 @@ document.addEventListener('DOMContentLoaded', function() {
     L.marker([{{ report.latitude }}, {{ report.longitude }}]).addTo(map).bindPopup('{{ report.title or "공유 위치" }}');
     {% endif %}
 });
+
+function mosaicShare(id) {
+    if (!confirm('AI 모자이크를 적용하시겠습니까?\n얼굴 영역이 자동으로 모자이크 처리됩니다.')) return;
+    const btn = event.target.closest('button');
+    btn.disabled = true; btn.innerHTML = '⏳ 처리 중...';
+    fetch('/share-report/mosaic/' + id, {method:'POST'})
+    .then(r=>r.json()).then(d=>{ if(d.status==='success') location.reload(); else alert(d.msg||'오류'); })
+    .catch(e=>alert('오류: '+e))
+    .finally(()=>{ btn.disabled = false; btn.innerHTML = '🎭 AI 모자이크 처리'; });
+}
 
 function voteShare(id, type) {
     if (!confirm(type === 'like' ? '좋아요 하시겠습니까?' : '나빠요 하시겠습니까?')) return;

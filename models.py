@@ -43,6 +43,7 @@ class User(db.Model):
     login_village = db.Column(db.String(50))             # 마지막 로그인 리
     login_location_share = db.Column(db.Boolean, default=False) # 벗에게 로그인 위치 공유 동의
     location_share = db.Column(db.Boolean, default=False) # 위치 공유 동의
+    is_neighbor = db.Column(db.Boolean, default=False)  # 이웃주민 (집에서 위치인증 완료)
 
     # SNS 연동 로그인
     social_id = db.Column(db.String(200), unique=True, nullable=True)

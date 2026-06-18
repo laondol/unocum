@@ -1739,6 +1739,36 @@ def register_routes(app):
         db.session.commit()
         return "<script>alert('✅ 책임 동의가 완료되었습니다. 공유글이 게시되었습니다.'); location.href='/share/detail/"+str(report_id)+"';</script>"
 
+    @app.route('/share-report/mosaic/<int:report_id>', methods=['POST'])
+    def share_mosaic(report_id):
+        uid = session.get('user_id')
+        if not uid: return jsonify({'status':'error','msg':'로그인 필요'}), 401
+        report = ShareReport.query.get_or_404(report_id)
+        role = session.get('role', '')
+        if report.user_id != uid and role not in ('admin', 'leader'):
+            return jsonify({'status':'error','msg':'권한 없음'}), 403
+        from services.ai_service import mosaic_image_faces
+        img_path = None
+        for attr in ['image_path', 'drawing_path']:
+            p = getattr(report, attr, None)
+            if p:
+                abs_p = os.path.join(current_app.root_path, '..', p.lstrip('/')).replace('/', os.sep)
+                if os.path.exists(abs_p):
+                    img_path = abs_p
+                    break
+        if not img_path:
+            return jsonify({'status':'error','msg':'모자이크 처리할 이미지가 없습니다.'})
+        result = mosaic_image_faces(img_path)
+        if result is None:
+            return jsonify({'status':'error','msg':'얼굴을 감지할 수 없거나 처리에 실패했습니다.'})
+        rel = os.path.relpath(result, os.path.join(current_app.root_path, '..')).replace(os.sep, '/')
+        report.image_path = '/' + rel
+        report.moderation_result = 'mosaic_applied'
+        report.moderation_reason = (report.moderation_reason or '') + ' | AI 모자이크 처리됨'
+        report.status = 'pending'
+        db.session.commit()
+        return jsonify({'status':'success','msg':'AI 모자이크 처리 완료, 재검토 대기 중입니다.'})
+
     # --- [공유 댓글] ---
     @app.route('/share/detail/<int:report_id>')
     def share_detail(report_id):

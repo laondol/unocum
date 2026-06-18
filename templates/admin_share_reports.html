@@ -127,6 +127,9 @@
                             {% elif r.status == 'rejected' %}
                             <a href="/share-report/toggle/{{ r.id }}/approve" class="btn btn-sm btn-success me-1">승인</a>
                             {% endif %}
+                            {% if r.image_path and not r.video_path %}
+                            <button onclick="mosaicShare({{ r.id }})" class="btn btn-sm btn-warning me-1" title="AI 모자이크">🎭</button>
+                            {% endif %}
                             <a href="/share/detail/{{ r.id }}" class="btn btn-sm btn-outline-primary me-1">보기</a>
                             <button onclick="adminDeleteShare({{ r.id }})" class="btn btn-sm btn-outline-danger">삭제</button>
                         </td>
@@ -153,6 +156,13 @@
 </div>
 
 <script>
+function mosaicShare(id) {
+    if (!confirm('AI 모자이크를 적용하시겠습니까?')) return;
+    fetch('/share-report/mosaic/' + id, {method:'POST'})
+    .then(r=>r.json()).then(d=>{ if(d.status==='success') { alert(d.msg); location.reload(); } else alert(d.msg||'오류'); })
+    .catch(e=>alert('오류: '+e));
+}
+
 function previewImage(el) {
     var img = el.querySelector('img');
     if (!img) return;

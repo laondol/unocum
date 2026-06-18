@@ -8,3 +8,5 @@ python-dotenv
 chromadb
 sentence-transformers
 openai
+Pillow
+opencv-python-headless
