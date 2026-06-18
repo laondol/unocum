@@ -2094,6 +2094,18 @@ def register_routes(app):
         }
         return jsonify(suggestion)
 
+    @app.route('/construction/traffic/gg')
+    def construction_traffic_gg():
+        from services.gg_traffic import traffic_summary, get_all_traffic, CONG_LABEL, CONG_COLOR
+        mode = request.args.get('mode', 'summary')
+        if mode == 'all':
+            data, err = get_all_traffic()
+            if err:
+                return jsonify({"error": err, "available": False})
+            return jsonify({"available": True, "count": len(data), "data": data[:50]})
+        summary = traffic_summary()
+        return jsonify(summary)
+
     @app.route('/api/user/location')
     def api_user_location():
         uid = session.get('user_id')
