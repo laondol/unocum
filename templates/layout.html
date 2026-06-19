@@ -229,14 +229,28 @@
                 <span id="globalFrameTitle" class="fw-bold small"></span>
                 <button class="btn btn-sm btn-outline-secondary" onclick="closeGlobalFrame()">✕ 닫기</button>
             </div>
-            <iframe id="globalIframe" style="width:100%;height:calc(100% - 40px);border:0;"></iframe>
+            <iframe id="globalIframe" style="width:100%;height:calc(100% - 40px);border:0;" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-top-navigation"></iframe>
         </div>
     </div>
     <script>
+    let _extUrl = '';
     function openExternal(url, title) {
+        _extUrl = url;
         document.getElementById('globalFrameTitle').textContent = title || '';
         document.getElementById('globalIframe').src = url;
         document.getElementById('globalFrame').style.display = '';
+        // iframe 로드 실패 시 3초 후 새 탭으로 열기
+        setTimeout(function() {
+            try {
+                if (document.getElementById('globalIframe').contentDocument && document.getElementById('globalIframe').contentDocument.body && document.getElementById('globalIframe').contentDocument.body.innerHTML.length < 50) {
+                    closeGlobalFrame();
+                    window.open(_extUrl, '_blank');
+                }
+            } catch(e) {
+                closeGlobalFrame();
+                window.open(_extUrl, '_blank');
+            }
+        }, 3000);
     }
     function closeGlobalFrame() {
         document.getElementById('globalFrame').style.display = 'none';
