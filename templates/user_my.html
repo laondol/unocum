@@ -38,6 +38,14 @@
         <small class="text-muted">다른 회원이 사용 중인 이름은 쓸 수 없습니다.</small>
     </div>
 
+    <div class="d-flex justify-content-end gap-2 mb-3">
+        <div class="btn-group btn-group-sm">
+            <button class="btn btn-{{ 'primary' if bot.tone=='friendly' else 'outline-secondary' }}" onclick="setTone('friendly')">💬 친근</button>
+            <button class="btn btn-{{ 'primary' if bot.tone=='respectful' else 'outline-secondary' }}" onclick="setTone('respectful')">🙇 존중</button>
+            <button class="btn btn-{{ 'primary' if bot.tone=='strict' else 'outline-secondary' }}" onclick="setTone('strict')">📋 엄격</button>
+        </div>
+    </div>
+
     <ul class="nav nav-tabs mb-4" id="botTabs">
         <li class="nav-item"><a class="nav-link active" href="#" data-tab="chat">💬 대화</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-tab="write">✍️ 글쓰기</a></li>
@@ -172,6 +180,10 @@ document.getElementById('draftCategory').addEventListener('change', function() {
 });
 
 function showRename() { document.getElementById('renameBox').style.display = ''; document.getElementById('newName').focus(); }
+function setTone(tone) {
+    fetch('/api/bot/tone', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tone})})
+    .then(r=>r.json()).then(d=>{ if(d.success) location.reload(); });
+}
 function renameBot() {
     const name = document.getElementById('newName').value.trim();
     if (!name) return alert('이름을 입력하세요.');

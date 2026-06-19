@@ -55,6 +55,20 @@ def bot_rename():
     db.session.commit()
     return jsonify({"success": True, "name": new_name})
 
+@tongbot_bp.route('/api/bot/tone', methods=['POST'])
+def bot_tone():
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({"error": "로그인이 필요합니다."}), 401
+    tone = request.json.get('tone', 'friendly')
+    if tone not in ('friendly','respectful','strict'):
+        return jsonify({"error": "올바른 말투를 선택하세요."})
+    bot = _get_bot(uid)
+    bot.tone = tone
+    bot.updated_at = datetime.now()
+    db.session.commit()
+    return jsonify({"success": True, "tone": tone})
+
 @tongbot_bp.route('/api/bot/chat', methods=['POST'])
 def bot_chat():
     uid = session.get('user_id')
@@ -114,10 +128,13 @@ def _ai_reply(bot, user, user_msg):
         key = getattr(Config, 'GROQ_API_KEY', '')
         if not key:
             return f"{_m['emoji']} 안녕하세요! 저는 {bot.bot_name}입니다. {lvl_name} 단계예요."
-        prompt = f"""당신은 '{bot.bot_name}'입니다. 회원 '{user.username}'님을 아들/딸처럼 돌보는 어머니 같은 AI입니다.
-성장단계: {lvl_name} (Lv.{bot.level}) | 친밀도: {bot.intimacy} | 기분: {MOTHER_MOODS.get(bot.mood,{}).get('label','')}
-당신의 태도: 자식을 사랑으로 키우는 어머니처럼 따뜻하고 격려하는 말투로 답변하세요.
-회원의 성장을 진심으로 바라고, 작은 성취도 크게 칭찬하며, 힘들 때는 위로해 주세요.
+        tone = bot.tone or 'friendly'
+        tone_guide = {'friendly':'친근하고 편안한 말투로, 반말과 이모티콘을 자유롭게 사용하세요.',
+                      'respectful':'존중하고 예의 바른 말투로, ~합니다/～요 체를 사용하세요.',
+                      'strict':'엄격하고 간결한 말투로, 핵심만 전달하며 군더더기 없이 답변하세요.'}.get(tone, '')
+        prompt = f"""당신은 '{bot.bot_name}'입니다. 회원 '{user.username}'님의 개인 AI 비서입니다.
+말투: {tone_guide}
+성장단계: {lvl_name} (Lv.{bot.level}) | 친밀도: {bot.intimacy}
 2~3문장으로 간결하게 답변하세요.
 
 회원: {user_msg}"""

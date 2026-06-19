@@ -273,6 +273,7 @@ class TongBot(db.Model):
     mood = db.Column(db.String(20), default='neutral')
     chat_count = db.Column(db.Integer, default=0)
     memory = db.Column(db.Text, default='')
+    tone = db.Column(db.String(20), default='friendly')
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now)
 
