@@ -2,6 +2,7 @@ from flask import Flask
 from config import Config, DB_MODE
 from models import db, User
 from routes import register_routes
+from tongbot_routes import tongbot_bp
 from werkzeug.security import generate_password_hash
 import sys
 import os
@@ -37,6 +38,7 @@ def create_app():
 
     # 웹 경로 등록
     register_routes(app)
+    app.register_blueprint(tongbot_bp)
     
     # DB 마이그레이션: 누락된 컬럼 자동 추가
     def migrate_news_article():
@@ -326,6 +328,29 @@ def create_app():
                         )
                     '''))
                     print('[OK] heritage_stamp table created')
+
+            # TongBot 테이블 생성
+            for tbl, sql in [
+                ('tong_bot', '''CREATE TABLE tong_bot (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER UNIQUE NOT NULL REFERENCES user(id),
+                    bot_id VARCHAR(10) UNIQUE NOT NULL, bot_name VARCHAR(30) UNIQUE NOT NULL,
+                    personality TEXT DEFAULT '', created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)'''),
+                ('tong_bot_draft', '''CREATE TABLE tong_bot_draft (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL REFERENCES user(id),
+                    title VARCHAR(200), content TEXT, category VARCHAR(50),
+                    bot_review TEXT, bot_suggestion VARCHAR(100), status VARCHAR(20) DEFAULT 'draft',
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)'''),
+                ('tong_bot_schedule', '''CREATE TABLE tong_bot_schedule (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL REFERENCES user(id),
+                    title VARCHAR(200) NOT NULL, description TEXT, event_date DATETIME NOT NULL,
+                    invited_user_ids TEXT DEFAULT '', created_at DATETIME DEFAULT CURRENT_TIMESTAMP)'''),
+            ]:
+                try:
+                    inspector.get_columns(tbl)
+                except:
+                    with db.engine.connect() as conn:
+                        conn.execute(db.text(sql))
+                        print(f'[OK] {tbl} table created')
 
             # LegalPost 테이블 생성 (fee/travel_allowance 누락 방지)
             try:

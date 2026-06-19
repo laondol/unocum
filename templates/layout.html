@@ -24,7 +24,7 @@
 </head>
 <body>
 
-    {% set page_name = {'/intro':'사업소개','/presentation':'운영계획','/terms':'회원약관','/charter':'정관','/world-news':'세계와양평','/kr-yp-news':'대한민국과양평','/main':'꿈꾸기','/all-proposals':'누구의꿈','/share-report':'공유마당','/share':'공유마당','/share/map':'지도로보기','/construction':'위치기반안내','/admin':'누구의꿈(관리)','/admin/news':'소식(관리)','/admin/share-reports':'공유마당(관리)','/admin/alerts':'알림(관리)','/service/ramp':'휠체어경사로','/service/legal':'법률상담','/service/psycho':'심리상담소','/legal/list':'법률상담','/legal/write':'상담글쓰기','/legal/schedule':'상담예약','/legal/admin':'법률상담관리','/psycho/list':'심리상담','/psycho/write':'심리글쓰기','/psycho/schedule':'심리예약','/psycho/admin':'심리상담관리','/login':'로그인','/register':'회원가입','/user':'내 프로필','/mypage/points':'닢내역'}.get(request.path.rstrip('/') or '/', '') %}
+    {% set page_name = {'/intro':'사업소개','/presentation':'운영계획','/terms':'회원약관','/charter':'정관','/world-news':'세계와양평','/kr-yp-news':'대한민국과양평','/main':'꿈꾸기','/all-proposals':'누구의꿈','/share-report':'공유마당','/share':'공유마당','/share/map':'지도로보기','/construction':'위치기반안내','/user/my':'내 통벗','/admin':'누구의꿈(관리)','/admin/news':'소식(관리)','/admin/share-reports':'공유마당(관리)','/admin/alerts':'알림(관리)','/service/ramp':'휠체어경사로','/service/legal':'법률상담','/service/psycho':'심리상담소','/legal/list':'법률상담','/legal/write':'상담글쓰기','/legal/schedule':'상담예약','/legal/admin':'법률상담관리','/psycho/list':'심리상담','/psycho/write':'심리글쓰기','/psycho/schedule':'심리예약','/psycho/admin':'심리상담관리','/login':'로그인','/register':'회원가입','/user':'내 프로필','/mypage/points':'닢내역'}.get(request.path.rstrip('/') or '/', '') %}
     <nav class="navbar navbar-expand-lg sticky-top mb-4">
         <div class="container">
             <a class="navbar-brand d-flex align-items-center" href="/intro">
@@ -118,6 +118,9 @@
                     <li class="nav-spacer"></li>
 
                     {% if session.get('username') %}
+                    <li class="nav-item me-1">
+                        <a href="/user/my" class="badge bg-warning text-dark p-2 text-decoration-none" title="내 통벗">🤖 통벗</a>
+                    </li>
                     <li class="nav-item me-1">
                         <a href="/user/{{ session.get('user_id') }}" class="badge bg-light text-dark p-2 text-decoration-none" title="내 프로필">💎 {{ session.get('username') }}님</a>
                     </li>

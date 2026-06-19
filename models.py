@@ -261,6 +261,36 @@ class HeritageStamp(db.Model):
     heritage_lng = db.Column(db.Float)
     stamped_at = db.Column(db.DateTime, default=datetime.now)
 
+class TongBot(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, unique=True)
+    bot_id = db.Column(db.String(10), unique=True, nullable=False)
+    bot_name = db.Column(db.String(30), unique=True, nullable=False)
+    personality = db.Column(db.Text, default='')
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now)
+
+class TongBotDraft(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    title = db.Column(db.String(200))
+    content = db.Column(db.Text)
+    category = db.Column(db.String(50))
+    bot_review = db.Column(db.Text)
+    bot_suggestion = db.Column(db.String(100))
+    status = db.Column(db.String(20), default='draft')
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now)
+
+class TongBotSchedule(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text)
+    event_date = db.Column(db.DateTime, nullable=False)
+    invited_user_ids = db.Column(db.Text, default='')
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
 class LegalPost(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
