@@ -1,7 +1,8 @@
 import random, string
-from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template
+from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template, current_app
 from models import db, User, TongBot, TongBotDraft, TongBotSchedule
 from datetime import datetime
+import os, uuid
 
 tongbot_bp = Blueprint('tongbot', __name__)
 
@@ -95,8 +96,14 @@ def bot_draft():
     if not uid:
         return jsonify({"error": "로그인이 필요합니다."}), 401
     if request.method == 'GET':
+        draft_id = request.args.get('id', type=int)
+        if draft_id:
+            draft = TongBotDraft.query.get(draft_id)
+            if draft and draft.user_id == uid:
+                return jsonify({"id": draft.id, "title": draft.title, "content": draft.content, "category": draft.category, "status": draft.status, "bot_review": draft.bot_review, "bot_suggestion": draft.bot_suggestion})
+            return jsonify({"error": "찾을 수 없습니다."}), 404
         drafts = TongBotDraft.query.filter_by(user_id=uid).order_by(TongBotDraft.updated_at.desc()).limit(20).all()
-        return jsonify({"drafts": [{"id": d.id, "title": d.title, "category": d.category, "status": d.status, "updated_at": d.updated_at.strftime("%m/%d %H:%M") if d.updated_at else ""} for d in drafts]})
+        return jsonify({"drafts": [{"id": d.id, "title": d.title, "category": d.category, "status": d.status, "content": d.content, "updated_at": d.updated_at.strftime("%m/%d %H:%M") if d.updated_at else ""} for d in drafts]})
     data = request.json
     draft_id = data.get('id')
     if draft_id:
@@ -173,3 +180,21 @@ def bot_schedule():
     db.session.add(s)
     db.session.commit()
     return jsonify({"success": True, "id": s.id})
+
+@tongbot_bp.route('/api/bot/upload', methods=['POST'])
+def bot_upload():
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({"error": "로그인이 필요합니다."}), 401
+    f = request.files.get('file')
+    if not f:
+        return jsonify({"error": "파일이 없습니다."})
+    ext = os.path.splitext(f.filename)[1].lower()
+    if request.form.get('type') == 'image' and ext not in ('.jpg','.jpeg','.png','.gif','.webp'):
+        return jsonify({"error": "지원하지 않는 이미지 형식입니다."})
+    fname = f"{uuid.uuid4().hex}{ext}"
+    upload_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'tongbot')
+    os.makedirs(upload_dir, exist_ok=True)
+    f.save(os.path.join(upload_dir, fname))
+    url = f"/static/uploads/tongbot/{fname}"
+    return jsonify({"url": url, "filename": fname})

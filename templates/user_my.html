@@ -11,7 +11,6 @@
             <a href="/user/{{ user.id }}" class="btn btn-sm btn-outline-secondary">내 프로필</a>
         </div>
     </div>
-
     <div id="renameBox" style="display:none;" class="mb-3">
         <div class="input-group input-group-sm">
             <input type="text" id="newName" class="form-control" placeholder="새 이름 (2~20자)" maxlength="20" value="{{ bot.bot_name }}">
@@ -22,22 +21,18 @@
     </div>
 
     <ul class="nav nav-tabs mb-4" id="botTabs">
-        <li class="nav-item"><a class="nav-link active" href="#" data-tab="chat">💬 {{ bot.bot_name }}과 대화</a></li>
+        <li class="nav-item"><a class="nav-link active" href="#" data-tab="chat">💬 대화</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-tab="write">✍️ 글쓰기</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-tab="schedule">📅 일정</a></li>
-        <li class="nav-item"><a class="nav-link" href="#" data-tab="today">🌤️ 오늘의 추천</a></li>
     </ul>
 
     <!-- 채팅 탭 -->
     <div id="tabChat">
-        <div id="chatMessages" class="mb-3" style="max-height:400px;overflow-y:auto;border:1px solid #dee2e6;border-radius:12px;padding:12px;">
-            <div class="text-center text-muted small py-3">
-                안녕하세요! 저는 <strong>{{ bot.bot_name }}</strong>입니다.<br>
-                함께사는양평에서의 활동을 도와드릴게요. 무엇이든 물어보세요.
-            </div>
+        <div id="chatMessages" class="mb-3" style="max-height:400px;overflow-y:auto;border:1px solid #dee2e6;border-radius:12px;padding:12px;background:#f8f9fa;">
+            <div class="text-center text-muted small py-3">안녕하세요! 저는 <strong>{{ bot.bot_name }}</strong>입니다.<br>함께사는양평에서의 활동을 도와드릴게요.</div>
         </div>
         <div class="input-group">
-            <input type="text" id="chatInput" class="form-control" placeholder="메시지를 입력하세요..." onkeypress="if(event.key==='Enter')sendChat()">
+            <input type="text" id="chatInput" class="form-control" placeholder="메시지..." onkeypress="if(event.key==='Enter')sendChat()">
             <button class="btn btn-primary" onclick="sendChat()">전송</button>
         </div>
     </div>
@@ -46,36 +41,58 @@
     <div id="tabWrite" style="display:none;">
         <div class="row g-3">
             <div class="col-md-8">
-                <div class="mb-3">
-                    <label class="form-label small">카테고리</label>
-                    <select id="draftCategory" class="form-select form-select-sm">
-                        <option value="">선택해 주세요</option>
+                <div class="d-flex gap-2 mb-3">
+                    <select id="draftCategory" class="form-select form-select-sm" style="width:auto;">
+                        <option value="">게시판 선택</option>
                         <option value="share">공유마당</option>
                         <option value="dream">꿈꾸기</option>
                         <option value="news">소식</option>
                         <option value="legal">법률상담</option>
                         <option value="psycho">심리상담</option>
                     </select>
+                    <span id="boardRule" class="small text-muted align-self-center"></span>
                 </div>
-                <div class="mb-3">
-                    <input type="text" id="draftTitle" class="form-control" placeholder="제목">
+                <input type="text" id="draftTitle" class="form-control mb-2" placeholder="제목">
+                <!-- 편집 툴바 -->
+                <div class="btn-group btn-group-sm mb-2" id="toolbar">
+                    <button class="btn btn-outline-secondary" onclick="execCmd('bold')" title="굵게"><b>B</b></button>
+                    <button class="btn btn-outline-secondary" onclick="execCmd('italic')" title="기울임"><i>I</i></button>
+                    <button class="btn btn-outline-secondary" onclick="execCmd('underline')" title="밑줄"><u>U</u></button>
+                    <button class="btn btn-outline-secondary" onclick="execCmd('insertUnorderedList')" title="목록">•</button>
+                    <button class="btn btn-outline-secondary" onclick="execCmd('insertOrderedList')" title="번호">1.</button>
+                    <button class="btn btn-outline-secondary" id="photoBtn" title="사진">📷</button>
+                    <button class="btn btn-outline-secondary" id="fileBtn" title="파일">📎</button>
+                    <button class="btn btn-outline-secondary" id="drawBtn" title="그리기">✏️</button>
                 </div>
-                <div class="mb-3">
-                    <textarea id="draftContent" class="form-control" rows="6" placeholder="내용을 작성하세요..."></textarea>
+                <input type="file" id="photoInput" accept="image/*" style="display:none;" onchange="insertPhoto(this)">
+                <input type="file" id="fileInput" style="display:none;" onchange="attachFile(this)">
+                <div id="editor" contenteditable="true" class="form-control mb-2" style="min-height:200px;max-height:400px;overflow-y:auto;white-space:pre-wrap;" placeholder="내용을 작성하세요..."></div>
+                <!-- 그리기 -->
+                <div id="drawPanel" style="display:none;" class="card p-2 mb-2">
+                    <canvas id="drawCanvas" width="400" height="300" style="border:1px solid #ddd;border-radius:8px;cursor:crosshair;"></canvas>
+                    <div class="d-flex gap-2 mt-2">
+                        <input type="color" id="drawColor" value="#000000">
+                        <input type="range" id="drawSize" min="1" max="10" value="3">
+                        <button class="btn btn-sm btn-outline-danger" onclick="clearDraw()">지우기</button>
+                        <button class="btn btn-sm btn-primary" onclick="insertDrawing()">삽입</button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('drawPanel').style.display='none'">닫기</button>
+                    </div>
                 </div>
+                <div id="attachedFiles" class="small mb-2"></div>
                 <div class="d-flex gap-2">
-                    <button class="btn btn-outline-secondary btn-sm" onclick="saveDraft()">💾 임시저장</button>
-                    <button class="btn btn-outline-primary btn-sm" onclick="requestReview()">🤖 {{ bot.bot_name }}교정부탁</button>
+                    <button class="btn btn-outline-secondary" onclick="saveDraft()">💾 임시저장</button>
+                    <button class="btn btn-outline-primary" onclick="requestReview()">🤖 {{ bot.bot_name }}교정부탁</button>
+                    <button class="btn btn-success" onclick="postDraftNow()">📤 게시하기</button>
                 </div>
             </div>
             <div class="col-md-4">
-                <h6 class="small text-muted">📝 임시저장 목록</h6>
+                <h6 class="small text-muted">📝 임시저장</h6>
                 <div id="draftList" class="small">
                     {% for d in drafts %}
-                    <div class="draft-item border-bottom py-1" data-id="{{ d.id }}">
-                        <strong>{{ d.title or '(제목없음)' }}</strong>
-                        <span class="badge bg-{{ 'success' if d.status=='reviewed' else 'secondary' }}">{{ d.status }}</span>
-                        <br><small class="text-muted">{{ d.updated_at.strftime('%m/%d %H:%M') if d.updated_at else '' }}</small>
+                    <div class="draft-item border rounded p-2 mb-1" style="cursor:pointer;" data-id="{{ d.id }}">
+                        <div class="fw-bold">{{ d.title or '(제목없음)' }}</div>
+                        <span class="badge bg-{{ 'success' if d.status=='reviewed' else 'secondary' }}">{{ {'draft':'임시','reviewed':'교정완료','posted':'게시됨'}.get(d.status, d.status) }}</span>
+                        <small class="text-muted">{{ d.updated_at.strftime('%m/%d %H:%M') if d.updated_at else '' }}</small>
                     </div>
                     {% endfor %}
                     {% if not drafts %}
@@ -86,20 +103,14 @@
         </div>
         <!-- 교정 결과 -->
         <div id="reviewResult" style="display:none;" class="mt-3">
-            <hr>
-            <h6>🤖 {{ bot.bot_name }}의 교정 결과</h6>
+            <hr><h6>🤖 {{ bot.bot_name }}의 교정 결과</h6>
             <div class="row g-3">
-                <div class="col-6">
-                    <small class="text-muted">✍️ 내 원본</small>
-                    <div id="originalView" class="p-2 bg-light rounded small" style="white-space:pre-wrap;"></div>
-                </div>
-                <div class="col-6">
-                    <small class="text-muted">🤖 교정 제안</small>
-                    <div id="reviewView" class="p-2 bg-warning bg-opacity-10 rounded small" style="white-space:pre-wrap;"></div>
-                </div>
+                <div class="col-6"><small class="text-muted">✍️ 내 원본</small><div id="originalView" class="p-2 bg-light rounded small" style="white-space:pre-wrap;max-height:300px;overflow-y:auto;"></div></div>
+                <div class="col-6"><small class="text-muted">🤖 교정 제안</small><div id="reviewView" class="p-2 bg-warning bg-opacity-10 rounded small" style="white-space:pre-wrap;max-height:300px;overflow-y:auto;"></div></div>
             </div>
+            <div id="reviewSuggestion" class="small text-primary mt-1"></div>
             <div class="mt-2 d-flex gap-2">
-                <button class="btn btn-sm btn-success" onclick="postDraft()">✅ 이대로 게시</button>
+                <button class="btn btn-sm btn-success" onclick="postReviewed()">✅ 교정본으로 게시</button>
                 <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('reviewResult').style.display='none'">숨기기</button>
             </div>
         </div>
@@ -107,9 +118,7 @@
 
     <!-- 일정 탭 -->
     <div id="tabSchedule" style="display:none;">
-        <div class="mb-3">
-            <button class="btn btn-sm btn-primary" onclick="showAddSchedule()">+ 새 일정</button>
-        </div>
+        <button class="btn btn-sm btn-primary mb-3" onclick="document.getElementById('addScheduleForm').style.display=''">+ 새 일정</button>
         <div id="addScheduleForm" style="display:none;" class="card p-3 mb-3">
             <input type="text" id="schedTitle" class="form-control form-control-sm mb-2" placeholder="일정 제목">
             <textarea id="schedDesc" class="form-control form-control-sm mb-2" rows="2" placeholder="설명"></textarea>
@@ -119,163 +128,161 @@
         </div>
         <div id="scheduleList">
             {% for s in schedules %}
-            <div class="card mb-2">
-                <div class="card-body p-2 small">
-                    <strong>{{ s.title }}</strong>
-                    <span class="text-muted ms-2">{{ s.event_date.strftime('%Y-%m-%d %H:%M') if s.event_date else '' }}</span>
-                    {% if s.description %}<br>{{ s.description }}{% endif %}
-                </div>
-            </div>
+            <div class="card mb-2"><div class="card-body p-2 small"><strong>{{ s.title }}</strong><span class="text-muted ms-2">{{ s.event_date.strftime('%Y-%m-%d %H:%M') if s.event_date else '' }}</span>{% if s.description %}<br>{{ s.description }}{% endif %}</div></div>
             {% endfor %}
-            {% if not schedules %}
-            <div class="text-muted text-center py-3">등록된 일정이 없습니다.</div>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- 오늘의 추천 탭 -->
-    <div id="tabToday" style="display:none;">
-        <div class="text-center py-5 text-muted">
-            <div class="fs-1 mb-3">🌤️</div>
-            <p>오늘의 추천 기능은 준비 중입니다.</p>
-            <p class="small">통벗이 양평에서의 즐거운 하루를 추천해 드릴 예정입니다.</p>
+            {% if not schedules %}<div class="text-muted text-center py-3">등록된 일정이 없습니다.</div>{% endif %}
         </div>
     </div>
 </div>
 
 <script>
-let currentDraftId = null;
+const BOARD_RULES = {'share':'사진·가게·나눔 정보를 공유합니다','dream':'마을에 바라는 제안을 올립니다','news':'마을 소식을 전합니다','legal':'법률 상담을 요청합니다','psycho':'심리 상담을 요청합니다'};
+let currentDraftId = null, drawing = false, drawCtx = null;
 
 document.querySelectorAll('#botTabs .nav-link').forEach(tab => {
     tab.addEventListener('click', function(e) {
         e.preventDefault();
         document.querySelectorAll('#botTabs .nav-link').forEach(t => t.classList.remove('active'));
         this.classList.add('active');
-        ['tabChat','tabWrite','tabSchedule','tabToday'].forEach(id => document.getElementById(id).style.display='none');
+        ['tabChat','tabWrite','tabSchedule'].forEach(id => document.getElementById(id).style.display='none');
         document.getElementById('tab' + this.dataset.tab.charAt(0).toUpperCase() + this.dataset.tab.slice(1)).style.display = '';
     });
 });
 
-function showRename() {
-    document.getElementById('renameBox').style.display = '';
-    document.getElementById('newName').focus();
-}
+document.getElementById('draftCategory').addEventListener('change', function() {
+    document.getElementById('boardRule').textContent = BOARD_RULES[this.value] || '';
+});
 
+function showRename() { document.getElementById('renameBox').style.display = ''; document.getElementById('newName').focus(); }
 function renameBot() {
     const name = document.getElementById('newName').value.trim();
     if (!name) return alert('이름을 입력하세요.');
-    fetch('/api/bot/rename', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({name: name})
-    }).then(r => r.json()).then(d => {
-        if (d.error) alert(d.error);
-        else {
-            document.getElementById('botNameDisplay').textContent = d.name;
-            document.getElementById('renameBox').style.display = 'none';
-            location.reload();
-        }
-    });
+    fetch('/api/bot/rename', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name})})
+    .then(r=>r.json()).then(d=>{ if(d.error) alert(d.error); else location.reload(); });
 }
 
 function sendChat() {
-    const input = document.getElementById('chatInput');
-    const msg = input.value.trim();
+    const input = document.getElementById('chatInput'), msg = input.value.trim();
     if (!msg) return;
     const msgs = document.getElementById('chatMessages');
-    msgs.innerHTML += '<div class="text-end mb-2"><span class="badge bg-primary">나</span> ' + msg + '</div>';
-    input.value = '';
-    msgs.innerHTML += '<div class="text-start mb-2 text-muted small">🤖 생각 중...</div>';
+    msgs.innerHTML += '<div class="text-end mb-2"><span class="badge bg-primary">나</span> '+msg+'</div>';
+    input.value = ''; msgs.innerHTML += '<div class="text-start mb-2 text-muted small">🤖 입력 중...</div>';
     msgs.scrollTop = msgs.scrollHeight;
-    fetch('/api/bot/chat', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({message: msg})
-    }).then(r => r.json()).then(d => {
-        msgs.lastElementChild.outerHTML = '<div class="text-start mb-2"><span class="badge bg-success">' + d.bot_name + '</span> ' + d.reply + '</div>';
-        msgs.scrollTop = msgs.scrollHeight;
-    }).catch(() => {
-        msgs.lastElementChild.outerHTML = '<div class="text-start mb-2 text-danger small">응답을 받지 못했습니다.</div>';
-    });
+    fetch('/api/bot/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message:msg})})
+    .then(r=>r.json()).then(d=>{ msgs.lastElementChild.outerHTML = '<div class="text-start mb-2"><span class="badge bg-success">'+d.bot_name+'</span> '+d.reply+'</div>'; msgs.scrollTop = msgs.scrollHeight; })
+    .catch(()=>{ msgs.lastElementChild.outerHTML = '<div class="text-start mb-2 text-danger small">응답 실패</div>'; });
 }
 
-function saveDraft() {
+// 편집기
+function execCmd(cmd) { document.execCommand(cmd, false, null); document.getElementById('editor').focus(); }
+
+document.getElementById('photoBtn').addEventListener('click', ()=>document.getElementById('photoInput').click());
+document.getElementById('fileBtn').addEventListener('click', ()=>document.getElementById('fileInput').click());
+document.getElementById('drawBtn').addEventListener('click', ()=>{
+    document.getElementById('drawPanel').style.display = '';
+    const canvas = document.getElementById('drawCanvas');
+    drawCtx = canvas.getContext('2d');
+    canvas.onmousedown = e => { drawing = true; drawCtx.beginPath(); drawCtx.moveTo(e.offsetX, e.offsetY); };
+    canvas.onmousemove = e => { if(!drawing) return; drawCtx.lineTo(e.offsetX, e.offsetY); drawCtx.strokeStyle = document.getElementById('drawColor').value; drawCtx.lineWidth = document.getElementById('drawSize').value; drawCtx.stroke(); };
+    canvas.onmouseup = () => drawing = false;
+});
+
+function clearDraw() { drawCtx.clearRect(0, 0, 400, 300); }
+function insertDrawing() {
+    const dataUrl = document.getElementById('drawCanvas').toDataURL();
+    const img = '<img src="'+dataUrl+'" style="max-width:100%;">';
+    document.getElementById('editor').innerHTML += img;
+    document.getElementById('drawPanel').style.display = 'none';
+}
+
+function insertPhoto(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        document.getElementById('editor').innerHTML += '<img src="'+e.target.result+'" style="max-width:300px;"> ';
+        uploadFile(file, 'image');
+    };
+    reader.readAsDataURL(file);
+}
+
+function attachFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+    document.getElementById('attachedFiles').innerHTML += '<span class="badge bg-light text-dark me-1">📎 '+file.name+'</span> ';
+    uploadFile(file, 'file');
+}
+
+function uploadFile(file, type) {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('type', type);
+    fetch('/api/bot/upload', {method:'POST', body:form})
+    .then(r=>r.json()).then(d=>{ if(d.url) window._lastUpload = d.url; });
+}
+
+async function saveDraft() {
     const data = {
         id: currentDraftId,
         title: document.getElementById('draftTitle').value,
-        content: document.getElementById('draftContent').value,
+        content: document.getElementById('editor').innerHTML,
         category: document.getElementById('draftCategory').value,
         status: 'draft'
     };
-    fetch('/api/bot/draft', {
-        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
-    }).then(r => r.json()).then(d => {
+    const r = await fetch('/api/bot/draft', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+    const d = await r.json();
+    if (d.success) { currentDraftId = d.id; alert('💾 임시저장 완료'); }
+}
+
+async function requestReview() {
+    if (!currentDraftId) { await saveDraft(); }
+    if (!currentDraftId) return alert('먼저 임시저장을 해주세요.');
+    try {
+        const r = await fetch('/api/bot/review/'+currentDraftId, {method:'POST'});
+        const d = await r.json();
         if (d.success) {
-            currentDraftId = d.id;
-            alert('저장되었습니다.');
+            document.getElementById('originalView').innerHTML = document.getElementById('editor').innerHTML;
+            document.getElementById('reviewView').innerHTML = d.review.replace(/\n/g,'<br>');
+            document.getElementById('reviewSuggestion').innerHTML = d.suggestion ? '📌 추천 게시판: <strong>'+d.suggestion+'</strong>' : '';
+            document.getElementById('reviewResult').style.display = '';
+        } else { alert(d.error || '교정 실패'); }
+    } catch(e) { alert('교정 중 오류 발생'); }
+}
+
+function postDraftNow() { postToBoard(document.getElementById('editor').innerHTML); }
+function postReviewed() { postToBoard(document.getElementById('reviewView').innerText); }
+
+function postToBoard(content) {
+    const cat = document.getElementById('draftCategory').value;
+    if (!cat) return alert('게시판을 선택해 주세요.');
+    const urls = {'share':'/share-report','dream':'/main','news':'/kr-yp-news','legal':'/legal/write','psycho':'/psycho/write'};
+    sessionStorage.setItem('draftContent', content);
+    sessionStorage.setItem('draftTitle', document.getElementById('draftTitle').value);
+    location.href = urls[cat] || '/share-report';
+}
+
+// 드래프트 클릭
+document.querySelectorAll('.draft-item').forEach(el => {
+    el.addEventListener('click', async function() {
+        const id = this.dataset.id;
+        const r = await fetch('/api/bot/draft');
+        const d = await r.json();
+        const draft = d.drafts.find(x => x.id == id);
+        if (draft) {
+            currentDraftId = draft.id;
+            document.getElementById('draftTitle').value = draft.title || '';
+            document.getElementById('editor').innerHTML = draft.content || '';
+            document.getElementById('draftCategory').value = draft.category || '';
         }
     });
-}
-
-function requestReview() {
-    if (!currentDraftId) return alert('먼저 임시저장을 해주세요.');
-    saveDraft();
-    setTimeout(() => {
-        fetch('/api/bot/review/' + currentDraftId, {method: 'POST'})
-        .then(r => r.json()).then(d => {
-            if (d.success) {
-                document.getElementById('originalView').textContent = document.getElementById('draftContent').value;
-                document.getElementById('reviewView').textContent = d.review;
-                document.getElementById('reviewResult').style.display = '';
-                if (d.suggestion) {
-                    alert('추천 게시판: ' + d.suggestion);
-                }
-            } else {
-                alert(d.error || '교정 실패');
-            }
-        });
-    }, 500);
-}
-
-function postDraft() {
-    if (!currentDraftId) return;
-    const cat = document.getElementById('draftCategory').value;
-    let url = '/share-report';
-    if (cat === 'dream') url = '/main';
-    else if (cat === 'news') url = '/kr-yp-news';
-    location.href = url;
-}
-
-function showAddSchedule() {
-    document.getElementById('addScheduleForm').style.display = '';
-}
-
-function addSchedule() {
-    const data = {
-        title: document.getElementById('schedTitle').value,
-        description: document.getElementById('schedDesc').value,
-        event_date: document.getElementById('schedDate').value
-    };
-    if (!data.title || !data.event_date) return alert('제목과 날짜를 입력하세요.');
-    fetch('/api/bot/schedule', {
-        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
-    }).then(r => r.json()).then(d => {
-        if (d.success) location.reload();
-    });
-}
-
-// 드래프트 클릭해서 불러오기
-document.querySelectorAll('.draft-item').forEach(el => {
-    el.addEventListener('click', function() {
-        const id = this.dataset.id;
-        fetch('/api/bot/draft', {headers: {'Accept': 'application/json'}})
-        .then(r => r.json()).then(d => {
-            const draft = d.drafts.find(x => x.id == id);
-            if (draft) {
-                currentDraftId = draft.id;
-                // 기본값으로 설정 (실제 내용은 서버에서 가져와야 함)
-                alert('임시저장 #' + draft.id + ' 선택됨');
-            }
-        });
-    });
 });
+
+function showAddSchedule() { document.getElementById('addScheduleForm').style.display = ''; }
+function addSchedule() {
+    const data = {title: document.getElementById('schedTitle').value, description: document.getElementById('schedDesc').value, event_date: document.getElementById('schedDate').value};
+    if (!data.title || !data.event_date) return alert('제목과 날짜를 입력하세요.');
+    fetch('/api/bot/schedule', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
+    .then(r=>r.json()).then(d=>{ if(d.success) location.reload(); });
+}
 </script>
 {% endblock %}
