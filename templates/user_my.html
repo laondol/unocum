@@ -27,7 +27,7 @@
         </div>
     </div>
     <div class="progress mb-3" style="height:6px;">
-        <div class="progress-bar bg-warning" style="width:{{ ((bot.exp or 0) % 100) }}%"></div>
+        <div class="progress-bar bg-warning" style="width:{{ ((bot.exp|int or 0) % 100) }}%"></div>
     </div>
     <div id="renameBox" style="display:none;" class="mb-3">
         <div class="input-group input-group-sm">

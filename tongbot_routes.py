@@ -81,7 +81,7 @@ def bot_chat():
     user = User.query.get(uid)
     reply = _ai_reply(bot, user, msg)
     talent = None
-    if bot.chat_count % 10 == 0 and bot.chat_count > 0:
+    if int(bot.chat_count or 0) % 10 == 0 and int(bot.chat_count or 0) > 0:
         talent = _discover_talent(bot, user)
     counselor = _detect_counselor_need(msg)
     counselor_msg = None
@@ -106,11 +106,11 @@ MOTHER_MOODS = {
 
 def _ai_reply(bot, user, user_msg):
     import random
-    bot.chat_count = (bot.chat_count or 0) + 1
-    bot.exp = (bot.exp or 0) + random.randint(5, 15)
-    bot.intimacy = (bot.intimacy or 0) + random.randint(1, 3)
-    new_level = min(7, 1 + (bot.exp or 0) // 100)
-    if new_level > (bot.level or 1):
+    bot.chat_count = int(bot.chat_count or 0) + 1
+    bot.exp = int(bot.exp or 0) + random.randint(5, 15)
+    bot.intimacy = int(bot.intimacy or 0) + random.randint(1, 3)
+    new_level = min(7, 1 + int(bot.exp or 0) // 100)
+    if new_level > int(bot.level or 1):
         bot.level = new_level
     msg_lower = user_msg.lower()
     if any(w in msg_lower for w in ['힘들','지쳤','우울','슬프','속상','화나']):
@@ -125,7 +125,7 @@ def _ai_reply(bot, user, user_msg):
         bot.mood = random.choice(['warm','caring','blessing','encourage'])
     _m = MOTHER_MOODS.get(bot.mood, MOTHER_MOODS['warm'])
     mood_prefix = f"{_m['emoji']} ({_m['label']}) "
-    if bot.chat_count > 0:
+    if int(bot.chat_count or 0) > 0:
         bot.memory = (bot.memory or '')[-800:] + f'\n회원: {user_msg[:100]}'
     db.session.commit()
     lvl_name = LEVEL_NAMES.get(bot.level, '')
