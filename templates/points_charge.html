@@ -6,15 +6,15 @@
     <p class="text-muted small mb-4">현재 보유: <strong class="text-success">{{ user.points }}</strong> 닢</p>
 
     <div class="row g-2 mb-4">
-        {% for amt, nip, label, color in [
-            (1000, 1000, '기본', 'outline-primary'),
-            (3000, 3200, '+200 보너스', 'outline-success'),
-            (5000, 5500, '+500 보너스', 'outline-info'),
-            (10000, 12000, '+2,000 보너스!', 'outline-warning'),
+        {% for amt, label, color in [
+            (1000, '', 'outline-primary'),
+            (3000, '', 'outline-success'),
+            (5000, '', 'outline-info'),
+            (10000, '', 'outline-warning'),
         ] %}
         <div class="col-6">
-            <button class="btn btn-{{ color }} w-100 py-3" onclick="selectAmount({{ amt }}, '{{ nip }}')">
-                <div class="fs-5 fw-bold">{{ nip }}</div>
+            <button class="btn btn-{{ color }} w-100 py-3" onclick="selectAmount({{ amt }})">
+                <div class="fs-5 fw-bold">{{ amt }}</div>
                 <small>{{ label }}</small>
             </button>
         </div>
@@ -78,10 +78,10 @@ document.getElementById('nipAmount').addEventListener('input', function() {
     document.getElementById('priceDisplay').textContent = '결제금액: ' + selectedNip.toLocaleString() + '원';
 });
 
-function selectAmount(nip, label) {
+function selectAmount(nip) {
     document.getElementById('nipAmount').value = nip;
     selectedNip = nip;
-    document.getElementById('priceDisplay').textContent = '결제금액: ' + nip.toLocaleString() + '원 (' + label + ')';
+    document.getElementById('priceDisplay').textContent = '결제금액: ' + nip.toLocaleString() + '원';
 }
 
 function selectMethod(btn) {
