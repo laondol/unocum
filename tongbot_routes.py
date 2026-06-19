@@ -34,6 +34,9 @@ def my_page():
         from models import HeritageStamp
         stamps_count = HeritageStamp.query.filter_by(user_id=user.id).count()
     except: pass
+    popup = request.args.get('popup') == '1'
+    if popup:
+        return render_template('user_my_popup.html', user=user, bot=bot, drafts=drafts, schedules=schedules, stamps_count=stamps_count)
     return render_template('user_my.html', user=user, bot=bot, drafts=drafts, schedules=schedules, stamps_count=stamps_count)
 
 @tongbot_bp.route('/api/bot/rename', methods=['POST'])
