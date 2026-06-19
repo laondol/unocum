@@ -1360,6 +1360,7 @@ def register_routes(app):
             ).first()
             is_friend = bool(f)
         
+        is_own = (session.get('user_id') == user.id)
         bot_name = ''
         if is_own:
             bot = TongBot.query.filter_by(user_id=uid).first()
