@@ -554,6 +554,11 @@ function loadLocalStores() {
 }
 
 // 첫 로딩 시 국가유산 탭 활성화
+const emptyEl = document.getElementById('emptyNotices');
+if (emptyEl) emptyEl.style.display = 'none';
+const alertList = document.getElementById('alertList');
+if (alertList) alertList.style.display = 'none';
+document.querySelectorAll('.notice-item').forEach(item => item.style.display = 'none');
 loadHeritage();
 
 document.addEventListener('click', function(e) {
