@@ -30,6 +30,18 @@
             <a class="navbar-brand d-flex align-items-center" href="/intro">
                 <img src="/static/images/logo.png" alt="양평" height="36" class="me-2">
                 <span class="fw-bold text-success" style="font-size: 1.2rem;">함께사는양평</span>
+                <div class="d-inline-block ms-2 position-relative" id="navQuick">
+                    <button class="btn btn-sm btn-outline-secondary px-2 py-0" style="font-size:0.7rem;" onclick="document.getElementById('quickMenu').classList.toggle('d-none')" onmouseenter="document.getElementById('quickMenu').classList.remove('d-none')">nav ▾</button>
+                    <div class="position-absolute bg-white border rounded shadow-sm p-2 d-none" id="quickMenu" style="z-index:1000;min-width:140px;top:100%;left:0;" onmouseleave="this.classList.add('d-none')">
+                        <a class="d-block small py-1 px-2 text-dark text-decoration-none rounded" href="/kr-yp-news">📰 소식</a>
+                        <a class="d-block small py-1 px-2 text-dark text-decoration-none rounded" href="/construction">📍 위치기반안내</a>
+                        <a class="d-block small py-1 px-2 text-dark text-decoration-none rounded" href="#" onclick="document.getElementById('quickMenu').classList.add('d-none'); if(document.querySelector('#infoTabs .nav-link[data-type=heritage]')){document.querySelector('#infoTabs .nav-link[data-type=heritage]').click()}else{location.href='/construction'}">🏛️ 국가유산</a>
+                        {% if page_name %}
+                        <div class="border-top my-1"></div>
+                        <span class="d-block small py-1 px-2 text-muted">📍 {{ page_name }}</span>
+                        {% endif %}
+                    </div>
+                </div>
                 {% if page_name %}
                 <span class="text-muted mx-2" style="font-size: 0.9rem; opacity: 0.5;">|</span>
                 <span class="text-secondary" style="font-size: 0.85rem; font-weight: 400;">{{ page_name }}</span>
