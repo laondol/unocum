@@ -1362,20 +1362,32 @@ def register_routes(app):
         
         is_own = (session.get('user_id') == user.id)
         bot_name = ''
+        posts = []
         if is_own:
             bot = TongBot.query.filter_by(user_id=uid).first()
             if bot:
                 bot_name = bot.bot_name
             else:
                 bot_name = 'A-' + ''.join([c for c in str(uid)])[:4]
+        # 게시글 모음
+        from models import Post, ShareReport
+        own_posts = Post.query.filter_by(user_id=user.id).order_by(Post.created_at.desc()).limit(10).all()
+        for p in own_posts:
+            posts.append({"type": "제안", "title": p.title, "url": f"/post/{p.id}", "date": p.created_at.strftime("%m/%d") if p.created_at else ""})
+        own_shares = ShareReport.query.filter_by(user_id=user.id).order_by(ShareReport.created_at.desc()).limit(10).all()
+        for s in own_shares:
+            posts.append({"type": "공유", "title": s.title or "제목없음", "url": f"/share/detail/{s.id}", "date": s.created_at.strftime("%m/%d") if s.created_at else ""})
+        posts.sort(key=lambda x: x["date"], reverse=True)
+        posts = posts[:15]
         
         return render_template('user_profile.html', 
             profile_user=user, 
             point_history=point_history, 
             messages=messages,
-            is_own=(session.get('user_id') == user.id),
+            is_own=is_own,
             is_friend=is_friend,
-            bot_name=bot_name
+            bot_name=bot_name,
+            posts=posts
         )
 
     @app.route('/user/location/refresh', methods=['POST'])
