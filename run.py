@@ -310,6 +310,23 @@ def create_app():
                     '''))
                     print('[OK] village_alert table created')
 
+            # HeritageStamp 테이블 생성
+            try:
+                hs_cols = [c['name'] for c in inspector.get_columns('heritage_stamp')]
+            except:
+                with db.engine.connect() as conn:
+                    conn.execute(db.text('''
+                        CREATE TABLE heritage_stamp (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            user_id INTEGER NOT NULL REFERENCES user(id),
+                            heritage_name VARCHAR(200) NOT NULL,
+                            heritage_lat REAL,
+                            heritage_lng REAL,
+                            stamped_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        )
+                    '''))
+                    print('[OK] heritage_stamp table created')
+
             # LegalPost 테이블 생성 (fee/travel_allowance 누락 방지)
             try:
                 cols = [c['name'] for c in inspector.get_columns('legal_post')]

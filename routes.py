@@ -6,7 +6,7 @@ from sqlalchemy import or_
 from urllib.parse import quote
 import json, base64, os, threading, requests
 
-from models import db, User, Post, Comment, NewsArticle, NewsComment, NewsRecommendation, NewsVote, PointHistory, ShareReport, Message, ShareComment, ConstructionNotice, VillageAlert, LegalPost, LegalAppointment, LawyerSchedule, GoogleCalendarConfig, PsychoPost, PsychoAppointment, PsychoDoctorSchedule, PsychoGoogleCalendarConfig, RampApplication, Friend, FriendGroup, PostVote
+from models import db, User, Post, Comment, NewsArticle, NewsComment, NewsRecommendation, NewsVote, PointHistory, ShareReport, Message, ShareComment, ConstructionNotice, VillageAlert, HeritageStamp, LegalPost, LegalAppointment, LawyerSchedule, GoogleCalendarConfig, PsychoPost, PsychoAppointment, PsychoDoctorSchedule, PsychoGoogleCalendarConfig, RampApplication, Friend, FriendGroup, PostVote
 from services.oauth import oauth
 from services.security import save_village_file
 from services.ai_service import call_ai_judge, call_ai_debate, background_ai_judge, moderate_image, background_process_share
@@ -2002,6 +2002,7 @@ def register_routes(app):
         uid = session.get('user_id')
         home_lat = home_lng = None
         home_label = ''
+        stamped_names = set()
         if uid:
             user = User.query.get(uid)
             if user and user.curr_town and user.curr_village:
@@ -2009,17 +2010,43 @@ def register_routes(app):
                 hc = lookup_village_coords(user.curr_town, user.curr_village)
                 if hc:
                     home_lat, home_lng = hc
-                    home_label = f'{user.curr_town} {user.curr_village}'
+            stamps = HeritageStamp.query.filter_by(user_id=uid).all()
+            stamped_names = {s.heritage_name for s in stamps}
         for h in items:
+            h['stamped'] = h['name'] in stamped_names
             if home_lat and home_lng:
                 d_home = round(haversine_km(h['lat'], h['lng'], home_lat, home_lng), 1)
                 h['dist_from_home'] = d_home
                 h['near_home'] = d_home <= 5
             else:
                 h['near_home'] = False
-            h['link_type'] = 'content' if h.get('near_home') else 'tour'
-            h['home_label'] = home_label
         return jsonify(items)
+
+    @app.route('/construction/heritage/stamp', methods=['POST'])
+    def heritage_stamp():
+        uid = session.get('user_id')
+        if not uid:
+            return jsonify({"error": "로그인이 필요합니다."}), 401
+        data = request.get_json()
+        name = data.get('name', '').strip()
+        lat = data.get('lat', type=float)
+        lng = data.get('lng', type=float)
+        gps_lat = data.get('gps_lat', type=float)
+        gps_lng = data.get('gps_lng', type=float)
+        if not name or not lat or not lng:
+            return jsonify({"error": "정보가 부족합니다."}), 400
+        from services.transit import haversine_km
+        if gps_lat and gps_lng:
+            dist = haversine_km(gps_lat, gps_lng, lat, lng)
+            if dist > 0.2:
+                return jsonify({"error": f"현장에서만 스탬프를 찍을 수 있습니다. (현재 {round(dist*1000)}m 떨어짐)", "distance_m": round(dist*1000)}), 400
+        existing = HeritageStamp.query.filter_by(user_id=uid, heritage_name=name).first()
+        if existing:
+            return jsonify({"error": "이미 방문한 국가유산입니다."}), 400
+        stamp = HeritageStamp(user_id=uid, heritage_name=name, heritage_lat=lat, heritage_lng=lng)
+        db.session.add(stamp)
+        db.session.commit()
+        return jsonify({"success": True, "message": "스탬프가 찍혔습니다!", "name": name})
 
     @app.route('/construction/transit')
     def construction_transit():

@@ -253,6 +253,14 @@ class VillageAlert(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now)
 
+class HeritageStamp(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    heritage_name = db.Column(db.String(200), nullable=False)
+    heritage_lat = db.Column(db.Float)
+    heritage_lng = db.Column(db.Float)
+    stamped_at = db.Column(db.DateTime, default=datetime.now)
+
 class LegalPost(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
