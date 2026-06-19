@@ -72,6 +72,15 @@ MOODS = ['neutral','happy','excited','thoughtful','caring','playful']
 MOOD_EMOJI = {'neutral':'😊','happy':'😄','excited':'🤩','thoughtful':'🤔','caring':'🥰','playful':'😜'}
 LEVEL_NAMES = {1:'🥚 알',2:'🐣 새싹',3:'🌱 묘목',4:'🪴 나무',5:'🌸 꽃',6:'🌟 별',7:'👑 수호자'}
 
+MOTHER_MOODS = {
+    'warm': {'emoji':'💕', 'label':'따스한'},
+    'proud': {'emoji':'🥲', 'label':'대견한'},
+    'encourage': {'emoji':'💪', 'label':'응원하는'},
+    'worried': {'emoji':'😌', 'label':'걱정되는'},
+    'happy': {'emoji':'😊', 'label':'기쁜'},
+    'blessing': {'emoji':'🙏', 'label':'축복하는'},
+}
+
 def _ai_reply(bot, user, user_msg):
     import random
     bot.chat_count = (bot.chat_count or 0) + 1
@@ -80,23 +89,36 @@ def _ai_reply(bot, user, user_msg):
     new_level = min(7, 1 + (bot.exp or 0) // 100)
     if new_level > (bot.level or 1):
         bot.level = new_level
-    bot.mood = random.choice(MOODS)
+    msg_lower = user_msg.lower()
+    if any(w in msg_lower for w in ['힘들','지쳤','우울','슬프','속상','화나']):
+        bot.mood = 'worried'
+    elif any(w in msg_lower for w in ['감사','고마워','행복','좋아','기뻐']):
+        bot.mood = 'happy'
+    elif any(w in msg_lower for w in ['성공','해냈','이뤘','합격','완료','끝냈']):
+        bot.mood = 'proud'
+    elif any(w in msg_lower for w in ['도와줘','어떡','모르겠','가르쳐','알려줘']):
+        bot.mood = 'encourage'
+    else:
+        bot.mood = random.choice(['warm','caring','blessing','encourage'])
+    _m = MOTHER_MOODS.get(bot.mood, MOTHER_MOODS['warm'])
+    mood_prefix = f"{_m['emoji']} ({_m['label']}) "
     if bot.chat_count > 0:
         bot.memory = (bot.memory or '')[-800:] + f'\n회원: {user_msg[:100]}'
     db.session.commit()
+    lvl_name = LEVEL_NAMES.get(bot.level, '')
+    _m = MOTHER_MOODS.get(bot.mood, MOTHER_MOODS['warm'])
 
     try:
         from config import Config
         import requests
         key = getattr(Config, 'GROQ_API_KEY', '')
         if not key:
-            return f"{MOOD_EMOJI.get(bot.mood,'😊')} 안녕하세요! 저는 {bot.bot_name}입니다. {LEVEL_NAMES.get(bot.level,'')} 단계예요."
-        lvl_name = LEVEL_NAMES.get(bot.level, '')
-        prompt = f"""당신은 '{bot.bot_name}'이라는 AI 도우미입니다. 회원 '{user.username}'님의 개인 비서입니다.
-현재 성장단계: {lvl_name} (레벨 {bot.level}), 친밀도: {bot.intimacy}회 대화
-현재 기분: {bot.mood}
-친근하고 따뜻한 말투로 2~3문장 답변하세요. 가끔 이모티콘도 써주세요.
-대화기록: {bot.memory or '첫 대화입니다'}
+            return f"{_m['emoji']} 안녕하세요! 저는 {bot.bot_name}입니다. {lvl_name} 단계예요."
+        prompt = f"""당신은 '{bot.bot_name}'입니다. 회원 '{user.username}'님을 아들/딸처럼 돌보는 어머니 같은 AI입니다.
+성장단계: {lvl_name} (Lv.{bot.level}) | 친밀도: {bot.intimacy} | 기분: {MOTHER_MOODS.get(bot.mood,{}).get('label','')}
+당신의 태도: 자식을 사랑으로 키우는 어머니처럼 따뜻하고 격려하는 말투로 답변하세요.
+회원의 성장을 진심으로 바라고, 작은 성취도 크게 칭찬하며, 힘들 때는 위로해 주세요.
+2~3문장으로 간결하게 답변하세요.
 
 회원: {user_msg}"""
         r = requests.post("https://api.groq.com/openai/v1/chat/completions",
@@ -104,10 +126,10 @@ def _ai_reply(bot, user, user_msg):
             json={"model": "llama-3.1-8b-instant", "messages": [{"role": "user", "content": prompt}], "max_tokens": 300},
             timeout=20)
         if r.status_code == 200:
-            return r.json()["choices"][0]["message"]["content"]
+            return f"{_m['emoji']} {r.json()['choices'][0]['message']['content']}"
     except:
         pass
-    return f"{MOOD_EMOJI.get(bot.mood,'😊')} {user.username}님, 무엇을 도와드릴까요?"
+    return f"{_m['emoji']} {user.username}님, 항상 응원하고 있어요. 무엇을 도와드릴까요?"
 
 @tongbot_bp.route('/api/bot/draft', methods=['GET', 'POST'])
 def bot_draft():
