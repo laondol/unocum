@@ -239,7 +239,7 @@ function loadHeritage() {
                     if (h.stamped) {
                         html += '<span class="btn btn-sm btn-warning disabled">✅ 방문완료</span>';
                     } else {
-                        html += '<button class="btn btn-sm btn-outline-danger" onclick="stampHeritage(this, \'' + h.name + '\', ' + h.lat + ', ' + h.lng + ')">🔖 스탬프</button>';
+                        html += '<button class="btn btn-sm btn-outline-danger stamp-btn" data-name="' + h.name.replace(/"/g, '&quot;') + '" data-lat="' + h.lat + '" data-lng="' + h.lng + '">🔖 스탬프</button>';
                     }
                     html += '</div>';
                     html += '</div></div></div>';
@@ -556,6 +556,16 @@ function loadLocalStores() {
 
 // 첫 로딩 시 국가유산 탭 활성화
 loadHeritage();
+
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.stamp-btn');
+    if (!btn) return;
+    e.preventDefault();
+    const name = btn.dataset.name;
+    const lat = parseFloat(btn.dataset.lat);
+    const lng = parseFloat(btn.dataset.lng);
+    stampHeritage(btn, name, lat, lng);
+});
 
 function stampHeritage(btn, name, lat, lng) {
     if (!navigator.geolocation) {
