@@ -68,27 +68,46 @@ def bot_chat():
     reply = _ai_reply(bot, user, msg)
     return jsonify({"reply": reply, "bot_name": bot.bot_name})
 
+MOODS = ['neutral','happy','excited','thoughtful','caring','playful']
+MOOD_EMOJI = {'neutral':'😊','happy':'😄','excited':'🤩','thoughtful':'🤔','caring':'🥰','playful':'😜'}
+LEVEL_NAMES = {1:'🥚 알',2:'🐣 새싹',3:'🌱 묘목',4:'🪴 나무',5:'🌸 꽃',6:'🌟 별',7:'👑 수호자'}
+
 def _ai_reply(bot, user, user_msg):
+    import random
+    bot.chat_count = (bot.chat_count or 0) + 1
+    bot.exp = (bot.exp or 0) + random.randint(5, 15)
+    bot.intimacy = (bot.intimacy or 0) + random.randint(1, 3)
+    new_level = min(7, 1 + (bot.exp or 0) // 100)
+    if new_level > (bot.level or 1):
+        bot.level = new_level
+    bot.mood = random.choice(MOODS)
+    if bot.chat_count > 0:
+        bot.memory = (bot.memory or '')[-800:] + f'\n회원: {user_msg[:100]}'
+    db.session.commit()
+
     try:
         from config import Config
         import requests
         key = getattr(Config, 'GROQ_API_KEY', '')
         if not key:
-            return f"안녕하세요, {user.username}님! 저는 {bot.bot_name}입니다. 어떤 도움이 필요하신가요?"
-        prompt = f"""당신은 '{bot.bot_name}'이라는 이름의 AI 도우미입니다. 회원 이름은 '{user.username}'입니다.
-당신은 함께사는양평 커뮤니티에서 활동을 돕는 개인 비서입니다.
-친근하고 따뜻한 말투로 답변하세요. 답변은 2~3문장으로 간결하게.
+            return f"{MOOD_EMOJI.get(bot.mood,'😊')} 안녕하세요! 저는 {bot.bot_name}입니다. {LEVEL_NAMES.get(bot.level,'')} 단계예요."
+        lvl_name = LEVEL_NAMES.get(bot.level, '')
+        prompt = f"""당신은 '{bot.bot_name}'이라는 AI 도우미입니다. 회원 '{user.username}'님의 개인 비서입니다.
+현재 성장단계: {lvl_name} (레벨 {bot.level}), 친밀도: {bot.intimacy}회 대화
+현재 기분: {bot.mood}
+친근하고 따뜻한 말투로 2~3문장 답변하세요. 가끔 이모티콘도 써주세요.
+대화기록: {bot.memory or '첫 대화입니다'}
 
-회원 메시지: {user_msg}"""
+회원: {user_msg}"""
         r = requests.post("https://api.groq.com/openai/v1/chat/completions",
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
             json={"model": "llama-3.1-8b-instant", "messages": [{"role": "user", "content": prompt}], "max_tokens": 300},
             timeout=20)
         if r.status_code == 200:
             return r.json()["choices"][0]["message"]["content"]
-        return f"{user.username}님, 지금은 응답하기 어렵네요. 잠시 후 다시 시도해 주세요."
     except:
-        return f"{user.username}님, 무엇을 도와드릴까요?"
+        pass
+    return f"{MOOD_EMOJI.get(bot.mood,'😊')} {user.username}님, 무엇을 도와드릴까요?"
 
 @tongbot_bp.route('/api/bot/draft', methods=['GET', 'POST'])
 def bot_draft():

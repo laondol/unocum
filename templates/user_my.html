@@ -10,6 +10,25 @@
             <a href="/user/{{ user.id }}" class="btn btn-sm btn-outline-secondary">내 프로필</a>
         </div>
     </div>
+
+    <!-- 성장 & 감정 바 -->
+    <div class="row g-3 mb-3">
+        <div class="col-4 text-center">
+            <div class="fs-2" id="moodEmoji">{{ {'neutral':'😊','happy':'😄','excited':'🤩','thoughtful':'🤔','caring':'🥰','playful':'😜'}.get(bot.mood, '😊') }}</div>
+            <small class="text-muted" id="moodLabel">{{ {'neutral':'평범','happy':'행복','excited':'신남','thoughtful':'생각중','caring':'다정','playful':'장난기'}.get(bot.mood, '평범') }}</small>
+        </div>
+        <div class="col-4 text-center">
+            <div class="fs-2">{{ {'1':'🥚','2':'🐣','3':'🌱','4':'🪴','5':'🌸','6':'🌟','7':'👑'}.get(bot.level|string, '🥚') }}</div>
+            <small class="text-muted">{{ {'1':'알','2':'새싹','3':'묘목','4':'나무','5':'꽃','6':'별','7':'수호자'}.get(bot.level|string, '알') }} Lv.{{ bot.level }}</small>
+        </div>
+        <div class="col-4 text-center">
+            <div class="fs-2">💬</div>
+            <small class="text-muted">친밀도 {{ bot.intimacy or 0 }}</small>
+        </div>
+    </div>
+    <div class="progress mb-3" style="height:6px;">
+        <div class="progress-bar bg-warning" style="width:{{ ((bot.exp or 0) % 100) }}%"></div>
+    </div>
     <div id="renameBox" style="display:none;" class="mb-3">
         <div class="input-group input-group-sm">
             <input type="text" id="newName" class="form-control" placeholder="새 이름 (2~20자)" maxlength="20" value="{{ bot.bot_name }}">

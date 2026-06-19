@@ -267,6 +267,12 @@ class TongBot(db.Model):
     bot_id = db.Column(db.String(10), unique=True, nullable=False)
     bot_name = db.Column(db.String(30), unique=True, nullable=False)
     personality = db.Column(db.Text, default='')
+    level = db.Column(db.Integer, default=1)
+    exp = db.Column(db.Integer, default=0)
+    intimacy = db.Column(db.Integer, default=0)
+    mood = db.Column(db.String(20), default='neutral')
+    chat_count = db.Column(db.Integer, default=0)
+    memory = db.Column(db.Text, default='')
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now)
 
