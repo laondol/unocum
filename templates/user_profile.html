@@ -14,7 +14,7 @@
                         </div>
                         <div>
                             <div class="fw-bold small">{{ profile_user.real_name or profile_user.username }}</div>
-                            <small class="text-muted">@{{ profile_user.username }}</small>
+                            <small class="text-muted">@{{ profile_user.username }} <span class="text-muted">({{ {'google':'구글','naver':'네이버','kakao':'카카오톡'}.get(profile_user.social_provider, '함사양') }})</span></small>
                         </div>
                     </div>
                     <div class="d-flex gap-1 flex-wrap mb-2">
