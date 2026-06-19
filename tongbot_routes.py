@@ -35,9 +35,9 @@ def my_page():
         stamps_count = HeritageStamp.query.filter_by(user_id=user.id).count()
     except: pass
     popup = request.args.get('popup') == '1'
-    if popup:
-        return render_template('user_my_popup.html', user=user, bot=bot, drafts=drafts, schedules=schedules, stamps_count=stamps_count)
-    return render_template('user_my.html', user=user, bot=bot, drafts=drafts, schedules=schedules, stamps_count=stamps_count)
+    greeting = _greeting(user)
+    tpl = 'user_my_popup.html' if popup else 'user_my.html'
+    return render_template(tpl, user=user, bot=bot, drafts=drafts, schedules=schedules, stamps_count=stamps_count, greeting=greeting)
 
 @tongbot_bp.route('/api/bot/rename', methods=['POST'])
 def bot_rename():
@@ -71,6 +71,35 @@ def bot_tone():
     bot.updated_at = datetime.now()
     db.session.commit()
     return jsonify({"success": True, "tone": tone})
+
+def _time_greeting(user):
+    h = datetime.now().hour
+    if h < 6: return "깊은 밤"
+    if h < 9: return "상쾌한 아침"
+    if h < 12: return "활기찬 오전"
+    if h < 14: return "점심"
+    if h < 17: return "따스한 오후"
+    if h < 20: return "저녁"
+    return "조용한 밤"
+
+def _weather_hint(user):
+    m = datetime.now().month
+    if m in (3,4,5): return "봄꽃이 피는 계절"
+    if m in (6,7,8): return "여름 더위"
+    if m in (9,10,11): return "가을 바람"
+    return "겨울 추위"
+
+def _greeting(user):
+    import random
+    t = _time_greeting(user)
+    w = _weather_hint(user)
+    loc = f"{user.curr_town or '양평'}"
+    greetings = [
+        f"{t}이에요, {user.username}님! {w} 속에서도 건강 챙기세요.",
+        f"{t}입니다! 오늘 {loc}은 어떠신가요?",
+        f"좋은 {t}이에요! {w}에 딱 맞는 하루 보내세요.",
+    ]
+    return random.choice(greetings)
 
 @tongbot_bp.route('/api/bot/chat', methods=['POST'])
 def bot_chat():
