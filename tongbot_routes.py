@@ -80,7 +80,16 @@ def bot_chat():
     bot = _get_bot(uid)
     user = User.query.get(uid)
     reply = _ai_reply(bot, user, msg)
-    return jsonify({"reply": reply, "bot_name": bot.bot_name})
+    talent = None
+    if bot.chat_count % 10 == 0 and bot.chat_count > 0:
+        talent = _discover_talent(bot, user)
+    counselor = _detect_counselor_need(msg)
+    counselor_msg = None
+    if counselor == 'legal':
+        counselor_msg = {'type':'legal','msg':'법률 고민이 있으신가요? 전문 노무사와 상담을 연결해 드릴까요? (50닢 소요)','url':'/legal/list'}
+    elif counselor == 'psycho':
+        counselor_msg = {'type':'psycho','msg':'마음이 힘드신가요? 심리상담사와 대화를 연결해 드릴까요? (30닢 소요)','url':'/psycho/list'}
+    return jsonify({"reply": reply, "bot_name": bot.bot_name, "talent": talent, "mood": bot.mood, "level": bot.level, "counselor": counselor_msg})
 
 MOODS = ['neutral','happy','excited','thoughtful','caring','playful']
 MOOD_EMOJI = {'neutral':'😊','happy':'😄','excited':'🤩','thoughtful':'🤔','caring':'🥰','playful':'😜'}
@@ -147,6 +156,61 @@ def _ai_reply(bot, user, user_msg):
     except:
         pass
     return f"{_m['emoji']} {user.username}님, 항상 응원하고 있어요. 무엇을 도와드릴까요?"
+
+TALENT_KEYWORDS = {
+    '글쓰기': ['글','쓰기','시','소설','일기','작문','이야기'],
+    '그림': ['그림','사진','디자인','색','풍경','스케치'],
+    '요리': ['요리','음식','레시피','맛집','베이킹','반찬'],
+    '음악': ['노래','악기','음악','연주','기타','피아노'],
+    '운동': ['운동','산책','달리기','등산','자전거','수영'],
+    '기술': ['코딩','프로그램','컴퓨터','앱','개발','IT'],
+    '상담': ['고민','상담','힘들','우울','조언','도움'],
+    '봉사': ['봉사','나눔','돕다','기부','이웃','마을'],
+}
+
+COUNSELOR_KEYWORDS = {
+    'legal': ['법','소송','계약','임금','해고','변호사','노무'],
+    'psycho': ['우울','불안','스트레스','상담','마음','심리','외로움'],
+}
+
+def _discover_talent(bot, user):
+    try:
+        from config import Config
+        import requests
+        key = getattr(Config, 'GROQ_API_KEY', '')
+        if not key:
+            return _keyword_talent(bot)
+        prompt = f"""다음 대화를 바탕으로 회원 '{user.username}'님의 숨은 재능이나 관심사를 발견하세요.
+10단어 이내로 간결하게 답변하세요.
+
+대화기록: {bot.memory or '없음'}"""
+        r = requests.post("https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            json={"model": "llama-3.1-8b-instant", "messages": [{"role": "user", "content": prompt}], "max_tokens": 50},
+            timeout=15)
+        if r.status_code == 200:
+            return r.json()["choices"][0]["message"]["content"].strip()
+    except:
+        pass
+    return _keyword_talent(bot)
+
+def _keyword_talent(bot):
+    memory = (bot.memory or '').lower()
+    scores = {}
+    for talent, kws in TALENT_KEYWORDS.items():
+        score = sum(1 for kw in kws if kw in memory)
+        if score > 0:
+            scores[talent] = score
+    if scores:
+        return max(scores, key=scores.get)
+    return None
+
+def _detect_counselor_need(user_msg):
+    msg = user_msg.lower()
+    for ctype, kws in COUNSELOR_KEYWORDS.items():
+        if any(kw in msg for kw in kws):
+            return ctype
+    return None
 
 @tongbot_bp.route('/api/bot/draft', methods=['GET', 'POST'])
 def bot_draft():
@@ -238,6 +302,23 @@ def bot_schedule():
     db.session.add(s)
     db.session.commit()
     return jsonify({"success": True, "id": s.id})
+
+@tongbot_bp.route('/admin/tongbot/monitor')
+def admin_tongbot_monitor():
+    if session.get('role') not in ('admin', 'leader'):
+        return "권한 없음", 403
+    bots = TongBot.query.order_by(TongBot.updated_at.desc()).limit(50).all()
+    result = []
+    for b in bots:
+        u = User.query.get(b.user_id)
+        result.append({
+            "bot_name": b.bot_name, "user": u.username if u else '?',
+            "level": b.level, "intimacy": b.intimacy, "chat_count": b.chat_count,
+            "mood": b.mood, "tone": b.tone,
+            "last_active": b.updated_at.strftime("%m/%d %H:%M") if b.updated_at else '',
+            "memory_len": len(b.memory or ''),
+        })
+    return jsonify({"bots": result})
 
 @tongbot_bp.route('/api/bot/upload', methods=['POST'])
 def bot_upload():

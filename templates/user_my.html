@@ -199,7 +199,7 @@ function sendChat() {
     input.value = ''; msgs.innerHTML += '<div class="text-start mb-2 text-muted small">🤖 입력 중...</div>';
     msgs.scrollTop = msgs.scrollHeight;
     fetch('/api/bot/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message:msg})})
-    .then(r=>r.json()).then(d=>{ msgs.lastElementChild.outerHTML = '<div class="text-start mb-2"><span class="badge bg-success">'+d.bot_name+'</span> '+d.reply+'</div>'; msgs.scrollTop = msgs.scrollHeight; })
+    .then(r=>r.json()).then(d=>{ msgs.lastElementChild.outerHTML = '<div class="text-start mb-2"><span class="badge bg-success">'+d.bot_name+'</span> '+d.reply+'</div>'; if(d.talent){msgs.innerHTML+='<div class="text-center mb-2"><span class="badge bg-warning text-dark">🌟 발견된 재능: '+d.talent+'</span></div>';} if(d.counselor){const c=d.counselor;msgs.innerHTML+='<div class="text-center mb-2"><div class="alert alert-info py-1 small">'+c.msg+'<br><a href="'+c.url+'" class="btn btn-sm btn-info mt-1">상담받기</a></div></div>';} msgs.scrollTop = msgs.scrollHeight; })
     .catch(()=>{ msgs.lastElementChild.outerHTML = '<div class="text-start mb-2 text-danger small">응답 실패</div>'; });
 }
 
