@@ -60,9 +60,14 @@
                 · {{ profile_user.login_town }} {{ profile_user.login_village or '' }}
                 {% endif %}
             </div>
-            {% endif %}
-        </div>
-    </div>
+                    {% endif %}
+                </div>
+                {% if is_own and bot_name %}
+                <div class="col-auto">
+                    <a href="#" onclick="openExternal('/user/my','통벗'); return false;" class="btn btn-warning" style="border-radius:20px;">🤖 통벗-{{ bot_name }}</a>
+                </div>
+                {% endif %}
+            </div>
 
     {% if is_own %}
     <!-- 위치 정보 -->

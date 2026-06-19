@@ -1360,12 +1360,21 @@ def register_routes(app):
             ).first()
             is_friend = bool(f)
         
+        bot_name = ''
+        if is_own:
+            bot = TongBot.query.filter_by(user_id=uid).first()
+            if bot:
+                bot_name = bot.bot_name
+            else:
+                bot_name = 'A-' + ''.join([c for c in str(uid)])[:4]
+        
         return render_template('user_profile.html', 
             profile_user=user, 
             point_history=point_history, 
             messages=messages,
             is_own=(session.get('user_id') == user.id),
-            is_friend=is_friend
+            is_friend=is_friend,
+            bot_name=bot_name
         )
 
     @app.route('/user/location/refresh', methods=['POST'])

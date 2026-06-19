@@ -127,9 +127,6 @@
 
                     {% if session.get('username') %}
                     <li class="nav-item me-1">
-                        <a href="/user/my" class="badge bg-warning text-dark p-2 text-decoration-none" title="내 통벗">🤖 통벗</a>
-                    </li>
-                    <li class="nav-item me-1">
                         <a href="/user/{{ session.get('user_id') }}" class="badge bg-light text-dark p-2 text-decoration-none" title="내 프로필">💎 {{ session.get('username') }}님</a>
                     </li>
                     <li class="nav-item me-1">
