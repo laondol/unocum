@@ -1998,7 +1998,7 @@ def register_routes(app):
             return jsonify([])
         from services.local_sources import get_nearby_heritage
         from services.transit import haversine_km
-        items = get_nearby_heritage(lat, lng, max_km=10)
+        items = get_nearby_heritage(lat, lng, max_km=5)
         uid = session.get('user_id')
         home_lat = home_lng = None
         home_label = ''
