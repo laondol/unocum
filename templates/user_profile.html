@@ -34,8 +34,10 @@
                 </div>
                 {% if is_own %}
                 <div class="col-auto text-end">
-                    <div class="fs-1 fw-bold text-success">{{ profile_user.points }}</div>
-                    <small class="text-muted">{{ nip() }}</small>
+                    <a href="#" onclick="document.getElementById('nipHistory').classList.toggle('d-none'); return false;" class="text-decoration-none">
+                        <div class="fs-1 fw-bold text-success">{{ profile_user.points }}</div>
+                        <small class="text-muted">{{ nip() }} ▾</small>
+                    </a>
                 </div>
                 {% endif %}
             </div>
