@@ -1367,8 +1367,6 @@ def register_routes(app):
             bot = TongBot.query.filter_by(user_id=uid).first()
             if bot:
                 bot_name = bot.bot_name
-            else:
-                bot_name = 'A-' + ''.join([c for c in str(uid)])[:4]
         # 게시글 모음
         from models import Post, ShareReport
         own_posts = Post.query.filter_by(user_id=user.id).order_by(Post.created_at.desc()).limit(10).all()

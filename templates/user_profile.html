@@ -5,65 +5,58 @@
     <!-- ========== 그룹1: 프로필 헤더 ========== -->
     <div class="card border-0 shadow-sm mb-3" style="border-radius: 18px;">
         <div class="card-body p-3">
-            <div class="row align-items-center">
-                <!-- 왼쪽: 대표이미지 + 기본정보 -->
-                <div class="col-auto">
-                    <div class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 64px; height: 64px; font-size: 1.5rem;">
-                        {{ profile_user.real_name[0] if profile_user.real_name else profile_user.username[0] }}
+            <div class="row">
+                <!-- 왼쪽 절반: 회원정보 -->
+                <div class="col-6 border-end">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <div class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 48px; height: 48px; font-size: 1.2rem;">
+                            {{ profile_user.real_name[0] if profile_user.real_name else profile_user.username[0] }}
+                        </div>
+                        <div>
+                            <div class="fw-bold small">{{ profile_user.real_name or profile_user.username }}</div>
+                            <small class="text-muted">@{{ profile_user.username }}</small>
+                        </div>
                     </div>
-                </div>
-                <div class="col">
-                    <div class="fw-bold">{{ profile_user.real_name or profile_user.username }}</div>
-                    <small class="text-muted">@{{ profile_user.username }}</small>
-                    <div class="d-flex gap-1 mt-1 flex-wrap">
-                        <span class="badge bg-light text-dark">{{ profile_user.town }} {{ profile_user.village }}</span>
-                        {% if profile_user.is_neighbor %}<span class="badge bg-success">이웃주민</span>{% else %}<span class="badge bg-secondary">미인증</span>{% endif %}
-                        {% if profile_user.role == 'admin' %}<span class="badge bg-danger">관리자</span>
-                        {% elif profile_user.role == 'leader' %}<span class="badge bg-primary">리더</span>{% endif %}
+                    <div class="d-flex gap-1 flex-wrap mb-2">
+                        <span class="badge bg-light text-dark small">{{ profile_user.town }} {{ profile_user.village }}</span>
+                        {% if profile_user.is_neighbor %}<span class="badge bg-success small">이웃</span>{% endif %}
+                        {% if profile_user.role == 'admin' %}<span class="badge bg-danger small">관리자</span>{% elif profile_user.role == 'leader' %}<span class="badge bg-primary small">리더</span>{% endif %}
                     </div>
-                </div>
-                <!-- 중앙: 닢 + 위치 -->
-                <div class="col-auto text-center border-start border-end px-3">
                     <a href="#" onclick="document.getElementById('nipSection').classList.toggle('d-none'); return false;" class="text-decoration-none">
-                        <div class="fw-bold text-success" style="font-size:1.3rem;">{{ profile_user.points }}</div>
+                        <span class="fw-bold text-success fs-5">{{ profile_user.points }}</span>
                         <small class="text-muted">{{ nip() }}</small>
                     </a>
                     {% if is_own %}
-                    <div class="mt-1">
-                        <small class="text-muted">{{ profile_user.curr_town or '' }} {{ profile_user.curr_village or '' }}</small>
+                    <div class="mt-1"><small class="text-muted">📍 {{ profile_user.curr_town or '' }} {{ profile_user.curr_village or '' }}</small></div>
+                    {% endif %}
+                    {% if is_own %}
+                    <div class="mt-2 d-flex gap-1">
+                        <a href="/logout" class="btn btn-sm btn-outline-danger" onclick="return confirm('로그아웃 하시겠습니까?')">🚪</a>
+                        <button class="btn btn-sm btn-outline-success" onclick="neighborVerify()">🏠 이웃인증</button>
+                        <div class="form-check form-switch mb-0 ms-1"><input class="form-check-input" type="checkbox" id="locationShareToggle" {{ 'checked' if profile_user.location_share }} onchange="toggleLocationShare(this.checked)"><label class="form-check-label small" for="locationShareToggle">위치공유</label></div>
                     </div>
+                    {% elif session.get('user_id') and session.get('user_id') != profile_user.id %}
+                    <div class="mt-2">{% if is_friend %}<span class="badge bg-success">👥 벗</span>{% else %}<button class="btn btn-sm btn-outline-primary" onclick="sendFriendRequest({{ profile_user.id }})">👋 벗 신청</button>{% endif %}</div>
                     {% endif %}
                 </div>
-                <!-- 오른쪽: 통벗 + 액션버튼 -->
-                <div class="col text-end">
+                <!-- 오른쪽 절반: 통벗 -->
+                <div class="col-6 text-center">
                     {% if is_own and bot_name %}
-                    <a href="#" onclick="openExternal('/user/my','통벗'); return false;" class="btn btn-sm btn-warning mb-2">🤖 통벗-{{ bot_name }}</a>
-                    {% endif %}
-                    <div class="d-flex gap-1 justify-content-end flex-wrap">
-                        {% if is_own %}
+                    <div class="mb-2">
+                        <a href="#" onclick="openExternal('/user/my','통벗'); return false;" class="btn btn-warning btn-sm">🤖 통벗-{{ bot_name }}</a>
+                    </div>
+                    <div class="d-flex flex-column gap-1">
                         <a href="/user/my#tabChat" class="btn btn-sm btn-outline-primary">💬 대화</a>
                         <a href="/user/my#tabWrite" class="btn btn-sm btn-outline-success">✍️ 글쓰기</a>
                         <a href="/user/my#tabSchedule" class="btn btn-sm btn-outline-info">📅 일정</a>
-                        {% endif %}
                     </div>
+                    {% else %}
+                    <div class="text-muted py-4">
+                        {% if is_own %}<small>통벗 생성 중...</small>{% else %}<small>통벗 정보 없음</small>{% endif %}
+                    </div>
+                    {% endif %}
                 </div>
             </div>
-            <!-- 하단 바: 로그아웃 + 위치공유 -->
-            {% if is_own %}
-            <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
-                <a href="/logout" class="btn btn-sm btn-outline-danger" onclick="return confirm('로그아웃 하시겠습니까?')">🚪 로그아웃</a>
-                <div class="form-check form-switch mb-0">
-                    <input class="form-check-input" type="checkbox" id="locationShareToggle" {{ 'checked' if profile_user.location_share }} onchange="toggleLocationShare(this.checked)">
-                    <label class="form-check-label small" for="locationShareToggle">내 위치 벗에게 공유</label>
-                </div>
-                <button class="btn btn-sm btn-outline-success" onclick="neighborVerify()">🏠 이웃인증</button>
-            </div>
-            {% elif session.get('user_id') and session.get('user_id') != profile_user.id %}
-            <div class="d-flex justify-content-end mt-2 pt-2 border-top">
-                {% if is_friend %}<span class="badge bg-success">👥 벗</span>
-                {% else %}<button class="btn btn-sm btn-outline-primary" onclick="sendFriendRequest({{ profile_user.id }})">👋 벗 신청</button>{% endif %}
-            </div>
-            {% endif %}
         </div>
     </div>
 
