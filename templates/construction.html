@@ -212,14 +212,32 @@ function loadHeritage() {
                 data.forEach(h => {
                     const naverUrl = 'https://map.naver.com/index.nhn?slat=' + lat + '&slng=' + lng + '&stitle=' + encodeURIComponent('현재위치') + '&elat=' + h.lat + '&elng=' + h.lng + '&etitle=' + encodeURIComponent(h.name) + '&pathType=1';
                     const kakaoUrl = 'https://map.kakao.com/?sX=' + lng + '&sY=' + lat + '&eX=' + h.lng + '&eY=' + h.lat + '&eName=' + encodeURIComponent(h.name);
-                    html += '<div class="col-12"><div class="card border-0 shadow-sm" style="border-radius:16px;border-left:4px solid #198754">';
-                    html += '<div class="card-body p-3"><div class="d-flex align-items-center gap-2">';
-                    html += '<span class="badge bg-success small" style="font-size:0.65rem;">' + h.type + '</span>';
-                    html += '<a href="' + naverUrl + '" target="_blank" class="fw-bold flex-grow-1 small text-dark text-decoration-none">' + h.name + '</a>';
-                    html += '<a href="' + kakaoUrl + '" target="_blank" class="text-warning flex-shrink-0 small" title="카카오맵">🗺️</a>';
-                    html += '<a href="' + naverUrl + '" target="_blank" class="text-success flex-shrink-0 small" title="네이버지도">🧭</a>';
+                    const nearHome = h.near_home;
+                    html += '<div class="col-12"><div class="card border-0 shadow-sm" style="border-radius:16px;border-left:4px solid ' + (nearHome ? '#0d6efd' : '#198754') + '">';
+                    html += '<div class="card-body p-3">';
+                    html += '<div class="d-flex align-items-center gap-2 mb-2">';
+                    html += '<span class="badge ' + (nearHome ? 'bg-primary' : 'bg-success') + ' small" style="font-size:0.65rem;">' + h.type + '</span>';
+                    html += '<span class="fw-bold flex-grow-1 small">' + h.name + '</span>';
                     html += '<small class="text-muted flex-shrink-0">' + h.dist + 'km</small>';
-                    html += '</div></div></div></div>';
+                    html += '</div>';
+                    if (nearHome) {
+                        const wikiUrl = 'https://ko.wikipedia.org/w/index.php?search=' + encodeURIComponent(h.name);
+                        const chaUrl = 'https://www.cha.go.kr/cha/SearchKindOpenapiList.do?ccbaMnm1=' + encodeURIComponent(h.name);
+                        html += '<div class="small text-primary mb-1">🏠 집에서 ' + (h.dist_from_home || h.dist) + 'km · 내 지역 문화유산</div>';
+                        html += '<div class="d-flex gap-1 flex-wrap">';
+                        html += '<a href="' + wikiUrl + '" target="_blank" class="btn btn-sm btn-outline-secondary">📖 위키백과</a>';
+                        html += '<a href="https://search.naver.com/search.naver?query=' + encodeURIComponent(h.name + ' 문화재') + '" target="_blank" class="btn btn-sm btn-outline-success">🔍 자세히보기</a>';
+                        html += '<a href="' + naverUrl + '" target="_blank" class="btn btn-sm btn-outline-primary">🧭 가는길</a>';
+                        html += '</div>';
+                    } else {
+                        html += '<div class="small text-muted mb-1">🧳 관광객 추천 · 현재위치 ' + h.dist + 'km</div>';
+                        html += '<div class="d-flex gap-1 flex-wrap">';
+                        html += '<a href="' + naverUrl + '" target="_blank" class="btn btn-sm btn-outline-success">🧭 네이버 길찾기</a>';
+                        html += '<a href="' + kakaoUrl + '" target="_blank" class="btn btn-sm btn-outline-warning">🗺️ 카카오맵</a>';
+                        html += '<a href="https://m.place.naver.com/place/search?query=' + encodeURIComponent(h.name) + '" target="_blank" class="btn btn-sm btn-outline-info">📍 주변정보</a>';
+                        html += '</div>';
+                    }
+                    html += '</div></div></div>';
                 });
                 html += '</div><small class="text-muted d-block mt-2">출처: 국가유산청 공간정보</small>';
                 el.innerHTML = html;

@@ -1997,7 +1997,29 @@ def register_routes(app):
         if not lat or not lng:
             return jsonify([])
         from services.local_sources import get_nearby_heritage
-        return jsonify(get_nearby_heritage(lat, lng, max_km=5))
+        from services.transit import haversine_km
+        items = get_nearby_heritage(lat, lng, max_km=5)
+        uid = session.get('user_id')
+        home_lat = home_lng = None
+        home_label = ''
+        if uid:
+            user = User.query.get(uid)
+            if user and user.curr_town and user.curr_village:
+                from services.transit import lookup_village_coords
+                hc = lookup_village_coords(user.curr_town, user.curr_village)
+                if hc:
+                    home_lat, home_lng = hc
+                    home_label = f'{user.curr_town} {user.curr_village}'
+        for h in items:
+            if home_lat and home_lng:
+                d_home = round(haversine_km(h['lat'], h['lng'], home_lat, home_lng), 1)
+                h['dist_from_home'] = d_home
+                h['near_home'] = d_home <= 5
+            else:
+                h['near_home'] = False
+            h['link_type'] = 'content' if h.get('near_home') else 'tour'
+            h['home_label'] = home_label
+        return jsonify(items)
 
     @app.route('/construction/transit')
     def construction_transit():
