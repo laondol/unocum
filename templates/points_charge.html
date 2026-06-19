@@ -1,0 +1,153 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container mt-4" style="max-width: 500px;">
+    <a href="/user/{{ user.id }}" class="btn btn-sm btn-outline-secondary mb-3">← 프로필로</a>
+    <h3 class="fw-bold mb-2">💎 닢 충전</h3>
+    <p class="text-muted small mb-4">현재 보유: <strong class="text-success">{{ user.points }}</strong> 닢</p>
+
+    <div class="row g-2 mb-4">
+        {% for amt, nip, label, color in [
+            (1000, 1000, '기본', 'outline-primary'),
+            (3000, 3200, '+200 보너스', 'outline-success'),
+            (5000, 5500, '+500 보너스', 'outline-info'),
+            (10000, 12000, '+2,000 보너스!', 'outline-warning'),
+        ] %}
+        <div class="col-6">
+            <button class="btn btn-{{ color }} w-100 py-3" onclick="selectAmount({{ amt }}, '{{ nip }}')">
+                <div class="fs-5 fw-bold">{{ nip }}</div>
+                <small>{{ label }}</small>
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="card border-0 shadow-sm" style="border-radius: 18px;">
+        <div class="card-body p-4">
+            <div class="mb-3">
+                <label class="form-label small fw-bold">충전 금액</label>
+                <div class="input-group">
+                    <input type="number" id="nipAmount" class="form-control" value="1000" min="1000" step="1000" placeholder="닢 수량">
+                    <span class="input-group-text">닢</span>
+                </div>
+                <small id="priceDisplay" class="text-muted">결제금액: 1,000원</small>
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-bold">결제 수단</label>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button class="btn btn-outline-dark btn-sm active" data-method="card" onclick="selectMethod(this)">💳 카드</button>
+                    <button class="btn btn-outline-dark btn-sm" data-method="transfer" onclick="selectMethod(this)">🏦 무통장</button>
+                    <button class="btn btn-outline-dark btn-sm" data-method="kakaopay" onclick="selectMethod(this)">🟡 카카오페이</button>
+                    <button class="btn btn-outline-dark btn-sm" data-method="naverpay" onclick="selectMethod(this)">🟢 네이버페이</button>
+                </div>
+            </div>
+            <button id="payBtn" class="btn btn-success w-100 py-2 fw-bold" onclick="startPayment()">💳 결제하기</button>
+            <div id="payStatus" class="small text-center mt-2"></div>
+            <hr class="my-3">
+            <div class="text-muted small">
+                <p>🔹 현재 <strong>테스트 모드</strong>입니다. 실제 결제는 이루어지지 않습니다.</p>
+                <p class="mb-0">🔹 테스트 카드: <code>4242 4242 4242 4242</code> / 아무 CVC / 아무 만료일</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 충전 내역 -->
+    <div class="card border-0 shadow-sm mt-3" style="border-radius: 18px;">
+        <div class="card-header bg-white fw-bold" style="border-radius: 18px 18px 0 0;">📋 충전 내역</div>
+        <div class="card-body p-0">
+            <div class="list-group list-group-flush small">
+                {% for h in point_history %}
+                {% if h.change_type == 'charge' %}
+                <div class="list-group-item d-flex justify-content-between">
+                    <span>{{ h.created_at.strftime('%m/%d %H:%M') }} · {{ h.description }}</span>
+                    <span class="fw-bold text-success">+{{ h.amount }}</span>
+                </div>
+                {% endif %}
+                {% else %}
+                <div class="list-group-item text-center text-muted py-3">충전 내역 없음</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.portone.io/v2/browser-sdk.js"></script>
+<script>
+let selectedNip = 1000, selectedMethod = 'card';
+document.getElementById('nipAmount').addEventListener('input', function() {
+    selectedNip = parseInt(this.value) || 1000;
+    document.getElementById('priceDisplay').textContent = '결제금액: ' + selectedNip.toLocaleString() + '원';
+});
+
+function selectAmount(nip, label) {
+    document.getElementById('nipAmount').value = nip;
+    selectedNip = nip;
+    document.getElementById('priceDisplay').textContent = '결제금액: ' + nip.toLocaleString() + '원 (' + label + ')';
+}
+
+function selectMethod(btn) {
+    document.querySelectorAll('[data-method]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedMethod = btn.dataset.method;
+}
+
+async function startPayment() {
+    const btn = document.getElementById('payBtn');
+    const status = document.getElementById('payStatus');
+    btn.disabled = true; status.textContent = '결제 준비 중...';
+
+    const payMethod = selectedMethod === 'kakaopay' ? 'EASY_PAY' :
+                      selectedMethod === 'naverpay' ? 'EASY_PAY' :
+                      selectedMethod === 'transfer' ? 'TRANSFER' : 'CARD';
+    const easyPay = selectedMethod === 'kakaopay' ? 'KAKAOPAY' :
+                    selectedMethod === 'naverpay' ? 'NAVERPAY' : null;
+
+    try {
+        const r = await fetch('/api/payment/prepare', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({nip: selectedNip})
+        });
+        const prep = await r.json();
+        if (prep.error) { status.innerHTML = '<span class="text-danger">'+prep.error+'</span>'; btn.disabled=false; return; }
+
+        const payment = await PortOne.requestPayment({
+            storeId: '{{ portone_store_id }}',
+            channelKey: '{{ portone_channel }}',
+            paymentId: prep.payment_id,
+            orderName: '닢 충전 ' + selectedNip + '닢',
+            totalAmount: selectedNip,
+            currency: 'CURRENCY_KRW',
+            payMethod: payMethod,
+            ...(easyPay ? {easyPay: {provider: easyPay}} : {}),
+            customer: {
+                fullName: '{{ user.real_name or user.username }}',
+                phoneNumber: '{{ user.phone or '01000000000' }}'
+            }
+        });
+
+        if (payment.code != null) {
+            status.innerHTML = '<span class="text-danger">결제 실패: '+payment.message+'</span>';
+            btn.disabled = false;
+            return;
+        }
+
+        status.textContent = '결제 확인 중...';
+        const vrf = await fetch('/api/payment/verify', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({payment_id: prep.payment_id, nip: selectedNip})
+        });
+        const result = await vrf.json();
+        if (result.success) {
+            status.innerHTML = '<span class="text-success fw-bold">✅ 충전 완료! '+selectedNip+'닢이 지급되었습니다.</span>';
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            status.innerHTML = '<span class="text-danger">'+result.error+'</span>';
+        }
+    } catch(e) {
+        status.innerHTML = '<span class="text-danger">오류: '+e.message+'</span>';
+    }
+    btn.disabled = false;
+}
+</script>
+{% endblock %}
