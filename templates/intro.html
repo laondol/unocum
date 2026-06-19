@@ -82,7 +82,7 @@
                     <small class="text-muted">👍 {{ news.like_count }} 👎 {{ news.dislike_count }}</small>
                     {% endif %}
                     {% if news.source_url %}
-                    <a href="{{ news.source_url }}" target="_blank" class="btn btn-sm btn-outline-success">🔗 원문보기</a>
+                    <a href="#" onclick="openExternal('{{ news.source_url }}','원문: {{ news.title[:30] }}'); return false;" class="btn btn-sm btn-outline-success">🔗 원문보기</a>
                     {% endif %}
                 </div>
                 <!-- 채자 승인 상태 -->

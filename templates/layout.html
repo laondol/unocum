@@ -222,5 +222,26 @@
         myModal.show();
     }
     </script>
+
+    <div id="globalFrame" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;background:rgba(0,0,0,0.5);">
+        <div style="position:absolute;top:5%;left:5%;width:90%;height:85%;background:#fff;border-radius:12px;overflow:hidden;">
+            <div class="d-flex justify-content-between align-items-center p-2 border-bottom">
+                <span id="globalFrameTitle" class="fw-bold small"></span>
+                <button class="btn btn-sm btn-outline-secondary" onclick="closeGlobalFrame()">✕ 닫기</button>
+            </div>
+            <iframe id="globalIframe" style="width:100%;height:calc(100% - 40px);border:0;"></iframe>
+        </div>
+    </div>
+    <script>
+    function openExternal(url, title) {
+        document.getElementById('globalFrameTitle').textContent = title || '';
+        document.getElementById('globalIframe').src = url;
+        document.getElementById('globalFrame').style.display = '';
+    }
+    function closeGlobalFrame() {
+        document.getElementById('globalFrame').style.display = 'none';
+        document.getElementById('globalIframe').src = '';
+    }
+    </script>
 </body>
 </html>

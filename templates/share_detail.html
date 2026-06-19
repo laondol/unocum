@@ -121,8 +121,8 @@
         <div id="map" style="height: 300px;"></div>
     </div>
     <div class="text-center mb-4">
-        <a href="https://www.google.com/maps/dir/?api=1&destination={{ report.latitude }},{{ report.longitude }}" target="_blank" class="btn btn-outline-primary">🗺️ 길찾기</a>
-        <a href="https://maps.google.com/?q={{ report.latitude }},{{ report.longitude }}" target="_blank" class="btn btn-outline-secondary">📍 구글맵</a>
+        <a href="#" onclick="openExternal('https://www.google.com/maps/dir/?api=1&destination={{ report.latitude }},{{ report.longitude }}','🗺️ 길찾기'); return false;" class="btn btn-outline-primary">🗺️ 길찾기</a>
+        <a href="#" onclick="openExternal('https://maps.google.com/?q={{ report.latitude }},{{ report.longitude }}','📍 구글맵'); return false;" class="btn btn-outline-secondary">📍 구글맵</a>
     </div>
     {% endif %}
 

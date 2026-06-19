@@ -37,7 +37,7 @@
                 <small class="text-muted">👍 {{ article.like_count }} &nbsp;👎 {{ article.dislike_count }}</small>
                 {% endif %}
                 {% if article.source_url %}
-                <a href="{{ article.source_url }}" target="_blank" class="btn btn-sm btn-outline-success ms-auto">🔗 원문보기</a>
+                <a href="#" onclick="openExternal('{{ article.source_url }}','원문: {{ article.title[:30] }}'); return false;" class="btn btn-sm btn-outline-success ms-auto">🔗 원문보기</a>
                 {% endif %}
             </div>
         </div>

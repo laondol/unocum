@@ -81,7 +81,7 @@
                         </td>
                         <td>
                             {% if a.source_url %}
-                            <a href="{{ a.source_url }}" target="_blank" class="btn btn-sm btn-outline-primary" title="{{ a.source_url }}">🔗 원문보기</a>
+                            <a href="#" onclick="openExternal('{{ a.source_url }}','원문: {{ a.title[:30] }}'); return false;" class="btn btn-sm btn-outline-primary" title="{{ a.source_url }}">🔗 원문보기</a>
                             {% else %}
                             <span class="text-muted small">-</span>
                             {% endif %}

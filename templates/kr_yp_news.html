@@ -24,7 +24,7 @@
                         <small class="text-muted">👍 {{ a.like_count }} &nbsp;👎 {{ a.dislike_count }}</small>
                         {% endif %}
                         {% if a.source_url %}
-                        <a href="{{ a.source_url }}" target="_blank" class="btn btn-sm btn-outline-success">🔗 원문보기</a>
+                        <a href="#" onclick="openExternal('{{ a.source_url }}','원문: {{ a.title[:30] }}{% if a.title|length > 30 %}...{% endif %}'); return false;" class="btn btn-sm btn-outline-success">🔗 원문보기</a>
                         {% endif %}
                         <button onclick="showContent({{ a.id }})" class="btn btn-sm btn-outline-primary">📄 본문보기</button>
                     </div>
@@ -44,7 +44,7 @@
                     <div class="mt-2 pt-2 border-top">
                         {% for r in a.recs %}
                         <div class="d-flex align-items-center gap-1 small text-muted mb-1">
-                            <a href="{{ r.url }}" target="_blank" class="text-primary text-decoration-none fw-medium" title="{{ r.title }}">🤖 {{ r.title[:30] }}{% if r.title|length > 30 %}...{% endif %}</a>
+                            <a href="#" onclick="openExternal('{{ r.url }}','{{ r.title[:30] }}{% if r.title|length > 30 %}...{% endif %}'); return false;" class="text-primary text-decoration-none fw-medium" title="{{ r.title }}">🤖 {{ r.title[:30] }}{% if r.title|length > 30 %}...{% endif %}</a>
                             <span class="badge bg-light text-dark rounded-pill" title="제보자: {{ r.author_name }}">👤 {{ r.author_name[:8] }}</span>
                         </div>
                         {% endfor %}
