@@ -1979,6 +1979,17 @@ def register_routes(app):
         db.session.commit()
         return jsonify({"status": "success", "msg": "삭제되었습니다."})
 
+    # --- [외부링크 중계] ---
+    @app.route('/go')
+    def go():
+        url = request.args.get('url', '')
+        title = request.args.get('title', '외부페이지')
+        if not url:
+            return "URL이 필요합니다.", 400
+        from urllib.parse import quote
+        back = request.args.get('back', request.headers.get('Referer', '/construction'))
+        return render_template('go.html', url=url, title=title, back=back)
+
     # --- [위치기반안내] ---
     @app.route('/construction')
     @app.route('/construction')

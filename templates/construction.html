@@ -222,20 +222,19 @@ function loadHeritage() {
                     html += '<small class="text-muted flex-shrink-0">' + h.dist + 'km</small>';
                     html += '</div>';
                     if (nearHome) {
-                        const wikiUrl = 'https://ko.wikipedia.org/w/index.php?search=' + encodeURIComponent(h.name);
-                        const chaUrl = 'https://www.cha.go.kr/cha/SearchKindOpenapiList.do?ccbaMnm1=' + encodeURIComponent(h.name);
+                        const wikiUrl = '/go?url=' + encodeURIComponent('https://ko.wikipedia.org/w/index.php?search=' + encodeURIComponent(h.name)) + '&title=' + encodeURIComponent('위키백과: ' + h.name);
                         html += '<div class="small text-primary mb-1">🏠 집에서 ' + (h.dist_from_home || h.dist) + 'km · 내 지역 문화유산</div>';
                         html += '<div class="d-flex gap-1 flex-wrap mb-2">';
-                        html += '<a href="' + wikiUrl + '" target="_blank" class="btn btn-sm btn-outline-secondary">📖 위키백과</a>';
-                        html += '<a href="https://search.naver.com/search.naver?query=' + encodeURIComponent(h.name + ' 문화재') + '" target="_blank" class="btn btn-sm btn-outline-success">🔍 자세히보기</a>';
+                        html += '<a href="' + wikiUrl + '" class="btn btn-sm btn-outline-secondary">📖 위키백과</a>';
+                        html += '<a href="/go?url=' + encodeURIComponent('https://search.naver.com/search.naver?query=' + encodeURIComponent(h.name + ' 문화재')) + '&title=' + encodeURIComponent('네이버 검색: ' + h.name) + '" class="btn btn-sm btn-outline-success">🔍 자세히보기</a>';
                         html += '</div>';
                     } else {
                         html += '<div class="small text-muted mb-1">🧳 관광객 추천 · 현재위치 ' + h.dist + 'km</div>';
                     }
                     html += '<div class="d-flex gap-1 flex-wrap align-items-center">';
-                    html += '<a href="' + tUrl + '" target="_blank" class="btn btn-sm btn-outline-primary">🚌 대중교통</a>';
-                    html += '<a href="' + bUrl + '" target="_blank" class="btn btn-sm btn-outline-success">🚲 자전거</a>';
-                    html += '<a href="' + wUrl + '" target="_blank" class="btn btn-sm btn-outline-secondary">🚶 도보</a>';
+                    html += '<a href="/go?url=' + encodeURIComponent(tUrl) + '&title=' + encodeURIComponent('네이버 대중교통: ' + h.name) + '" class="btn btn-sm btn-outline-primary">🚌 대중교통</a>';
+                    html += '<a href="/go?url=' + encodeURIComponent(bUrl) + '&title=' + encodeURIComponent('네이버 자전거: ' + h.name) + '" class="btn btn-sm btn-outline-success">🚲 자전거</a>';
+                    html += '<a href="/go?url=' + encodeURIComponent(wUrl) + '&title=' + encodeURIComponent('네이버 도보: ' + h.name) + '" class="btn btn-sm btn-outline-secondary">🚶 도보</a>';
                     if (h.stamped) {
                         html += '<span class="btn btn-sm btn-warning disabled">✅ 방문완료</span>';
                     } else {
