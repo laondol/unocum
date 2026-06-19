@@ -27,8 +27,7 @@
                         <small class="text-muted">{{ nip() }}</small>
                     </a>
                     {% if is_own %}
-                    {% set yp_towns = ['양평읍','강상면','강하면','양서면','옥천면','서종면','단월면','청운면','양동면','지평면','용문면','개군면'] %}
-                    <div class="mt-1"><small class="text-muted">📍 {% if profile_user.curr_town and profile_user.curr_town in yp_towns %}{{ profile_user.curr_town }} {{ profile_user.curr_village or '' }}{% elif profile_user.curr_latitude and profile_user.curr_longitude %}{{ '%.4f' % profile_user.curr_latitude }}, {{ '%.4f' % profile_user.curr_longitude }}{% else %}위치 없음{% endif %}</small></div>
+                    <div class="mt-1"><small class="text-muted">📍 {{ curr_location or '위치 없음' }}</small></div>
                     {% endif %}
                     {% if is_own %}
                     <div class="mt-2 d-flex gap-1">
@@ -130,7 +129,7 @@
         <div class="card-body p-3">
             <div class="row g-2">
                 <div class="col-6"><small class="text-muted">기본주소</small><br><span class="fw-bold small">{{ profile_user.town }} {{ profile_user.village }}</span> <button class="btn btn-sm btn-outline-secondary" onclick="showAddressEdit()">✏️</button></div>
-                <div class="col-6"><small class="text-muted">현재위치</small><br><span class="fw-bold small">{% if profile_user.curr_town and profile_user.curr_town in yp_towns %}{{ profile_user.curr_town }} {{ profile_user.curr_village or '' }}{% elif profile_user.curr_latitude and profile_user.curr_longitude %}{{ '%.4f' % profile_user.curr_latitude }}, {{ '%.4f' % profile_user.curr_longitude }}{% else %}-{% endif %}</span></div>
+                <div class="col-6"><small class="text-muted">현재위치</small><br><span class="fw-bold small">{{ curr_location or '-' }}</span></div>
             </div>
             <div id="addressEditForm" class="mt-2 p-2 bg-light rounded" style="display:none;">
                 <form id="addressForm" onsubmit="updateAddress(event)" class="row g-1">

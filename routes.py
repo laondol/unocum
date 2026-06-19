@@ -1363,6 +1363,21 @@ def register_routes(app):
         is_own = (session.get('user_id') == user.id)
         bot_name = ''
         posts = []
+        curr_location = ''
+        yp_towns = {'양평읍','강상면','강하면','양서면','옥천면','서종면','단월면','청운면','양동면','지평면','용문면','개군면'}
+        if user.curr_town and user.curr_town in yp_towns:
+            curr_location = f"{user.curr_town} {user.curr_village or ''}"
+        elif user.curr_latitude and user.curr_longitude:
+            from services.transit import reverse_geocode
+            from config import Config
+            geo = reverse_geocode(user.curr_latitude, user.curr_longitude,
+                kakao_key=Config.KAKAO_REST_API_KEY,
+                naver_id=Config.NAVER_SEARCH_CLIENT_ID,
+                naver_secret=Config.NAVER_SEARCH_CLIENT_SECRET)
+            if geo and geo.get('address'):
+                curr_location = geo['address']
+            else:
+                curr_location = f"{user.curr_latitude:.4f}, {user.curr_longitude:.4f}"
         if is_own:
             bot = TongBot.query.filter_by(user_id=uid).first()
             if bot:
@@ -1385,7 +1400,8 @@ def register_routes(app):
             is_own=is_own,
             is_friend=is_friend,
             bot_name=bot_name,
-            posts=posts
+            posts=posts,
+            curr_location=curr_location
         )
 
     @app.route('/user/location/refresh', methods=['POST'])
