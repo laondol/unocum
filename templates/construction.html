@@ -569,36 +569,36 @@ document.addEventListener('click', function(e) {
 
 function stampHeritage(btn, name, lat, lng) {
     if (!navigator.geolocation) {
-        alert('위치 정보를 사용할 수 없습니다.');
+        alert('📍 위치 정보를 사용할 수 없습니다. GPS를 켜주세요.');
         return;
     }
     btn.disabled = true;
     btn.textContent = '확인 중...';
     navigator.geolocation.getCurrentPosition(pos => {
-        const gps_lat = pos.coords.latitude;
-        const gps_lng = pos.coords.longitude;
         fetch('/construction/heritage/stamp', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({name: name, lat: lat, lng: lng, gps_lat: gps_lat, gps_lng: gps_lng})
+            body: JSON.stringify({name: name, lat: lat, lng: lng, gps_lat: pos.coords.latitude, gps_lng: pos.coords.longitude})
         })
         .then(r => r.json())
         .then(data => {
             if (data.success) {
                 btn.outerHTML = '<span class="btn btn-sm btn-warning disabled">✅ 방문완료</span>';
             } else {
-                alert(data.error || '스탬프 실패');
+                alert(data.error || '스탬프를 찍을 수 없습니다.');
                 btn.disabled = false;
                 btn.textContent = '🔖 스탬프';
             }
         })
         .catch(() => {
-            alert('오류가 발생했습니다.');
+            alert('네트워크 오류가 발생했습니다. 다시 시도해 주세요.');
             btn.disabled = false;
             btn.textContent = '🔖 스탬프';
         });
-    }, () => {
-        alert('위치 정보가 필요합니다.');
+    }, (err) => {
+        let msg = 'GPS 위치를 확인할 수 없습니다.';
+        if (err.code === 1) msg = '위치 권한이 필요합니다. 브라우저 설정에서 위치를 허용해 주세요.';
+        alert(msg);
         btn.disabled = false;
         btn.textContent = '🔖 스탬프';
     });

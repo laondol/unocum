@@ -2034,19 +2034,19 @@ def register_routes(app):
         gps_lat = data.get('gps_lat', type=float)
         gps_lng = data.get('gps_lng', type=float)
         if not name or not lat or not lng:
-            return jsonify({"error": "정보가 부족합니다."}), 400
+            return jsonify({"success": False, "error": "정보가 부족합니다."})
         from services.transit import haversine_km
         if gps_lat and gps_lng:
             dist = haversine_km(gps_lat, gps_lng, lat, lng)
             if dist > 0.2:
-                return jsonify({"error": f"현장에서만 스탬프를 찍을 수 있습니다. (현재 {round(dist*1000)}m 떨어짐)", "distance_m": round(dist*1000)}), 400
+                return jsonify({"success": False, "error": f"현장에서만 찍을 수 있어요! 약 {round(dist*1000)}m 떨어져 있습니다. 가까이 가서 다시 시도해 주세요.", "distance_m": round(dist*1000)})
         existing = HeritageStamp.query.filter_by(user_id=uid, heritage_name=name).first()
         if existing:
-            return jsonify({"error": "이미 방문한 국가유산입니다."}), 400
+            return jsonify({"success": False, "error": "이미 방문 완료한 국가유산입니다."})
         stamp = HeritageStamp(user_id=uid, heritage_name=name, heritage_lat=lat, heritage_lng=lng)
         db.session.add(stamp)
         db.session.commit()
-        return jsonify({"success": True, "message": "스탬프가 찍혔습니다!", "name": name})
+        return jsonify({"success": True, "message": "⭐ 스탬프가 찍혔습니다!"})
 
     @app.route('/construction/transit')
     def construction_transit():
