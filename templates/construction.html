@@ -346,8 +346,8 @@ function renderHome(data, loc) {
         }
         if (sd.deep_links) {
             html += '<div class="d-flex gap-2 mt-2">';
-            html += '<a href="' + sd.deep_links.kakao + '" target="_blank" class="btn btn-sm btn-warning">🗺️ 역까지 카카오맵</a>';
-            html += '<a href="' + sd.deep_links.naver + '" target="_blank" class="btn btn-sm btn-success">🗺️ 역까지 네이버지도</a>';
+            html += '<a href="/go?url=' + encodeURIComponent(sd.deep_links.kakao) + '&title=' + encodeURIComponent('카카오맵: ' + sd.transfer_station) + '" class="btn btn-sm btn-warning">🗺️ 역까지 카카오맵</a>';
+            html += '<a href="/go?url=' + encodeURIComponent(sd.deep_links.naver) + '&title=' + encodeURIComponent('네이버지도: ' + sd.transfer_station) + '" class="btn btn-sm btn-success">🗺️ 역까지 네이버지도</a>';
             html += '</div>';
         }
         if (sd.all_options && sd.all_options.length > 1) {
@@ -383,8 +383,8 @@ function renderHome(data, loc) {
 
     if (data.deep_links) {
         html += '<div class="d-flex gap-2 mb-3 mt-2">';
-        html += '<a href="' + data.deep_links.kakao + '" target="_blank" class="btn btn-sm btn-warning">🗺️ 카카오맵 길찾기</a>';
-        html += '<a href="' + data.deep_links.naver + '" target="_blank" class="btn btn-sm btn-success">🗺️ 네이버지도 길찾기</a>';
+        html += '<a href="/go?url=' + encodeURIComponent(data.deep_links.kakao) + '&title=' + encodeURIComponent('카카오맵 길찾기') + '" class="btn btn-sm btn-warning">🗺️ 카카오맵 길찾기</a>';
+        html += '<a href="/go?url=' + encodeURIComponent(data.deep_links.naver) + '&title=' + encodeURIComponent('네이버지도 길찾기') + '" class="btn btn-sm btn-success">🗺️ 네이버지도 길찾기</a>';
         html += '</div>';
     }
 
