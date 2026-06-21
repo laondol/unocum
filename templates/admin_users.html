@@ -28,7 +28,7 @@
                     {% for u in users %}
                     <tr class="user-row" data-name="{{ u.username }} {{ u.real_name or '' }} {{ u.village or '' }}">
                         <td><input type="checkbox" class="user-check" value="{{ u.id }}"></td>
-                        <td><a href="/admin/user/{{ u.id }}" class="fw-bold text-decoration-none">{{ u.username }}</a></td>
+                        <td><a href="/user/{{ u.id }}" class="fw-bold text-decoration-none">{{ u.username }}</a></td>
                         <td>{{ u.village or '-' }}</td>
                         <td>{{ u.real_name or '-' }}</td>
                         <td><span class="fw-bold text-success">{{ u.points }}</span></td>
