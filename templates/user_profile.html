@@ -45,10 +45,11 @@
                     <div class="mb-2">
                         <a href="#" onclick="openExternal('/user/my?popup=1','통벗'); return false;" class="btn btn-warning btn-sm">🤖 통벗-{{ bot_name }}</a>
                     </div>
-                    <div class="d-flex flex-column gap-1">
-                        <a href="/user/my#tabChat" class="btn btn-sm btn-outline-primary">💬 대화</a>
-                        <a href="/user/my#tabWrite" class="btn btn-sm btn-outline-success">✍️ 글쓰기</a>
-                        <a href="/user/my#tabSchedule" class="btn btn-sm btn-outline-info">📅 일정</a>
+                    <div class="d-flex flex-wrap gap-1 justify-content-center">
+                        <a href="/user/my#tabChat" class="btn btn-sm btn-outline-primary py-0 px-1" style="font-size:0.7rem;">💬</a>
+                        <a href="/user/my#tabWrite" class="btn btn-sm btn-outline-success py-0 px-1" style="font-size:0.7rem;">✍️</a>
+                        <a href="/user/my#tabFriendchat" class="btn btn-sm btn-outline-info py-0 px-1" style="font-size:0.7rem;">👥</a>
+                        <a href="/user/my#tabSchedule" class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:0.7rem;">📅</a>
                     </div>
                     {% else %}
                     <div class="text-muted py-4">
@@ -82,11 +83,21 @@
     <!-- ========== 그룹2: 벗리스트 + 쪽지 ========== -->
     <div class="card border-0 shadow-sm mb-3" style="border-radius: 18px;">
         <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center" style="border-radius: 18px 18px 0 0;">
-            <span>{% if is_own %}📬 받은 쪽지{% else %}💬 주고받은 쪽지{% endif %}</span>
+            <span>{% if is_own %}👥 벗 · 쪽지{% else %}💬 주고받은 쪽지{% endif %}</span>
             {% if not is_own %}<a href="/message/send/{{ profile_user.id }}" class="btn btn-success btn-sm">쪽지 보내기</a>{% endif %}
         </div>
         <div class="card-body p-0">
-            <div class="list-group list-group-flush" style="max-height:300px;overflow-y:auto;">
+            {% if is_own and recent_friends %}
+            <div class="p-2 border-bottom">
+                <small class="text-muted">최근 교류한 벗</small>
+                <div class="d-flex flex-wrap gap-1 mt-1">
+                    {% for f in recent_friends[:8] %}
+                    <a href="/user/{{ f.id }}" class="badge bg-light text-dark text-decoration-none">{{ f.name }}</a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            <div class="list-group list-group-flush" style="max-height:250px;overflow-y:auto;">
                 {% for m in messages %}
                 <a href="/message/read/{{ m.id }}" class="list-group-item list-group-item-action {% if not m.is_read and is_own %}fw-bold bg-light{% endif %} small">
                     <div class="d-flex justify-content-between">

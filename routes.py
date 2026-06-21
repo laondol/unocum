@@ -1442,6 +1442,24 @@ def register_routes(app):
         posts.sort(key=lambda x: x["date"], reverse=True)
         posts = posts[:15]
         
+        recent_friends = []
+        if is_own:
+            from models import Friend, ChatMessage
+            f1 = Friend.query.filter_by(requester_id=uid, status='accepted').all()
+            f2 = Friend.query.filter_by(receiver_id=uid, status='accepted').all()
+            friend_ids = set()
+            for f in f1: friend_ids.add(f.receiver_id)
+            for f in f2: friend_ids.add(f.requester_id)
+            recent = []
+            for fid in friend_ids:
+                last_msg = ChatMessage.query.filter(ChatMessage.user_id==fid).order_by(ChatMessage.created_at.desc()).first()
+                recent.append({"id":fid, "last":last_msg.created_at if last_msg else None})
+            recent.sort(key=lambda x: x["last"] or datetime.min, reverse=True)
+            for r in recent:
+                u = User.query.get(r["id"])
+                if u:
+                    recent_friends.append({"id":u.id,"username":u.username,"name":u.real_name or u.username,"town":u.town or "","village":u.village or ""})
+        
         return render_template('user_profile.html', 
             profile_user=user, 
             point_history=point_history, 
@@ -1450,7 +1468,8 @@ def register_routes(app):
             is_friend=is_friend,
             bot_name=bot_name,
             posts=posts,
-            curr_location=curr_location
+            curr_location=curr_location,
+            recent_friends=recent_friends
         )
 
     @app.route('/user/location/refresh', methods=['POST'])
