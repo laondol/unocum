@@ -65,9 +65,10 @@
         <div id="chatMessages" class="mb-3" style="max-height:400px;overflow-y:auto;border:1px solid #dee2e6;border-radius:12px;padding:12px;background:#f8f9fa;">
             <div class="text-center text-muted small py-3">{{ greeting }}<br>저는 <strong>{{ bot.bot_name }}</strong>입니다. 함께사는양평에서 도와드릴게요.</div>
         </div>
-        <div class="input-group">
+        <div class="d-flex gap-2 mb-2">
             <input type="text" id="chatInput" class="form-control" placeholder="메시지..." onkeypress="if(event.key==='Enter')sendChat()">
             <button class="btn btn-primary" onclick="sendChat()">전송</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="showHistory()">📜 기록</button>
         </div>
     </div>
 

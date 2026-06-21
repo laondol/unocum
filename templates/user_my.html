@@ -57,10 +57,12 @@
         <div id="chatMessages" class="mb-3" style="max-height:400px;overflow-y:auto;border:1px solid #dee2e6;border-radius:12px;padding:12px;background:#f8f9fa;">
             <div class="text-center text-muted small py-3">{{ greeting }}<br>저는 <strong>{{ bot.bot_name }}</strong>입니다. 함께사는양평에서 도와드릴게요.</div>
         </div>
-        <div class="input-group">
+        <div class="d-flex gap-2 mb-2">
             <input type="text" id="chatInput" class="form-control" placeholder="메시지..." onkeypress="if(event.key==='Enter')sendChat()">
             <button class="btn btn-primary" onclick="sendChat()">전송</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="showHistory()">📜 기록</button>
         </div>
+        <div id="historyPanel" style="display:none;" class="card p-2 mb-2 small" style="max-height:300px;overflow-y:auto;"></div>
     </div>
 
     <!-- 글쓰기 탭 -->
@@ -201,6 +203,22 @@ function sendChat() {
     fetch('/api/bot/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message:msg})})
     .then(r=>r.json()).then(d=>{ msgs.lastElementChild.outerHTML = '<div class="text-start mb-2"><span class="badge bg-success">'+d.bot_name+'</span> '+d.reply+'</div>'; if(d.talent){msgs.innerHTML+='<div class="text-center mb-2"><span class="badge bg-warning text-dark">🌟 발견된 재능: '+d.talent+'</span></div>';} if(d.counselor){const c=d.counselor;msgs.innerHTML+='<div class="text-center mb-2"><div class="alert alert-info py-1 small">'+c.msg+'<br><a href="'+c.url+'" class="btn btn-sm btn-info mt-1">상담받기</a></div></div>';} msgs.scrollTop = msgs.scrollHeight; })
     .catch(()=>{ msgs.lastElementChild.outerHTML = '<div class="text-start mb-2 text-danger small">응답 실패</div>'; });
+}
+
+function showHistory() {
+    const panel = document.getElementById('historyPanel');
+    if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+    panel.style.display = ''; panel.innerHTML = '불러오는 중...';
+    fetch('/api/bot/history').then(r=>r.json()).then(d => {
+        if (!d.history || d.history.length === 0) { panel.innerHTML = '<div class="text-muted">대화 기록이 없습니다.</div>'; return; }
+        let html = '<strong>📜 대화 기록 (' + d.total + '회)</strong><hr class="my-1">';
+        d.history.forEach(h => {
+            html += '<div class="' + (h.role==='user'?'text-end':'text-start') + ' mb-1">';
+            html += '<span class="badge bg-' + (h.role==='user'?'primary':'success') + '">' + (h.role==='user'?'나':'통벗') + '</span> ';
+            html += h.text + '</div>';
+        });
+        panel.innerHTML = html;
+    });
 }
 
 // 편집기

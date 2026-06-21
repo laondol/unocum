@@ -112,6 +112,8 @@ def bot_chat():
     bot = _get_bot(uid)
     user = User.query.get(uid)
     reply = _ai_reply(bot, user, msg)
+    bot.memory = (bot.memory or '')[-800:] + f'\n통벗: {reply[:150]}'
+    db.session.commit()
     talent = None
     if int(bot.chat_count or 0) % 10 == 0 and int(bot.chat_count or 0) > 0:
         talent = _discover_talent(bot, user)
@@ -122,6 +124,22 @@ def bot_chat():
     elif counselor == 'psycho':
         counselor_msg = {'type':'psycho','msg':'마음이 힘드신가요? 심리상담사와 대화를 연결해 드릴까요? (30닢 소요)','url':'/psycho/list'}
     return jsonify({"reply": reply, "bot_name": bot.bot_name, "talent": talent, "mood": bot.mood, "level": bot.level, "counselor": counselor_msg})
+
+@tongbot_bp.route('/api/bot/history')
+def bot_history():
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({"error": "로그인이 필요합니다."}), 401
+    bot = _get_bot(uid)
+    lines = (bot.memory or '').strip().split('\n')
+    history = []
+    for line in lines[-50:]:
+        line = line.strip()
+        if line.startswith('회원:'):
+            history.append({"role": "user", "text": line[3:].strip()})
+        elif line.startswith('통벗:'):
+            history.append({"role": "bot", "text": line[3:].strip()})
+    return jsonify({"history": history, "total": bot.chat_count or 0})
 
 MOODS = ['neutral','happy','excited','thoughtful','caring','playful']
 MOOD_EMOJI = {'neutral':'😊','happy':'😄','excited':'🤩','thoughtful':'🤔','caring':'🥰','playful':'😜'}
