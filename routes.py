@@ -1420,8 +1420,17 @@ def register_routes(app):
                 curr_location = f"{user.curr_latitude:.4f}, {user.curr_longitude:.4f}"
         if is_own:
             bot = TongBot.query.filter_by(user_id=uid).first()
-            if bot:
-                bot_name = bot.bot_name
+            if not bot:
+                import random, string as _s
+                uid_str = ''.join(random.choices(_s.ascii_uppercase + _s.digits, k=4))
+                bid = f"A-{uid_str}"
+                while TongBot.query.filter_by(bot_id=bid).first():
+                    uid_str = ''.join(random.choices(_s.ascii_uppercase + _s.digits, k=4))
+                    bid = f"A-{uid_str}"
+                bot = TongBot(user_id=uid, bot_id=bid, bot_name=bid)
+                db.session.add(bot)
+                db.session.commit()
+            bot_name = bot.bot_name
         # 게시글 모음
         from models import Post, ShareReport
         own_posts = Post.query.filter_by(user_id=user.id).order_by(Post.created_at.desc()).limit(10).all()
