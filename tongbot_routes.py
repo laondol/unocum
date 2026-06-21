@@ -547,3 +547,22 @@ def chat_invite(room_id):
     room.participants = json.dumps(pids)
     db.session.commit()
     return jsonify({"ok":True})
+
+@tongbot_bp.route('/api/chat/warn/<int:room_id>', methods=['POST'])
+def chat_warn(room_id):
+    room = ChatRoom.query.get_or_404(room_id)
+    bot = _get_bot(room.creator_id)
+    db.session.add(ChatMessage(room_id=room_id, user_id=None, username='⏰',
+        message=f"⚠️ 채팅방이 10분 후에 종료됩니다. 중요한 내용은 미리 저장해 주세요!", is_bot=True))
+    db.session.commit()
+    return jsonify({"ok":True})
+
+@tongbot_bp.route('/api/chat/close/<int:room_id>', methods=['POST'])
+def chat_close(room_id):
+    room = ChatRoom.query.get_or_404(room_id)
+    room.is_active = False
+    bot = _get_bot(room.creator_id)
+    db.session.add(ChatMessage(room_id=room_id, user_id=None, username='⏰',
+        message=f"🛑 2시간이 지나 채팅방이 종료되었습니다. 다음에 또 만나요! 💕", is_bot=True))
+    db.session.commit()
+    return jsonify({"ok":True})
