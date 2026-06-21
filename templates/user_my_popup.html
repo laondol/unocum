@@ -58,6 +58,7 @@
         <li class="nav-item"><a class="nav-link active" href="#" data-tab="chat">💬 대화</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-tab="write">✍️ 글쓰기</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-tab="schedule">📅 일정</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" data-tab="friendchat">👥 벗 채팅</a></li>
     </ul>
 
     <!-- 채팅 탭 -->
@@ -179,7 +180,7 @@ document.querySelectorAll('#botTabs .nav-link').forEach(tab => {
         e.preventDefault();
         document.querySelectorAll('#botTabs .nav-link').forEach(t => t.classList.remove('active'));
         this.classList.add('active');
-        ['tabChat','tabWrite','tabSchedule'].forEach(id => document.getElementById(id).style.display='none');
+        ['tabChat','tabWrite','tabFriendchat','tabSchedule'].forEach(id => document.getElementById(id).style.display='none');
         document.getElementById('tab' + this.dataset.tab.charAt(0).toUpperCase() + this.dataset.tab.slice(1)).style.display = '';
     });
 });
