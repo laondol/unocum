@@ -417,6 +417,23 @@ def bot_upload():
 
 # ─── 벗 채팅 ───
 
+@tongbot_bp.route('/api/chat/friends')
+def chat_friends():
+    uid = session.get('user_id')
+    if not uid: return jsonify({"error":"로그인"}),401
+    from models import Friend
+    f1 = Friend.query.filter_by(requester_id=uid, status='accepted').all()
+    f2 = Friend.query.filter_by(receiver_id=uid, status='accepted').all()
+    friend_ids = set()
+    for f in f1: friend_ids.add(f.receiver_id)
+    for f in f2: friend_ids.add(f.requester_id)
+    friends = []
+    for fid in friend_ids:
+        u = User.query.get(fid)
+        if u:
+            friends.append({"id":u.id,"username":u.username,"name":u.real_name or u.username,"town":u.town or "","village":u.village or ""})
+    return jsonify({"friends":friends})
+
 @tongbot_bp.route('/api/chat/rooms', methods=['GET','POST'])
 def chat_rooms():
     uid = session.get('user_id')

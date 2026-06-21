@@ -147,38 +147,25 @@
 
     <!-- 벗 채팅 탭 -->
     <div id="tabFriendchat" style="display:none;">
-        <div class="d-flex gap-2 mb-3">
-            <button class="btn btn-sm btn-primary" onclick="createChatRoom()">+ 새 채팅방</button>
-        </div>
-        <div id="chatRoomList">
-            {% for r in chat_rooms %}
-            <div class="card mb-2" style="cursor:pointer;" onclick="openChatRoom({{ r.id }})">
-                <div class="card-body p-2 small">
-                    <strong>{{ r.name }}</strong>
-                    <span class="text-muted ms-2">
-                        {% for pid in json.loads(r.participants or '[]') %}
-                        {{ pid }}{% if not loop.last %}, {% endif %}
-                        {% endfor %}
-                    </span>
-                    <small class="text-muted float-end">{{ r.created_at.strftime('%H:%M') if r.created_at else '' }}</small>
+        <div class="row g-3">
+            <div class="col-md-5">
+                <h6 class="small text-muted">👥 내 벗 목록</h6>
+                <div id="friendList" class="list-group small" style="max-height:300px;overflow-y:auto;">불러오는 중...</div>
+            </div>
+            <div class="col-md-7">
+                <div id="chatRoomList">
+                    {% for r in chat_rooms %}
+                    <div class="card mb-2" style="cursor:pointer;" onclick="openChatRoom({{ r.id }})">
+                        <div class="card-body p-2 small"><strong>{{ r.name }}</strong> <small class="text-muted float-end">{{ r.created_at.strftime('%H:%M') if r.created_at else '' }}</small></div>
+                    </div>
+                    {% endfor %}
+                    {% if not chat_rooms %}<div class="text-muted text-center py-3">참여 중인 채팅방이 없습니다.<br><small>벗을 선택하고 채팅방을 만들어보세요!</small></div>{% endif %}
                 </div>
-            </div>
-            {% endfor %}
-            {% if not chat_rooms %}
-            <div class="text-muted text-center py-3">참여 중인 채팅방이 없습니다.</div>
-            {% endif %}
-        </div>
-        <!-- 채팅창 -->
-        <div id="activeChat" style="display:none;" class="card">
-            <div class="card-header d-flex justify-content-between p-2">
-                <strong class="small" id="activeChatName"></strong>
-                <button class="btn btn-sm btn-outline-secondary" onclick="closeChatRoom()">✕</button>
-            </div>
-            <div id="activeChatMsgs" class="card-body p-2" style="max-height:300px;overflow-y:auto;"></div>
-            <div class="card-footer p-2">
-                <div class="input-group input-group-sm">
-                    <input type="text" id="chatMsgInput" class="form-control" placeholder="메시지..." onkeypress="if(event.key==='Enter')sendChatMsg()">
-                    <button class="btn btn-primary" onclick="sendChatMsg()">전송</button>
+                <button class="btn btn-sm btn-primary mt-2" onclick="createChatFromFriends()">+ 선택한 벗과 채팅</button>
+                <div id="activeChat" style="display:none;" class="card mt-2">
+                    <div class="card-header d-flex justify-content-between p-2"><strong class="small" id="activeChatName"></strong><button class="btn btn-sm btn-outline-secondary" onclick="closeChatRoom()">✕</button></div>
+                    <div id="activeChatMsgs" class="card-body p-2" style="max-height:250px;overflow-y:auto;"></div>
+                    <div class="card-footer p-2"><div class="input-group input-group-sm"><input type="text" id="chatMsgInput" class="form-control" placeholder="메시지..." onkeypress="if(event.key==='Enter')sendChatMsg()"><button class="btn btn-primary" onclick="sendChatMsg()">전송</button></div></div>
                 </div>
             </div>
         </div>
@@ -214,6 +201,7 @@ document.querySelectorAll('#botTabs .nav-link').forEach(tab => {
         this.classList.add('active');
         ['tabChat','tabWrite','tabFriendchat','tabSchedule'].forEach(id => document.getElementById(id).style.display='none');
         document.getElementById('tab' + this.dataset.tab.charAt(0).toUpperCase() + this.dataset.tab.slice(1)).style.display = '';
+        if (this.dataset.tab === 'friendchat') loadFriendList();
     });
 });
 
@@ -374,7 +362,27 @@ function addSchedule() {
 }
 
 let activeRoomId = null, chatPollTimer = null;
-function createChatRoom() {
+function loadFriendList() {
+    fetch('/api/chat/friends').then(r=>r.json()).then(d=>{
+        if (!d.friends || d.friends.length===0) {
+            document.getElementById('friendList').innerHTML='<div class="text-muted py-2">아직 벗이 없습니다.<br><small>다른 회원님 프로필에서 벗 신청을 해보세요!</small></div>';
+            return;
+        }
+        document.getElementById('friendList').innerHTML = d.friends.map(f=>
+            '<label class="list-group-item"><input type="checkbox" class="friend-check" value="'+f.id+'"> '+f.name+' <small class="text-muted">@'+f.username+'</small><br><small>'+f.town+' '+f.village+'</small></label>'
+        ).join('');
+    });
+}
+function createChatFromFriends() {
+    const checked = document.querySelectorAll('.friend-check:checked');
+    if (checked.length===0) return alert('벗을 선택해 주세요.');
+    const name = prompt('채팅방 이름:','우리들의 대화');
+    if (!name) return;
+    const fids = Array.from(checked).map(c=>parseInt(c.value));
+    fetch('/api/chat/rooms', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name,friends:fids})})
+    .then(r=>r.json()).then(d=>{ if(d.id) location.reload(); else alert(d.error||'실패'); });
+}
+function createChatRoom() {}
     const name = prompt('채팅방 이름:','우리들의 대화');
     if (!name) return;
     const friends = prompt('초대할 벗의 회원번호 (쉼표로 구분):');
