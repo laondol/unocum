@@ -379,7 +379,15 @@ function createChatFromFriends() {
     const name = prompt('채팅방 이름:','우리들의 대화');
     if (!name) return;
     const fids = Array.from(checked).map(c=>parseInt(c.value));
-    fetch('/api/chat/rooms', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name,friends:fids})})
+    const hasSchedule = confirm('이 채팅방에 일정을 연결할까요?');
+    let schedule = null;
+    if (hasSchedule) {
+        const stitle = prompt('일정 제목:',name);
+        const sdate = prompt('일정 날짜/시간 (예: 2026-07-01 14:00):','');
+        const sdesc = prompt('일정 설명:','');
+        if (stitle && sdate) schedule = {title:stitle, event_date:sdate, description:sdesc};
+    }
+    fetch('/api/chat/rooms', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name,friends:fids,schedule})})
     .then(r=>r.json()).then(d=>{ if(d.id) location.reload(); else alert(d.error||'실패'); });
 }
 function createChatRoom() {}

@@ -442,6 +442,7 @@ def chat_rooms():
         data = request.json
         name = data.get('name','채팅방')
         friends = data.get('friends',[])
+        schedule = data.get('schedule')
         if not friends: return jsonify({"error":"벗을 선택하세요"})
         import json, datetime as _dt
         pids = [uid] + friends
@@ -449,13 +450,28 @@ def chat_rooms():
                        expires_at=datetime.now() + _dt.timedelta(hours=2))
         db.session.add(room)
         db.session.flush()
-        # 통벗 입장 메시지
+        # 일정 연결
+        if schedule and schedule.get('title') and schedule.get('event_date'):
+            try:
+                s = TongBotSchedule(user_id=uid, title=schedule['title'],
+                    description=schedule.get('description',''),
+                    event_date=datetime.fromisoformat(schedule['event_date']),
+                    invited_user_ids=json.dumps(friends))
+                db.session.add(s)
+                db.session.flush()
+                db.session.add(ChatMessage(room_id=room.id, user_id=None, username='📅 일정',
+                    message=f"📅 일정: {schedule['title']}\n🕐 {schedule['event_date']}\n📝 {schedule.get('description','')}\n참여자: {len(friends)+1}명", is_bot=True))
+            except: pass
+        # 통벗 입장
         bot = _get_bot(uid)
         db.session.add(ChatMessage(room_id=room.id, user_id=None, username=bot.bot_name,
-            message=f"안녕하세요! 저는 {bot.bot_name}입니다. 즐거운 대화를 위해 제가 함께할게요. 서로 존중하며 이야기 나눠요! 💕", is_bot=True))
+            message=f"안녕하세요! 저는 {bot.bot_name}입니다. {len(friends)}명의 벗과 함께 대화를 시작합니다. 서로 존중하며 즐거운 시간 보내요! 💕", is_bot=True))
         db.session.commit()
         return jsonify({"id": room.id, "name": name})
     import json
+    # 만료된 방 정리
+    ChatRoom.query.filter(ChatRoom.is_active==True, ChatRoom.expires_at < datetime.now()).update({"is_active":False}, synchronize_session=False)
+    db.session.commit()
     rooms = ChatRoom.query.filter(ChatRoom.is_active==True, ChatRoom.participants.contains(str(uid))).order_by(ChatRoom.created_at.desc()).limit(20).all()
     result = []
     for r in rooms:
