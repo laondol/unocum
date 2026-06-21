@@ -49,6 +49,7 @@
     <ul class="nav nav-tabs mb-4" id="botTabs">
         <li class="nav-item"><a class="nav-link active" href="#" data-tab="chat">💬 대화</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-tab="write">✍️ 글쓰기</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" data-tab="friendchat">👥 벗 채팅</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-tab="schedule">📅 일정</a></li>
     </ul>
 
@@ -144,6 +145,45 @@
         </div>
     </div>
 
+    <!-- 벗 채팅 탭 -->
+    <div id="tabFriendchat" style="display:none;">
+        <div class="d-flex gap-2 mb-3">
+            <button class="btn btn-sm btn-primary" onclick="createChatRoom()">+ 새 채팅방</button>
+        </div>
+        <div id="chatRoomList">
+            {% for r in chat_rooms %}
+            <div class="card mb-2" style="cursor:pointer;" onclick="openChatRoom({{ r.id }})">
+                <div class="card-body p-2 small">
+                    <strong>{{ r.name }}</strong>
+                    <span class="text-muted ms-2">
+                        {% for pid in json.loads(r.participants or '[]') %}
+                        {{ pid }}{% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                    </span>
+                    <small class="text-muted float-end">{{ r.created_at.strftime('%H:%M') if r.created_at else '' }}</small>
+                </div>
+            </div>
+            {% endfor %}
+            {% if not chat_rooms %}
+            <div class="text-muted text-center py-3">참여 중인 채팅방이 없습니다.</div>
+            {% endif %}
+        </div>
+        <!-- 채팅창 -->
+        <div id="activeChat" style="display:none;" class="card">
+            <div class="card-header d-flex justify-content-between p-2">
+                <strong class="small" id="activeChatName"></strong>
+                <button class="btn btn-sm btn-outline-secondary" onclick="closeChatRoom()">✕</button>
+            </div>
+            <div id="activeChatMsgs" class="card-body p-2" style="max-height:300px;overflow-y:auto;"></div>
+            <div class="card-footer p-2">
+                <div class="input-group input-group-sm">
+                    <input type="text" id="chatMsgInput" class="form-control" placeholder="메시지..." onkeypress="if(event.key==='Enter')sendChatMsg()">
+                    <button class="btn btn-primary" onclick="sendChatMsg()">전송</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 일정 탭 -->
     <div id="tabSchedule" style="display:none;">
         <button class="btn btn-sm btn-primary mb-3" onclick="document.getElementById('addScheduleForm').style.display=''">+ 새 일정</button>
@@ -172,7 +212,7 @@ document.querySelectorAll('#botTabs .nav-link').forEach(tab => {
         e.preventDefault();
         document.querySelectorAll('#botTabs .nav-link').forEach(t => t.classList.remove('active'));
         this.classList.add('active');
-        ['tabChat','tabWrite','tabSchedule'].forEach(id => document.getElementById(id).style.display='none');
+        ['tabChat','tabWrite','tabFriendchat','tabSchedule'].forEach(id => document.getElementById(id).style.display='none');
         document.getElementById('tab' + this.dataset.tab.charAt(0).toUpperCase() + this.dataset.tab.slice(1)).style.display = '';
     });
 });
@@ -331,6 +371,44 @@ function addSchedule() {
     if (!data.title || !data.event_date) return alert('제목과 날짜를 입력하세요.');
     fetch('/api/bot/schedule', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
     .then(r=>r.json()).then(d=>{ if(d.success) location.reload(); });
+}
+
+let activeRoomId = null, chatPollTimer = null;
+function createChatRoom() {
+    const name = prompt('채팅방 이름:','우리들의 대화');
+    if (!name) return;
+    const friends = prompt('초대할 벗의 회원번호 (쉼표로 구분):');
+    if (!friends) return;
+    const fids = friends.split(',').map(s=>parseInt(s.trim())).filter(n=>!isNaN(n));
+    fetch('/api/chat/rooms', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name,friends:fids})})
+    .then(r=>r.json()).then(d=>{ if(d.id) location.reload(); else alert(d.error); });
+}
+function openChatRoom(id) {
+    activeRoomId = id; document.getElementById('activeChat').style.display='';
+    document.getElementById('activeChatName').textContent = '채팅방 #'+id;
+    loadChatMsgs();
+    chatPollTimer = setInterval(loadChatMsgs, 3000);
+}
+function closeChatRoom() {
+    activeRoomId = null; clearInterval(chatPollTimer);
+    document.getElementById('activeChat').style.display='none';
+}
+function loadChatMsgs() {
+    if (!activeRoomId) return;
+    fetch('/api/chat/messages/'+activeRoomId).then(r=>r.json()).then(d=>{
+        const el = document.getElementById('activeChatMsgs');
+        el.innerHTML = d.messages.map(m=>{
+            const cls = m.is_bot?'text-center text-muted fst-italic':'';
+            return '<div class="mb-1 '+cls+'"><span class="badge bg-'+(m.is_bot?'warning':'primary')+' small">'+m.username+'</span> '+m.message+' <small class="text-muted">'+m.time+'</small></div>';
+        }).join('');
+        el.scrollTop = el.scrollHeight;
+    });
+}
+function sendChatMsg() {
+    const input = document.getElementById('chatMsgInput'), msg = input.value.trim();
+    if (!msg || !activeRoomId) return;
+    fetch('/api/chat/messages/'+activeRoomId, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message:msg})})
+    .then(r=>r.json()).then(d=>{ input.value=''; loadChatMsgs(); });
 }
 </script>
 {% endblock %}

@@ -1,6 +1,6 @@
 import random, string
 from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template, current_app
-from models import db, User, TongBot, TongBotDraft, TongBotSchedule
+from models import db, User, TongBot, TongBotDraft, TongBotSchedule, ChatRoom, ChatMessage
 from datetime import datetime
 import os, uuid
 
@@ -36,8 +36,10 @@ def my_page():
     except: pass
     popup = request.args.get('popup') == '1'
     greeting = _greeting(user)
+    import json
+    chat_rooms = ChatRoom.query.filter(ChatRoom.is_active==True, ChatRoom.participants.contains(str(user.id))).order_by(ChatRoom.created_at.desc()).limit(10).all()
     tpl = 'user_my_popup.html' if popup else 'user_my.html'
-    return render_template(tpl, user=user, bot=bot, drafts=drafts, schedules=schedules, stamps_count=stamps_count, greeting=greeting)
+    return render_template(tpl, user=user, bot=bot, drafts=drafts, schedules=schedules, stamps_count=stamps_count, greeting=greeting, chat_rooms=chat_rooms, json=json)
 
 @tongbot_bp.route('/api/bot/rename', methods=['POST'])
 def bot_rename():
@@ -412,3 +414,103 @@ def bot_upload():
     f.save(os.path.join(upload_dir, fname))
     url = f"/static/uploads/tongbot/{fname}"
     return jsonify({"url": url, "filename": fname})
+
+# ─── 벗 채팅 ───
+
+@tongbot_bp.route('/api/chat/rooms', methods=['GET','POST'])
+def chat_rooms():
+    uid = session.get('user_id')
+    if not uid: return jsonify({"error": "로그인"}), 401
+    if request.method == 'POST':
+        data = request.json
+        name = data.get('name','채팅방')
+        friends = data.get('friends',[])
+        if not friends: return jsonify({"error":"벗을 선택하세요"})
+        import json, datetime as _dt
+        pids = [uid] + friends
+        room = ChatRoom(name=name, creator_id=uid, participants=json.dumps(pids),
+                       expires_at=datetime.now() + _dt.timedelta(hours=2))
+        db.session.add(room)
+        db.session.flush()
+        # 통벗 입장 메시지
+        bot = _get_bot(uid)
+        db.session.add(ChatMessage(room_id=room.id, user_id=None, username=bot.bot_name,
+            message=f"안녕하세요! 저는 {bot.bot_name}입니다. 즐거운 대화를 위해 제가 함께할게요. 서로 존중하며 이야기 나눠요! 💕", is_bot=True))
+        db.session.commit()
+        return jsonify({"id": room.id, "name": name})
+    import json
+    rooms = ChatRoom.query.filter(ChatRoom.is_active==True, ChatRoom.participants.contains(str(uid))).order_by(ChatRoom.created_at.desc()).limit(20).all()
+    result = []
+    for r in rooms:
+        pids = json.loads(r.participants or '[]')
+        names = []
+        for pid in pids:
+            u = User.query.get(pid)
+            names.append(u.username if u else str(pid))
+        result.append({"id": r.id, "name": r.name, "participants": names, "created": r.created_at.strftime("%H:%M") if r.created_at else ''})
+    return jsonify({"rooms": result})
+
+@tongbot_bp.route('/api/chat/messages/<int:room_id>', methods=['GET','POST'])
+def chat_messages(room_id):
+    uid = session.get('user_id')
+    if not uid: return jsonify({"error":"로그인"}),401
+    import json
+    room = ChatRoom.query.get_or_404(room_id)
+    pids = json.loads(room.participants or '[]')
+    if uid not in pids: return jsonify({"error":"권한없음"}),403
+    if request.method == 'POST':
+        msg = request.json.get('message','').strip()
+        if not msg: return jsonify({"error":"내용입력"})
+        # 비방 감지
+        bad_words = ['바보','멍청','죽어','꺼져','XX','시발','병신']
+        is_bad = any(w in msg for w in bad_words)
+        db.session.add(ChatMessage(room_id=room_id, user_id=uid, username=session.get('username',''), message=msg))
+        if is_bad:
+            bot = _get_bot(uid)
+            db.session.add(ChatMessage(room_id=room_id, user_id=None, username=bot.bot_name,
+                message=f"⚠️ 부적절한 표현이 감지되었습니다. 서로 존중하는 대화를 부탁드려요.", is_bot=True))
+        db.session.commit()
+        # 통벗 조율 (5회마다)
+        count = ChatMessage.query.filter_by(room_id=room_id, is_bot=False).count()
+        if count % 5 == 0:
+            _moderate_chat(room_id)
+        return jsonify({"ok":True})
+    msgs = ChatMessage.query.filter_by(room_id=room_id).order_by(ChatMessage.created_at.desc()).limit(50).all()
+    msgs.reverse()
+    return jsonify({"messages":[{"id":m.id,"username":m.username,"message":m.message,"is_bot":m.is_bot,"time":m.created_at.strftime("%H:%M") if m.created_at else ""} for m in msgs]})
+
+def _moderate_chat(room_id):
+    bot = _get_bot(session.get('user_id'))
+    msgs = ChatMessage.query.filter_by(room_id=room_id, is_bot=False).order_by(ChatMessage.created_at.desc()).limit(10).all()
+    if not msgs: return
+    recent = ' | '.join([f"{m.username}:{m.message[:30]}" for m in msgs])
+    try:
+        from config import Config
+        import requests
+        key = getattr(Config, 'GROQ_API_KEY', '')
+        if not key: return
+        prompt = f"""당신은 채팅 중재자입니다. 다음 대화를 보고 분위기를 판단하세요.
+긍정적이면 칭찬, 부정적이면 부드럽게 조율하는 한 문장을 쓰세요.
+대화: {recent}"""
+        r = requests.post("https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {key}"}, json={"model":"llama-3.1-8b-instant","messages":[{"role":"user","content":prompt}],"max_tokens":100}, timeout=15)
+        if r.status_code == 200:
+            reply = r.json()["choices"][0]["message"]["content"]
+            db.session.add(ChatMessage(room_id=room_id, user_id=None, username=bot.bot_name, message=f"💬 {reply}", is_bot=True))
+            db.session.commit()
+    except: pass
+
+@tongbot_bp.route('/api/chat/invite/<int:room_id>', methods=['POST'])
+def chat_invite(room_id):
+    uid = session.get('user_id')
+    if not uid: return jsonify({"error":"로그인"}),401
+    import json
+    room = ChatRoom.query.get_or_404(room_id)
+    pids = json.loads(room.participants or '[]')
+    if uid not in pids: return jsonify({"error":"권한없음"}),403
+    friend_id = request.json.get('friend_id')
+    if not friend_id or friend_id in pids: return jsonify({"error":"불가"})
+    pids.append(int(friend_id))
+    room.participants = json.dumps(pids)
+    db.session.commit()
+    return jsonify({"ok":True})

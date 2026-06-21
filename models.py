@@ -298,6 +298,24 @@ class TongBotSchedule(db.Model):
     invited_user_ids = db.Column(db.Text, default='')
     created_at = db.Column(db.DateTime, default=datetime.now)
 
+class ChatRoom(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), default='')
+    creator_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    participants = db.Column(db.Text, default='[]')
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    expires_at = db.Column(db.DateTime)
+
+class ChatMessage(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    room_id = db.Column(db.Integer, nullable=False)
+    user_id = db.Column(db.Integer, nullable=True)
+    username = db.Column(db.String(50))
+    message = db.Column(db.Text)
+    is_bot = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
 class LegalPost(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
