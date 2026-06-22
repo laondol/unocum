@@ -25,7 +25,7 @@
 
     <div class="row g-3">
         <div class="col-4">
-            <h6 class="small text-muted">👥 벗</h6>
+            <h6 class="small text-muted">👥 벗 <span id="friendCount"></span></h6>
             <div id="friendList" class="list-group small" style="max-height:400px;overflow-y:auto;">불러오는 중...</div>
         </div>
         <div class="col-8">
@@ -189,6 +189,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function loadFriendList() {
     fetch('/api/chat/friends').then(r=>r.json()).then(d=>{
         const el = document.getElementById('friendList');
+        document.getElementById('friendCount').textContent = '(' + (d.friends ? d.friends.length : 0) + ')';
         if (!d.friends||d.friends.length===0) { el.innerHTML='<div class="text-muted py-2">아직 벗이 없습니다.<br><small>프로필에서 벗 신청을 해보세요!</small></div>'; return; }
         el.innerHTML = d.friends.map(f=>'<label class="list-group-item"><input type="checkbox" class="friend-check" value="'+f.id+'"> '+f.name+' <small class="text-muted">@'+f.username+'</small></label>').join('');
     });
