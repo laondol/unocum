@@ -161,7 +161,7 @@
                     {% endfor %}
                     {% if not chat_rooms %}<div class="text-muted text-center py-3">참여 중인 채팅방이 없습니다.<br><small>벗을 선택하고 채팅방을 만들어보세요!</small></div>{% endif %}
                 </div>
-                <button class="btn btn-sm btn-primary mt-2" onclick="showChatOptions()">+ 선택한 벗과 채팅</button>
+                <button class="btn btn-sm btn-primary mt-2" id="chatCreateBtn">+ 선택한 벗과 채팅</button>
                 <div id="activeChat" style="display:none;" class="card mt-2">
                     <div class="card-header d-flex justify-content-between p-2"><strong class="small" id="activeChatName"></strong><button class="btn btn-sm btn-outline-secondary" onclick="closeChatRoom()">✕</button></div>
                     <div id="activeChatMsgs" class="card-body p-2" style="max-height:250px;overflow-y:auto;"></div>
