@@ -79,12 +79,17 @@
 
     <!-- 동선 계획 탭 -->
     <div id="tabPlan" style="display:none;">
+        <div class="row g-2 mb-2">
+            <div class="col-6"><small class="text-muted">날짜</small><input type="date" id="planDate" class="form-control form-control-sm"></div>
+            <div class="col-6"><small class="text-muted">출발시간</small><input type="time" id="planStart" class="form-control form-control-sm" value="09:00"></div>
+        </div>
+        <div class="row g-2 mb-2">
+            <div class="col-6"><small class="text-muted">출발장소</small><input class="form-control form-control-sm" id="planFrom" placeholder="기본장소"></div>
+            <div class="col-6"><small class="text-muted">도착장소</small><input class="form-control form-control-sm" id="planTo" placeholder="기본장소"></div>
+        </div>
+        <small class="text-muted">📋 일정 목록</small>
         <div id="planItems"></div>
         <button class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="addPlanItem()">+ 일정 추가</button>
-        <div class="row g-2 mb-2">
-            <div class="col-6"><input type="date" id="planDate" class="form-control"></div>
-            <div class="col-6"><input type="time" id="planStart" class="form-control" value="09:00"></div>
-        </div>
         <button class="btn btn-primary w-100" onclick="calcPlan()">🗺️ 일정 계산하기</button>
         <div id="planResult" class="small mt-2"></div>
     </div>
@@ -257,6 +262,8 @@ function addPlanItem() {
 function calcPlan() {
     var date = document.getElementById('planDate').value;
     var start = document.getElementById('planStart').value;
+    var from = document.getElementById('planFrom').value;
+    var to = document.getElementById('planTo').value;
     if (!date) return alert('날짜를 선택하세요.');
     var items = [];
     for (var i = 1; i <= planCount; i++) {
@@ -268,16 +275,17 @@ function calcPlan() {
     if (items.length === 0) return alert('일정을 하나 이상 추가하세요.');
     fetch('/api/bot/schedule/plan', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({date:date, start:start, items:items})
+        body:JSON.stringify({date:date, start:start, from:from, to:to, items:items})
     }).then(function(r){return r.json()}).then(function(d){
         var el = document.getElementById('planResult');
         if (d.error) { el.innerHTML = '<div class="text-danger">'+d.error+'</div>'; return; }
-        var html = '<div class="alert alert-info py-2 small"><strong>🗺️ '+d.date+' 동선</strong><br>';
-        html += '🏠 ' + d.home + ' → 출발<br>';
+        var html = '<div class="alert alert-info py-2 small"><strong>🗺️ ' + d.date + '</strong><br>';
+        html += '🏠 <strong>' + d.from + '</strong> → ' + d.start + ' 출발<br>';
         d.plan.forEach(function(p){
-            html += '🚶 ' + p.travel_min + '분 이동 → <strong>' + p.time + '</strong> ' + p.title + ' (' + p.dur + '분)<br>';
+            html += '  🚌 ' + p.travel_min + '분 → <strong>' + p.time + '</strong> <em>' + p.title + '</em> (' + p.dur + '분)<br>';
+            html += '  ⏰ ' + p.leave_time + ' 출발 → ';
         });
-        html += '🏠 ' + d.arrive_home + ' 귀가</div>';
+        html += '🏠 <strong>' + d.to + '</strong> ' + d.arrive_home + ' 도착</div>';
         el.innerHTML = html;
     });
 }

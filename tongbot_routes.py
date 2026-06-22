@@ -524,12 +524,18 @@ def schedule_plan():
     data = request.get_json()
     date = data.get('date','')
     start_time = data.get('start','09:00')
+    from_loc = data.get('from','') or f"{user.town or ''} {user.village or ''}".strip() or '양평'
+    to_loc = data.get('to','') or from_loc
     items = data.get('items',[])
     user = User.query.get(uid)
-    home = f"{user.town or ''} {user.village or ''}".strip() or '양평'
     from services.transit import haversine_km, geocode_address, estimate_transit_time_rough
     from config import Config
-    # Geocode locations (rough)
+    # Geocode start/end
+    start_geo = geocode_address(from_loc, Config.KAKAO_REST_API_KEY) if from_loc else None
+    start_coords = (start_geo['lat'], start_geo['lng']) if start_geo else (37.49, 127.49)
+    end_geo = geocode_address(to_loc, Config.KAKAO_REST_API_KEY) if to_loc else None
+    end_coords = (end_geo['lat'], end_geo['lng']) if end_geo else start_coords
+    # Geocode locations
     locations = []
     for item in items:
         loc = item.get('loc','')
@@ -543,23 +549,25 @@ def schedule_plan():
     home_coords = (home_geo['lat'], home_geo['lng']) if home_geo else (37.49, 127.49)
     # Calculate plan
     plan = []
-    current_coords = home_coords
+    current_coords = start_coords
     current_min = int(start_time.split(':')[0])*60 + int(start_time.split(':')[1])
-    for loc in locations:
+    for idx, loc in enumerate(locations):
         if loc['coords']:
             travel = estimate_transit_time_rough(current_coords[0], current_coords[1], loc['coords'][0], loc['coords'][1])
         else:
             travel = 15
         arr_min = current_min + travel
         arr_time = f"{arr_min//60:02d}:{arr_min%60:02d}"
-        plan.append({'title':loc['title'],'time':arr_time,'dur':loc['dur'],'travel_min':travel})
-        current_min = arr_min + loc['dur']
+        leave_min = arr_min + loc['dur']
+        leave_time = f"{leave_min//60:02d}:{leave_min%60:02d}"
+        plan.append({'title':loc['title'],'time':arr_time,'dur':loc['dur'],'travel_min':travel,'leave_time':leave_time})
+        current_min = leave_min
         if loc['coords']:
             current_coords = loc['coords']
-    # Return home
-    travel_home = estimate_transit_time_rough(current_coords[0], current_coords[1], home_coords[0], home_coords[1])
+    # Return to end location
+    travel_home = estimate_transit_time_rough(current_coords[0], current_coords[1], end_coords[0], end_coords[1])
     arrive_home = f"{(current_min+travel_home)//60:02d}:{(current_min+travel_home)%60:02d}"
-    return jsonify({'date':date,'home':home,'plan':plan,'arrive_home':arrive_home})
+    return jsonify({'date':date,'from':from_loc,'to':to_loc,'start':start_time,'plan':plan,'arrive_home':arrive_home})
 
 @tongbot_bp.route('/admin/tongbot/monitor')
 def admin_tongbot_monitor():
