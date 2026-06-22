@@ -365,9 +365,15 @@ function createChatFromFriends(mode) {
 function showChatOptions() {
     const checked = document.querySelectorAll('.friend-check:checked');
     if (checked.length===0) return alert('벗을 먼저 선택해 주세요.');
-    const html = '<div class="text-center p-3"><strong>채팅방 만들기</strong><hr><button class="btn btn-success w-100 mb-2" onclick="this.parentElement.parentElement.remove();createChatFromFriends(\"now\")">⚡ 바로 채팅</button><button class="btn btn-outline-primary w-100" onclick="this.parentElement.parentElement.remove();createChatFromFriends(\"later\")">📅 예약 채팅</button></div>';
+    const html = '<div id=\"chatOptions\" class=\"text-center p-3\"><strong>채팅방 만들기</strong><hr><button class=\"btn btn-success w-100 mb-2 chat-opt-btn\" data-mode=\"now\">⚡ 바로 채팅</button><button class=\"btn btn-outline-primary w-100 chat-opt-btn\" data-mode=\"later\">📅 예약 채팅</button></div>';
     const el = document.getElementById('chatRoomListPop');
     el.innerHTML = html;
+    document.querySelectorAll('.chat-opt-btn').forEach(b => {
+        b.addEventListener('click', function() {
+            document.getElementById('chatOptions').remove();
+            createChatFromFriends(this.dataset.mode);
+        });
+    });
 }
 
 function createRoom(name, fids, schedule) {
