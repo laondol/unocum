@@ -1689,6 +1689,10 @@ def register_routes(app):
                 ai_news_links='[]',
                 ai_danger_alert=False
             )
+            if video_path:
+                report.status = 'pending_review'
+                report.moderation_result = 'video'
+                report.moderation_reason = '동영상은 승인 후 공개됩니다'
             db.session.add(report)
             db.session.commit()
 

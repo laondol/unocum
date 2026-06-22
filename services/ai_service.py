@@ -158,17 +158,14 @@ def moderate_image(image_path, app=None):
     b64 = _image_to_base64(image_path)
     if not b64:
         return False, "", "clean"
-    system = "당신은 양평군 공유 이미지 방역관입니다."
-    user = """다음 이미지가 아래 기준에 해당하는지 판단해주세요.
-1. 인물 사진 (얼굴 전체 및 일부, 신체 일부 포함)
-2. 폭력적/혐오적 내용
-3. 선정적/음란적 내용
-4. 개인정보 노출 (주민등록증, 번호판 등)
-5. 불법 촬영물
-6. 스팸/광고성 이미지
-※ 1번(인물 사진)은 단체 사진, 뒷모습, 흐릿한 실루엣, 셀카, 프로필 사진, 얼굴이 조금이라도 나온 모든 사진 포함. 인물이 전혀 없는 풍경/사물/음식/동물 사진만 허용.
-위 내용이 하나라도 해당되면 flagged=true, 아니면 false.
-JSON: {"flagged": true/false, "reason": "이유", "category": "person/violence/adult/privacy/illegal/spam/clean"}"""
+    system = "당신은 양평군 공유 이미지 방역관입니다. 개인정보보호법을 엄격히 적용합니다."
+    user = """다음 이미지가 아래 기준에 하나라도 해당하면 반드시 flagged=true로 판단하세요.
+1. 인물 사진 (얼굴, 신체 일부, 실루엣, 뒷모습 포함 모든 인물)
+2. 개인정보 노출 (주민등록증, 면허증, 여권, 번호판, 신용카드, 명함)
+3. 폭력적/혐오적/선정적 내용
+4. 불법 촬영물, 스팸/광고성 이미지
+※ 조금이라도 의심되면 flagged=true로 판단하세요. 확실한 풍경/사물/음식/동물만 false입니다.
+JSON: {"flagged": true/false, "reason": "이유", "category": "person/privacy/violence/adult/illegal/spam/clean"}"""
     data = _groq_vision(system, user, b64)
     flagged = data.get('flagged', False)
     category = data.get('category', 'clean')
@@ -253,28 +250,30 @@ def background_process_share(app, report_id, title, description, latitude, longi
         report.ai_region_news = news_summary or ''
         report.ai_news_links = news_links or '[]'
 
-        flagged = False
-        reason = ""
-        mod_category = "clean"
-        for path_key in ['image_path', 'drawing_path']:
-            rel_path = getattr(report, path_key, None)
-            if not rel_path: continue
-            abs_path = os.path.join(app.root_path, '..', rel_path.lstrip('/')).replace('/', os.sep)
-            f, r, c = moderate_image(abs_path, app)
-            if f:
-                flagged = True
-                reason = r
-                mod_category = c
-                break
+        # 동영상은 무조건 보류
+        v_path = getattr(report, 'video_path', None)
+        if v_path and not flagged:
+            flagged = True
+            reason = "동영상은 관리자 승인 후 공개됩니다"
+            mod_category = "video"
+
         if not flagged:
-            v_path = getattr(report, 'video_path', None)
-            if v_path:
-                abs_v = os.path.join(app.root_path, '..', v_path.lstrip('/')).replace('/', os.sep)
-                f, r, c = moderate_video_frames(abs_v, app)
+            for path_key in ['image_path', 'drawing_path']:
+                rel_path = getattr(report, path_key, None)
+                if not rel_path: continue
+                abs_path = os.path.join(app.root_path, '..', rel_path.lstrip('/')).replace('/', os.sep)
+                f, r, c = moderate_image(abs_path, app)
                 if f:
                     flagged = True
                     reason = r
                     mod_category = c
+                    break
+        
+        # AI danger_alert가 true이면 강제 보류
+        if not flagged and report.ai_danger_alert:
+            flagged = True
+            reason = "AI가 개인정보 위험을 감지했습니다"
+            mod_category = "privacy"
 
         report.is_moderated = True
         report.moderation_at = datetime.now()
