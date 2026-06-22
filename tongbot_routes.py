@@ -523,10 +523,10 @@ def schedule_plan():
     if not uid: return jsonify({"error":"로그인"}),401
     data = request.get_json()
     date = data.get('date','')
-    from_loc = data.get('from','') or f"{user.town or ''} {user.village or ''}".strip() or '양평'
-    to_loc = data.get('to','') or from_loc
     items = data.get('items',[])
     user = User.query.get(uid)
+    from_loc = data.get('from','') or f"{user.town or ''} {user.village or ''}".strip() or '양평'
+    to_loc = data.get('to','') or from_loc
     from services.transit import haversine_km, geocode_address, estimate_transit_time_rough
     from config import Config
     s = geocode_address(from_loc, Config.KAKAO_REST_API_KEY) if from_loc else None
