@@ -1817,9 +1817,7 @@ def register_routes(app):
         role = session.get('role', '')
         uid = session.get('user_id')
         
-        if role in ('admin', 'leader'):
-            query = ShareReport.query
-        elif uid:
+        if uid:
             query = ShareReport.query.filter(
                 db.or_(ShareReport.status == 'approved', ShareReport.user_id == uid)
             )
