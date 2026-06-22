@@ -9,15 +9,9 @@
     </div>
     
     <div class="text-center mb-4">
-        {% if session.get('username') %}
         <a href="/share-report" class="btn btn-success btn-lg px-5 py-3 fw-bold shadow" style="border-radius: 16px;">
             📸 사진/그림으로 공유하기
         </a>
-        {% else %}
-        <a href="/login?next=/share-report" class="btn btn-success btn-lg px-5 py-3 fw-bold shadow" style="border-radius: 16px;">
-            📸 로그인 후 공유하기
-        </a>
-        {% endif %}
         <a href="/share/map" class="btn btn-outline-primary btn-lg px-4 py-3 fw-bold shadow ms-2" style="border-radius: 16px;">
             🗺️ 지도로 보기
         </a>
