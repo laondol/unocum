@@ -523,51 +523,37 @@ def schedule_plan():
     if not uid: return jsonify({"error":"로그인"}),401
     data = request.get_json()
     date = data.get('date','')
-    start_time = data.get('start','09:00')
     from_loc = data.get('from','') or f"{user.town or ''} {user.village or ''}".strip() or '양평'
     to_loc = data.get('to','') or from_loc
     items = data.get('items',[])
     user = User.query.get(uid)
     from services.transit import haversine_km, geocode_address, estimate_transit_time_rough
     from config import Config
-    # Geocode start/end
-    start_geo = geocode_address(from_loc, Config.KAKAO_REST_API_KEY) if from_loc else None
-    start_coords = (start_geo['lat'], start_geo['lng']) if start_geo else (37.49, 127.49)
-    end_geo = geocode_address(to_loc, Config.KAKAO_REST_API_KEY) if to_loc else None
-    end_coords = (end_geo['lat'], end_geo['lng']) if end_geo else start_coords
-    # Geocode locations
-    locations = []
-    for item in items:
-        loc = item.get('loc','')
-        coords = None
-        if loc:
-            geo = geocode_address(loc, Config.KAKAO_REST_API_KEY)
-            if geo: coords = (geo['lat'], geo['lng'])
-        locations.append({'title':item['title'],'dur':item['dur'],'loc':loc,'coords':coords})
-    # Home coords
-    home_geo = geocode_address(home, Config.KAKAO_REST_API_KEY)
-    home_coords = (home_geo['lat'], home_geo['lng']) if home_geo else (37.49, 127.49)
-    # Calculate plan
+    s = geocode_address(from_loc, Config.KAKAO_REST_API_KEY) if from_loc else None
+    start_coords = (s['lat'], s['lng']) if s else (37.49, 127.49)
+    e = geocode_address(to_loc, Config.KAKAO_REST_API_KEY) if to_loc else None
+    end_coords = (e['lat'], e['lng']) if e else start_coords
     plan = []
-    current_coords = start_coords
-    current_min = int(start_time.split(':')[0])*60 + int(start_time.split(':')[1])
-    for idx, loc in enumerate(locations):
-        if loc['coords']:
-            travel = estimate_transit_time_rough(current_coords[0], current_coords[1], loc['coords'][0], loc['coords'][1])
+    prev_coords = start_coords
+    for item in items:
+        g = geocode_address(item.get('loc',''), Config.KAKAO_REST_API_KEY) if item.get('loc') else None
+        coords = (g['lat'], g['lng']) if g else None
+        travel = estimate_transit_time_rough(prev_coords[0], prev_coords[1], coords[0] if coords else prev_coords[0], coords[1] if coords else prev_coords[1])
+        if item.get('time'):
+            arr_min = int(item['time'].split(':')[0])*60 + int(item['time'].split(':')[1])
         else:
-            travel = 15
-        arr_min = current_min + travel
-        arr_time = f"{arr_min//60:02d}:{arr_min%60:02d}"
-        leave_min = arr_min + loc['dur']
-        leave_time = f"{leave_min//60:02d}:{leave_min%60:02d}"
-        plan.append({'title':loc['title'],'time':arr_time,'dur':loc['dur'],'travel_min':travel,'leave_time':leave_time})
-        current_min = leave_min
-        if loc['coords']:
-            current_coords = loc['coords']
-    # Return to end location
-    travel_home = estimate_transit_time_rough(current_coords[0], current_coords[1], end_coords[0], end_coords[1])
-    arrive_home = f"{(current_min+travel_home)//60:02d}:{(current_min+travel_home)%60:02d}"
-    return jsonify({'date':date,'from':from_loc,'to':to_loc,'start':start_time,'plan':plan,'arrive_home':arrive_home})
+            arr_min = 540
+        dep_prev = arr_min - travel
+        dep_str = f"{dep_prev//60:02d}:{dep_prev%60:02d}"
+        end_min = arr_min + item.get('dur',60)
+        end_str = f"{end_min//60:02d}:{end_min%60:02d}"
+        plan.append({'title':item['title'],'arrive':item.get('time','--:--'),'dur':item.get('dur',60),'travel_min':travel,'leave_when':end_str,'depart_prev':dep_str})
+        prev_coords = coords if coords else prev_coords
+    last_end = end_min if items else 540
+    travel_home = estimate_transit_time_rough(prev_coords[0], prev_coords[1], end_coords[0], end_coords[1])
+    arrive_home = f"{(last_end+travel_home)//60:02d}:{(last_end+travel_home)%60:02d}"
+    first_leave = plan[0]['depart_prev'] if plan else '09:00'
+    return jsonify({'date':date,'from':from_loc,'to':to_loc,'leave_time':first_leave,'plan':plan,'arrive_home':arrive_home})
 
 @tongbot_bp.route('/admin/tongbot/monitor')
 def admin_tongbot_monitor():
