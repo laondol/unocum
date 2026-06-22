@@ -57,8 +57,6 @@
     <ul class="nav nav-tabs mb-4" id="botTabs">
         <li class="nav-item"><a class="nav-link {{ 'active' if active_tab=='chat' else '' }}" href="#" data-tab="chat">💬 대화</a></li>
         <li class="nav-item"><a class="nav-link {{ 'active' if active_tab=='write' else '' }}" href="#" data-tab="write">✍️ 글쓰기</a></li>
-        <li class="nav-item"><a class="nav-link {{ 'active' if active_tab=='friendchat' else '' }}" href="#" data-tab="friendchat">👥 벗 채팅</a></li>
-        <li class="nav-item"><a class="nav-link {{ 'active' if active_tab=='schedule' else '' }}" href="#" data-tab="schedule">📅 일정</a></li>
     </ul>
 
     <!-- 채팅 탭 -->
@@ -192,7 +190,7 @@ document.querySelectorAll('#botTabs .nav-link').forEach(tab => {
         e.preventDefault();
         document.querySelectorAll('#botTabs .nav-link').forEach(t => t.classList.remove('active'));
         this.classList.add('active');
-        ['tabChat','tabWrite','tabFriendchat','tabSchedule'].forEach(id => document.getElementById(id).style.display='none');
+        ['tabChat','tabWrite'].forEach(id => document.getElementById(id).style.display='none');
         document.getElementById('tab' + this.dataset.tab.charAt(0).toUpperCase() + this.dataset.tab.slice(1)).style.display = '';
     });
 });
