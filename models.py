@@ -303,6 +303,7 @@ class ChatRoom(db.Model):
     name = db.Column(db.String(100), default='')
     creator_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     participants = db.Column(db.Text, default='[]')
+    status_map = db.Column(db.Text, default='{}')
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.now)
     expires_at = db.Column(db.DateTime)

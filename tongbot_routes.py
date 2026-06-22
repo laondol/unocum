@@ -1,6 +1,6 @@
 import random, string
 from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template, current_app
-from models import db, User, TongBot, TongBotDraft, TongBotSchedule, ChatRoom, ChatMessage
+from models import db, User, TongBot, TongBotDraft, TongBotSchedule, ChatRoom, ChatMessage, Message
 from datetime import datetime
 import os, uuid
 
@@ -36,6 +36,11 @@ def my_page():
     except: pass
     popup = request.args.get('popup') == '1'
     active_tab = request.args.get('tab', 'chat')
+    room_id = request.args.get('room', type=int)
+    action = request.args.get('action', '')
+    if room_id and action:
+        _handle_chat_action(user.id, room_id, action)
+        active_tab = 'friendchat'
     greeting = _greeting(user)
     import json
     chat_rooms = ChatRoom.query.filter(ChatRoom.is_active==True, ChatRoom.participants.contains(str(user.id))).order_by(ChatRoom.created_at.desc()).limit(10).all()
@@ -290,6 +295,26 @@ def _detect_counselor_need(user_msg):
             return ctype
     return None
 
+def _handle_chat_action(uid, room_id, action):
+    room = ChatRoom.query.get(room_id)
+    if not room: return
+    import json
+    status_map = json.loads(room.status_map or '{}')
+    user = User.query.get(uid)
+    bot = _get_bot(uid)
+    if action == 'join':
+        status_map[str(uid)] = 'joined'
+        db.session.add(ChatMessage(room_id=room_id, user_id=None, username='✅',
+            message=f'{user.username}님이 입장했습니다.', is_bot=True))
+    elif action == 'decline':
+        status_map[str(uid)] = 'declined'
+    elif action == 'monitor':
+        status_map[str(uid)] = 'monitoring'
+        db.session.add(ChatMessage(room_id=room_id, user_id=None, username=bot.bot_name,
+            message=f'{user.username}님이 모니터링 모드로 참여했습니다.', is_bot=True))
+    room.status_map = json.dumps(status_map)
+    db.session.commit()
+
 @tongbot_bp.route('/api/bot/draft', methods=['GET', 'POST'])
 def bot_draft():
     uid = session.get('user_id')
@@ -447,7 +472,10 @@ def chat_rooms():
         if not friends: return jsonify({"error":"벗을 선택하세요"})
         import json, datetime as _dt
         pids = [uid] + friends
+        status_map = {str(uid): 'joined'}
+        for f in friends: status_map[str(f)] = 'invited'
         room = ChatRoom(name=name, creator_id=uid, participants=json.dumps(pids),
+                       status_map=json.dumps(status_map),
                        expires_at=datetime.now() + _dt.timedelta(hours=2))
         db.session.add(room)
         db.session.flush()
@@ -459,14 +487,17 @@ def chat_rooms():
                     event_date=datetime.fromisoformat(schedule['event_date']),
                     invited_user_ids=json.dumps(friends))
                 db.session.add(s)
-                db.session.flush()
-                db.session.add(ChatMessage(room_id=room.id, user_id=None, username='📅 일정',
-                    message=f"📅 일정: {schedule['title']}\n🕐 {schedule['event_date']}\n📝 {schedule.get('description','')}\n참여자: {len(friends)+1}명", is_bot=True))
             except: pass
+        # 초대 쪽지 발송
+        creator = User.query.get(uid)
+        invite_msg = f'<div style="border:2px solid #0d6efd;border-radius:12px;padding:12px;text-align:center;"><strong>{name}</strong><br><small>{creator.username}님이 채팅방에 초대했습니다</small><hr style="margin:8px 0;"><a href="/user/my?popup=1&tab=friendchat&room={room.id}&action=join" class="btn btn-success btn-sm" style="margin:2px;">✅ 입장</a> <a href="/user/my?popup=1&tab=friendchat&room={room.id}&action=decline" class="btn btn-outline-danger btn-sm" style="margin:2px;">❌ 거절</a> <a href="/user/my?popup=1&tab=friendchat&room={room.id}&action=monitor" class="btn btn-outline-secondary btn-sm" style="margin:2px;">👁️ 모니터링</a></div>'
+        for fid in friends:
+            db.session.add(Message(sender_id=uid, sender_name=creator.username, receiver_id=fid,
+                subject=f'💬 채팅 초대: {name}', content=invite_msg, sender_role='member'))
         # 통벗 입장
         bot = _get_bot(uid)
         db.session.add(ChatMessage(room_id=room.id, user_id=None, username=bot.bot_name,
-            message=f"안녕하세요! 저는 {bot.bot_name}입니다. {len(friends)}명의 벗과 함께 대화를 시작합니다. 서로 존중하며 즐거운 시간 보내요! 💕", is_bot=True))
+            message=f"채팅방이 개설되었습니다! {len(friends)}명의 벗을 초대했습니다. 💕", is_bot=True))
         db.session.commit()
         return jsonify({"id": room.id, "name": name})
     import json
