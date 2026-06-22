@@ -55,14 +55,14 @@
     </div>
 
     <ul class="nav nav-tabs mb-4" id="botTabs">
-        <li class="nav-item"><a class="nav-link active" href="#" data-tab="chat">💬 대화</a></li>
-        <li class="nav-item"><a class="nav-link" href="#" data-tab="write">✍️ 글쓰기</a></li>
-        <li class="nav-item"><a class="nav-link" href="#" data-tab="schedule">📅 일정</a></li>
-        <li class="nav-item"><a class="nav-link" href="#" data-tab="friendchat">👥 벗 채팅</a></li>
+        <li class="nav-item"><a class="nav-link {{ 'active' if active_tab=='chat' else '' }}" href="#" data-tab="chat">💬 대화</a></li>
+        <li class="nav-item"><a class="nav-link {{ 'active' if active_tab=='write' else '' }}" href="#" data-tab="write">✍️ 글쓰기</a></li>
+        <li class="nav-item"><a class="nav-link {{ 'active' if active_tab=='friendchat' else '' }}" href="#" data-tab="friendchat">👥 벗 채팅</a></li>
+        <li class="nav-item"><a class="nav-link {{ 'active' if active_tab=='schedule' else '' }}" href="#" data-tab="schedule">📅 일정</a></li>
     </ul>
 
     <!-- 채팅 탭 -->
-    <div id="tabChat">
+    <div id="tabChat" {{ 'style=display:none;' if active_tab!='chat' else '' }}>
         <div id="chatMessages" class="mb-3" style="max-height:400px;overflow-y:auto;border:1px solid #dee2e6;border-radius:12px;padding:12px;background:#f8f9fa;">
             <div class="text-center text-muted small py-3">{{ greeting }}<br>저는 <strong>{{ bot.bot_name }}</strong>입니다. 함께사는양평에서 도와드릴게요.</div>
         </div>
@@ -74,7 +74,7 @@
     </div>
 
     <!-- 글쓰기 탭 -->
-    <div id="tabWrite" style="display:none;">
+    <div id="tabWrite" style="display:{{ 'none' if active_tab!='write' else 'block' }};">
         <div class="row g-3">
             <div class="col-md-8">
                 <div class="d-flex gap-2 mb-3">

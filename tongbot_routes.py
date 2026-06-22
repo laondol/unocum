@@ -35,11 +35,12 @@ def my_page():
         stamps_count = HeritageStamp.query.filter_by(user_id=user.id).count()
     except: pass
     popup = request.args.get('popup') == '1'
+    active_tab = request.args.get('tab', 'chat')
     greeting = _greeting(user)
     import json
     chat_rooms = ChatRoom.query.filter(ChatRoom.is_active==True, ChatRoom.participants.contains(str(user.id))).order_by(ChatRoom.created_at.desc()).limit(10).all()
     tpl = 'user_my_popup.html' if popup else 'user_my.html'
-    return render_template(tpl, user=user, bot=bot, drafts=drafts, schedules=schedules, stamps_count=stamps_count, greeting=greeting, chat_rooms=chat_rooms, json=json)
+    return render_template(tpl, user=user, bot=bot, drafts=drafts, schedules=schedules, stamps_count=stamps_count, greeting=greeting, chat_rooms=chat_rooms, json=json, active_tab=active_tab)
 
 @tongbot_bp.route('/api/bot/rename', methods=['POST'])
 def bot_rename():
