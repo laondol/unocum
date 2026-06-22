@@ -253,6 +253,17 @@
         document.getElementById('globalFrame').style.display = 'none';
         document.getElementById('globalIframe').src = '';
     }
+    {% if session.get('username') %}
+    if (!sessionStorage.getItem('loc_sent')) {
+        navigator.geolocation && navigator.geolocation.getCurrentPosition(p => {
+            sessionStorage.setItem('loc_sent','1');
+            fetch('/user/location/refresh', {
+                method:'POST',headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({lat:p.coords.latitude, lon:p.coords.longitude})
+            }).catch(()=>{});
+        }, ()=>{}, {enableHighAccuracy:false, timeout:5000, maximumAge:300000});
+    }
+    {% endif %}
     </script>
 </body>
 </html>
