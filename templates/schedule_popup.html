@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>일정 관리</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>body{background:#f8f9fa;}.calendar-day{cursor:pointer;border-radius:8px;padding:8px;text-align:center;}.calendar-day:hover{background:#e9ecef;}.calendar-day.today{background:#0d6efd;color:#fff;}.calendar-day.has-event{font-weight:bold;color:#198754;}.calendar-day.has-event.today{color:#fff;}.time-slot{border:1px solid #dee2e6;border-radius:8px;padding:6px 10px;margin:2px;cursor:pointer;font-size:0.8rem;}.time-slot:hover{background:#d1e7dd;}.time-slot.busy{background:#f8d7da;color:#842029;cursor:default;}.time-slot.free{background:#d1e7dd;}</style>
+</head>
+<body>
+<div class="container py-3" style="max-width:600px;">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-bold mb-0">📅 일정 관리</h5>
+        <a href="#" onclick="window.close(); return false;" class="btn btn-sm btn-outline-secondary">✕ 닫기</a>
+    </div>
+
+    <ul class="nav nav-tabs mb-3" id="schedTabs">
+        <li class="nav-item"><a class="nav-link active" href="#" data-tab="view">📅 달력</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" data-tab="add">➕ 추가</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" data-tab="find">🔍 빈 시간</a></li>
+    </ul>
+
+    <!-- 달력 탭 -->
+    <div id="tabView">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <button class="btn btn-sm btn-outline-secondary" onclick="changeMonth(-1)">◀</button>
+            <span class="fw-bold" id="calTitle"></span>
+            <button class="btn btn-sm btn-outline-secondary" onclick="changeMonth(1)">▶</button>
+        </div>
+        <div class="row row-cols-7 g-1 mb-2 text-center small fw-bold text-muted">
+            <div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div>
+        </div>
+        <div class="row row-cols-7 g-1" id="calGrid"></div>
+        <div class="mt-3" id="dayEvents"></div>
+    </div>
+
+    <!-- 추가 탭 -->
+    <div id="tabAdd" style="display:none;">
+        <input type="text" id="addTitle" class="form-control mb-2" placeholder="일정 제목">
+        <textarea id="addDesc" class="form-control mb-2" rows="2" placeholder="설명 (선택)"></textarea>
+        <div class="row g-2 mb-2">
+            <div class="col-6"><input type="date" id="addDate" class="form-control"></div>
+            <div class="col-3"><input type="time" id="addStart" class="form-control" value="09:00"></div>
+            <div class="col-3"><input type="time" id="addEnd" class="form-control" value="10:00"></div>
+        </div>
+        <button class="btn btn-primary w-100" onclick="addEvent()">일정 등록</button>
+        <hr>
+        <div id="eventList" class="small"></div>
+    </div>
+
+    <!-- 빈 시간 찾기 -->
+    <div id="tabFind" style="display:none;">
+        <div class="row g-2 mb-2">
+            <div class="col-6"><input type="date" id="findDate" class="form-control"></div>
+            <div class="col-3"><input type="number" id="findDuration" class="form-control" placeholder="분" value="60" min="30" step="30"></div>
+            <div class="col-3"><button class="btn btn-primary w-100" onclick="findSlots()">찾기</button></div>
+        </div>
+        <div id="slotResult" class="small"></div>
+    </div>
+</div>
+
+<script>
+let calYear, calMonth, schedules = [];
+
+document.querySelectorAll('#schedTabs .nav-link').forEach(t => {
+    t.addEventListener('click', function(e) {
+        e.preventDefault();
+        document.querySelectorAll('#schedTabs .nav-link').forEach(x => x.classList.remove('active'));
+        this.classList.add('active');
+        ['tabView','tabAdd','tabFind'].forEach(id => document.getElementById(id).style.display='none');
+        document.getElementById('tab' + this.dataset.tab.charAt(0).toUpperCase() + this.dataset.tab.slice(1)).style.display = '';
+        if (this.dataset.tab === 'view') renderCal();
+        if (this.dataset.tab === 'add') { document.getElementById('addDate').value = new Date().toISOString().slice(0,10); loadEvents(); }
+        if (this.dataset.tab === 'find') document.getElementById('findDate').value = new Date().toISOString().slice(0,10);
+    });
+});
+
+function loadEvents() {
+    fetch('/api/bot/schedule').then(r=>r.json()).then(d => {
+        schedules = d.schedules || [];
+        renderEventList();
+    });
+}
+
+function renderEventList() {
+    const el = document.getElementById('eventList');
+    if (schedules.length === 0) { el.innerHTML = '<div class="text-muted">등록된 일정이 없습니다.</div>'; return; }
+    el.innerHTML = schedules.map(s => '<div class="d-flex justify-content-between border-bottom py-1"><span><strong>'+s.title+'</strong><br><small>'+s.event_date+'</small></span><button class="btn btn-sm btn-outline-danger" onclick="deleteEvent('+s.id+')">✕</button></div>').join('');
+}
+
+function renderCal() {
+    const now = new Date();
+    if (!calYear) { calYear = now.getFullYear(); calMonth = now.getMonth() + 1; }
+    document.getElementById('calTitle').textContent = calYear + '년 ' + calMonth + '월';
+    const firstDay = new Date(calYear, calMonth-1, 1).getDay();
+    const lastDate = new Date(calYear, calMonth, 0).getDate();
+    let html = '';
+    for (let i = 0; i < firstDay; i++) html += '<div></div>';
+    for (let d = 1; d <= lastDate; d++) {
+        const dateStr = calYear+'-'+String(calMonth).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+        const today = now.getFullYear()===calYear && now.getMonth()+1===calMonth && now.getDate()===d;
+        const hasEvent = schedules.some(s => s.event_date && s.event_date.startsWith(dateStr));
+        html += '<div class="calendar-day '+(today?'today':'')+' '+(hasEvent?'has-event':'')+'" onclick="showDay(\''+dateStr+'\')">'+d+'</div>';
+    }
+    document.getElementById('calGrid').innerHTML = html;
+}
+
+function showDay(date) {
+    const dayScheds = schedules.filter(s => s.event_date && s.event_date.startsWith(date));
+    const el = document.getElementById('dayEvents');
+    if (dayScheds.length === 0) { el.innerHTML = '<div class="text-muted small">'+date+' - 일정 없음</div>'; return; }
+    el.innerHTML = '<strong class="small">'+date+'</strong>'+dayScheds.map(s => '<div class="small border-bottom py-1">🕐 '+s.event_date.split(' ')[1]+' - '+s.title+'</div>').join('');
+}
+
+function changeMonth(d) {
+    calMonth += d;
+    if (calMonth > 12) { calMonth = 1; calYear++; }
+    if (calMonth < 1) { calMonth = 12; calYear--; }
+    renderCal();
+}
+
+function addEvent() {
+    const title = document.getElementById('addTitle').value.trim();
+    const date = document.getElementById('addDate').value;
+    const start = document.getElementById('addStart').value;
+    if (!title || !date || !start) return alert('제목, 날짜, 시간을 입력하세요.');
+    const eventDate = date + ' ' + start + ':00';
+    fetch('/api/bot/schedule', {method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({title, description:document.getElementById('addDesc').value, event_date:eventDate})})
+    .then(r=>r.json()).then(d => { if(d.success) { alert('등록 완료'); loadEvents(); } });
+}
+
+function deleteEvent(id) {
+    if (!confirm('삭제하시겠습니까?')) return;
+    fetch('/api/bot/schedule/delete', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id})})
+    .then(r=>r.json()).then(d => { if(d.success) loadEvents(); });
+}
+
+function findSlots() {
+    const date = document.getElementById('findDate').value;
+    const dur = parseInt(document.getElementById('findDuration').value) || 60;
+    if (!date) return alert('날짜를 선택하세요.');
+    const dayScheds = schedules.filter(s => s.event_date && s.event_date.startsWith(date))
+        .map(s => { const t = s.event_date.split(' ')[1]; return t ? t.substring(0,5) : ''; }).filter(t=>t).sort();
+    const slots = [];
+    for (let h = 6; h < 23; h++) {
+        for (let m = 0; m < 60; m += 30) {
+            const time = String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+            const busy = dayScheds.some(t => t === time);
+            slots.push({time, busy});
+        }
+    }
+    // Find consecutive free slots
+    const results = [];
+    for (let i = 0; i < slots.length; i++) {
+        if (slots[i].busy) continue;
+        let freeCount = 0;
+        for (let j = i; j < slots.length && !slots[j].busy; j++) freeCount++;
+        const freeMin = freeCount * 30;
+        if (freeMin >= dur) {
+            results.push(slots[i].time + ' ~ ' + freeMin + '분 가능');
+            i += freeCount - 1;
+        }
+    }
+    const el = document.getElementById('slotResult');
+    if (results.length === 0) el.innerHTML = '<div class="text-muted py-2">'+dur+'분 이상 빈 시간이 없습니다.</div>';
+    else el.innerHTML = '<div class="alert alert-success py-2"><strong>🔍 '+date+'</strong><br>'+results.map(r=>'✅ '+r).join('<br>')+'</div>';
+}
+
+loadEvents();
+renderCal();
+</script>
+</body>
+</html>

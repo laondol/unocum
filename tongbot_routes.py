@@ -423,6 +423,24 @@ def bot_schedule():
     db.session.commit()
     return jsonify({"success": True, "id": s.id})
 
+@tongbot_bp.route('/api/bot/schedule/delete', methods=['POST'])
+def bot_schedule_delete():
+    uid = session.get('user_id')
+    if not uid: return jsonify({"error":"로그인"}),401
+    data = request.get_json()
+    s = TongBotSchedule.query.get(data.get('id'))
+    if not s or s.user_id != uid: return jsonify({"error":"권한없음"}),403
+    db.session.delete(s)
+    db.session.commit()
+    return jsonify({"success":True})
+
+@tongbot_bp.route('/schedule')
+def schedule_popup():
+    if not session.get('user_id'):
+        return redirect(url_for('login', next='/schedule'))
+    user = User.query.get(session['user_id'])
+    return render_template('schedule_popup.html', user=user)
+
 @tongbot_bp.route('/admin/tongbot/monitor')
 def admin_tongbot_monitor():
     if session.get('role') not in ('admin', 'leader'):
