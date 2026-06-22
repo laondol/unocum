@@ -286,8 +286,10 @@ function calcPlan() {
             if (p.leave_when) html += '<strong class="text-danger">' + p.leave_when + ' 출발</strong><br>';
             else html += '끝<br>';
         });
-        html += '🏠 ' + d.to + ' <strong>' + d.arrive_home + '</strong> 도착</div>';
+        html += '🏠 ' + d.to + ' <strong>' + d.arrive_home + '</strong> 도착';
+        html += '<br><button class="btn btn-sm btn-success mt-2 w-100" onclick="savePlan()">📥 일정에 추가하기</button></div>';
         el.innerHTML = html;
+        window._lastPlan = d;
     });
 }
 
@@ -295,6 +297,22 @@ function showCommuteHint() {
     var from = document.getElementById('planFrom');
     fetch('/api/user/location').then(function(r){return r.json()}).then(function(loc){
         if (loc.town) from.placeholder = loc.town + ' ' + loc.village;
+    });
+}
+
+function savePlan() {
+    var d = window._lastPlan;
+    if (!d || !d.plan) return alert('먼저 계산하기를 실행하세요.');
+    if (!confirm('계산된 일정을 저장할까요?')) return;
+    var promises = d.plan.map(function(p) {
+        return fetch('/api/bot/schedule', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({title: p.title, description: d.from + ' → ' + p.arrive, event_date: d.date + ' ' + p.arrive + ':00'})
+        });
+    });
+    Promise.all(promises).then(function() {
+        alert('일정이 저장되었습니다!');
+        loadEvents();
     });
 }
 </script>
