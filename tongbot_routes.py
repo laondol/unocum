@@ -1,6 +1,6 @@
 import random, string
 from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template, current_app
-from models import db, User, TongBot, TongBotDraft, TongBotSchedule, ChatRoom, ChatMessage, Message
+from models import db, User, TongBot, TongBotDraft, TongBotSchedule, ChatRoom, ChatMessage, Message, FriendCache
 from datetime import datetime
 import os, uuid
 
@@ -524,18 +524,28 @@ def bot_upload():
 def chat_friends():
     uid = session.get('user_id')
     if not uid: return jsonify({"error":"로그인"}),401
+    import json
+    cache = FriendCache.query.get(uid)
+    if cache and cache.updated_at:
+        age = (datetime.now() - cache.updated_at).total_seconds()
+        if age < 300:
+            friend_ids = json.loads(cache.friend_ids or '[]')
+            users = User.query.filter(User.id.in_(friend_ids)).all() if friend_ids else []
+            return jsonify({"friends":[{"id":u.id,"username":u.username,"name":u.real_name or u.username,"town":u.town or "","village":u.village or ""} for u in users]})
     from models import Friend
     f1 = Friend.query.filter_by(requester_id=uid, status='accepted').all()
     f2 = Friend.query.filter_by(receiver_id=uid, status='accepted').all()
     friend_ids = set()
     for f in f1: friend_ids.add(f.receiver_id)
     for f in f2: friend_ids.add(f.requester_id)
-    friends = []
-    if friend_ids:
-        users = User.query.filter(User.id.in_(friend_ids)).all()
-        for u in users:
-            friends.append({"id":u.id,"username":u.username,"name":u.real_name or u.username,"town":u.town or "","village":u.village or ""})
-    return jsonify({"friends":friends})
+    if cache:
+        cache.friend_ids = json.dumps(list(friend_ids))
+        cache.updated_at = datetime.now()
+    else:
+        db.session.add(FriendCache(user_id=uid, friend_ids=json.dumps(list(friend_ids))))
+    db.session.commit()
+    users = User.query.filter(User.id.in_(friend_ids)).all() if friend_ids else []
+    return jsonify({"friends":[{"id":u.id,"username":u.username,"name":u.real_name or u.username,"town":u.town or "","village":u.village or ""} for u in users]})
 
 @tongbot_bp.route('/api/chat/rooms', methods=['GET','POST'])
 def chat_rooms():

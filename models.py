@@ -317,6 +317,11 @@ class ChatMessage(db.Model):
     is_bot = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.now)
 
+class FriendCache(db.Model):
+    user_id = db.Column(db.Integer, primary_key=True)
+    friend_ids = db.Column(db.Text, default='[]')
+    updated_at = db.Column(db.DateTime, default=datetime.now)
+
 class LegalPost(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
