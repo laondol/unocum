@@ -416,9 +416,18 @@ def bot_schedule():
         return jsonify({"error": "로그인이 필요합니다."}), 401
     if request.method == 'GET':
         schedules = TongBotSchedule.query.filter_by(user_id=uid).order_by(TongBotSchedule.event_date.asc()).limit(30).all()
-        return jsonify({"schedules": [{"id": s.id, "title": s.title, "description": s.description, "event_date": s.event_date.strftime("%Y-%m-%d %H:%M") if s.event_date else "", "invited": s.invited_user_ids} for s in schedules]})
+        return jsonify({"schedules": [{"id": s.id, "title": s.title, "description": s.description, "memo": s.memo, "location": s.location, "event_date": s.event_date.strftime("%Y-%m-%d %H:%M") if s.event_date else "", "end_date": s.end_date.strftime("%Y-%m-%d %H:%M") if s.end_date else "", "invited": s.invited_user_ids} for s in schedules]})
     data = request.json
-    s = TongBotSchedule(user_id=uid, title=data.get('title',''), description=data.get('description',''), event_date=datetime.fromisoformat(data.get('event_date','')), invited_user_ids=data.get('invited',''))
+    end_date = None
+    if data.get('end_date'):
+        try: end_date = datetime.fromisoformat(data['end_date'])
+        except: pass
+    s = TongBotSchedule(user_id=uid, title=data.get('title',''), description=data.get('description',''),
+        event_date=datetime.fromisoformat(data.get('event_date','')),
+        end_date=end_date,
+        location=data.get('location',''),
+        memo=data.get('memo',''),
+        invited_user_ids=data.get('invited',''))
     db.session.add(s)
     db.session.commit()
     return jsonify({"success": True, "id": s.id})
