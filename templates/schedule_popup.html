@@ -180,9 +180,11 @@ function findSlots() {
 
 function findMySlots(date, dur) {
 
-loadEvents();
-renderCal();
-loadFriendList();
+document.addEventListener('DOMContentLoaded', function() {
+    loadEvents();
+    renderCal();
+    loadFriendList();
+});
 
 function loadFriendList() {
     fetch('/api/chat/friends').then(r=>r.json()).then(d=>{
