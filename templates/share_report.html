@@ -17,19 +17,16 @@
             <form id="shareForm" enctype="multipart/form-data">
                 <!-- 사진촬영 (모바일 카메라 / 데스크탑 파일선택) -->
                 <div class="mb-3">
-                    <input type="file" name="image" id="cameraInput" accept="image/*" capture="environment" onchange="previewImage(this, 'filePreview')" style="display:none;">
+                    <input type="file" name="camera_image" id="cameraInput" accept="image/*" capture="environment" onchange="previewFile(this)" style="display:none;">
                     <button type="button" id="cameraBtn" class="btn btn-success w-100 py-3 fw-bold" style="border-radius:12px; font-size:1.1rem;" onclick="document.getElementById('cameraInput').click()">
                         📸 사진촬영
                     </button>
-                    <div id="cameraUnsupported" class="mt-1 small text-danger text-center" style="display:none;">이 기기는 카메라를 지원하지 않습니다</div>
-                    <div id="filePreview" class="mt-2" style="display:none;">
-                        <img src="#" alt="미리보기" style="width:100%; border-radius:12px; border:1px solid #eee;">
-                    </div>
                 </div>
 
                 <!-- 파일 업로드 -->
                 <div class="mb-3">
-                    <input type="file" name="image" class="form-control" onchange="previewFile(this)">
+                    <span class="fw-bold small d-block mb-1">📁 파일 업로드</span>
+                    <input type="file" name="image" class="form-control" accept="image/*" onchange="previewFile(this)">
                     <div id="fileUploadPreview" class="mt-2" style="display:none;"></div>
                 </div>
 
@@ -223,6 +220,10 @@ document.getElementById('shareForm').addEventListener('submit', async function(e
     btn.textContent = '접수 중...';
     
     const formData = new FormData(this);
+    const camInput = document.getElementById('cameraInput');
+    if (camInput.files && camInput.files[0] && !formData.has('image')) {
+        formData.set('image', camInput.files[0]);
+    }
     
     const drawingData = canvas.toDataURL('image/png');
     if(drawingData.length > 2000) {
