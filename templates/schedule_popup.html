@@ -34,6 +34,7 @@
         <li class="nav-item"><a class="nav-link active" href="#" data-tab="view">📅 달력</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-tab="add">➕ 추가</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-tab="find">🔍 빈 시간</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" data-tab="plan">🗺️ 동선 계획</a></li>
     </ul>
 
     <!-- 달력 탭 -->
@@ -75,6 +76,18 @@
         </div>
         <div id="slotResult" class="small"></div>
     </div>
+
+    <!-- 동선 계획 탭 -->
+    <div id="tabPlan" style="display:none;">
+        <div id="planItems"></div>
+        <button class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="addPlanItem()">+ 일정 추가</button>
+        <div class="row g-2 mb-2">
+            <div class="col-6"><input type="date" id="planDate" class="form-control"></div>
+            <div class="col-6"><input type="time" id="planStart" class="form-control" value="09:00"></div>
+        </div>
+        <button class="btn btn-primary w-100" onclick="calcPlan()">🗺️ 일정 계산하기</button>
+        <div id="planResult" class="small mt-2"></div>
+    </div>
         <div id="slotResult" class="small">        </div>
     </div>
     </div></div>
@@ -87,10 +100,11 @@ document.querySelectorAll('#schedTabs .nav-link').forEach(t => {
         e.preventDefault();
         document.querySelectorAll('#schedTabs .nav-link').forEach(x => x.classList.remove('active'));
         this.classList.add('active');
-        ['tabView','tabAdd','tabFind'].forEach(id => document.getElementById(id).style.display='none');
+        ['tabView','tabAdd','tabFind','tabPlan'].forEach(id => document.getElementById(id).style.display='none');
         document.getElementById('tab' + this.dataset.tab.charAt(0).toUpperCase() + this.dataset.tab.slice(1)).style.display = '';
         if (this.dataset.tab === 'view') renderCal();
         if (this.dataset.tab === 'add') { document.getElementById('addDate').value = new Date().toISOString().slice(0,10); loadEvents(); }
+        if (this.dataset.tab === 'plan') document.getElementById('planDate').value = new Date().toISOString().slice(0,10);
         if (this.dataset.tab === 'find') document.getElementById('findDate').value = new Date().toISOString().slice(0,10);
     });
 });
@@ -227,6 +241,44 @@ function loadFriendList() {
         document.getElementById('friendCount').textContent = '(' + (d.friends ? d.friends.length : 0) + ')';
         if (!d.friends||d.friends.length===0) { el.innerHTML='<div class="text-muted py-2">아직 벗이 없습니다.<br><small>프로필에서 벗 신청을 해보세요!</small></div>'; return; }
         el.innerHTML = d.friends.map(f=>'<label class="list-group-item"><input type="checkbox" class="friend-check" value="'+f.id+'"> '+f.name+' <small class="text-muted">@'+f.username+'</small></label>').join('');
+    });
+}
+
+let planCount = 0;
+
+function addPlanItem() {
+    planCount++;
+    var div = document.createElement('div');
+    div.className = 'card p-2 mb-2';
+    div.innerHTML = '<div class="row g-1"><div class="col-5"><input class="form-control form-control-sm" placeholder="일정명" id="planTitle'+planCount+'"></div><div class="col-4"><input class="form-control form-control-sm" placeholder="위치/주소" id="planLoc'+planCount+'"></div><div class="col-3"><input type="number" class="form-control form-control-sm" placeholder="분" value="60" id="planDur'+planCount+'" min="30" step="30"></div></div>';
+    document.getElementById('planItems').appendChild(div);
+}
+
+function calcPlan() {
+    var date = document.getElementById('planDate').value;
+    var start = document.getElementById('planStart').value;
+    if (!date) return alert('날짜를 선택하세요.');
+    var items = [];
+    for (var i = 1; i <= planCount; i++) {
+        var titleEl = document.getElementById('planTitle'+i);
+        var locEl = document.getElementById('planLoc'+i);
+        var durEl = document.getElementById('planDur'+i);
+        if (titleEl && titleEl.value) items.push({title:titleEl.value, loc:(locEl?locEl.value:''), dur:parseInt(durEl?durEl.value:60)});
+    }
+    if (items.length === 0) return alert('일정을 하나 이상 추가하세요.');
+    fetch('/api/bot/schedule/plan', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({date:date, start:start, items:items})
+    }).then(function(r){return r.json()}).then(function(d){
+        var el = document.getElementById('planResult');
+        if (d.error) { el.innerHTML = '<div class="text-danger">'+d.error+'</div>'; return; }
+        var html = '<div class="alert alert-info py-2 small"><strong>🗺️ '+d.date+' 동선</strong><br>';
+        html += '🏠 ' + d.home + ' → 출발<br>';
+        d.plan.forEach(function(p){
+            html += '🚶 ' + p.travel_min + '분 이동 → <strong>' + p.time + '</strong> ' + p.title + ' (' + p.dur + '분)<br>';
+        });
+        html += '🏠 ' + d.arrive_home + ' 귀가</div>';
+        el.innerHTML = html;
     });
 }
 </script>

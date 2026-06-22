@@ -517,6 +517,50 @@ def schedule_invite():
     db.session.commit()
     return jsonify({"success":True,"msg":f"{len(friend_ids)}명에게 약속 제안을 보냈습니다!"})
 
+@tongbot_bp.route('/api/bot/schedule/plan', methods=['POST'])
+def schedule_plan():
+    uid = session.get('user_id')
+    if not uid: return jsonify({"error":"로그인"}),401
+    data = request.get_json()
+    date = data.get('date','')
+    start_time = data.get('start','09:00')
+    items = data.get('items',[])
+    user = User.query.get(uid)
+    home = f"{user.town or ''} {user.village or ''}".strip() or '양평'
+    from services.transit import haversine_km, geocode_address, estimate_transit_time_rough
+    from config import Config
+    # Geocode locations (rough)
+    locations = []
+    for item in items:
+        loc = item.get('loc','')
+        coords = None
+        if loc:
+            geo = geocode_address(loc, Config.KAKAO_REST_API_KEY)
+            if geo: coords = (geo['lat'], geo['lng'])
+        locations.append({'title':item['title'],'dur':item['dur'],'loc':loc,'coords':coords})
+    # Home coords
+    home_geo = geocode_address(home, Config.KAKAO_REST_API_KEY)
+    home_coords = (home_geo['lat'], home_geo['lng']) if home_geo else (37.49, 127.49)
+    # Calculate plan
+    plan = []
+    current_coords = home_coords
+    current_min = int(start_time.split(':')[0])*60 + int(start_time.split(':')[1])
+    for loc in locations:
+        if loc['coords']:
+            travel = estimate_transit_time_rough(current_coords[0], current_coords[1], loc['coords'][0], loc['coords'][1])
+        else:
+            travel = 15
+        arr_min = current_min + travel
+        arr_time = f"{arr_min//60:02d}:{arr_min%60:02d}"
+        plan.append({'title':loc['title'],'time':arr_time,'dur':loc['dur'],'travel_min':travel})
+        current_min = arr_min + loc['dur']
+        if loc['coords']:
+            current_coords = loc['coords']
+    # Return home
+    travel_home = estimate_transit_time_rough(current_coords[0], current_coords[1], home_coords[0], home_coords[1])
+    arrive_home = f"{(current_min+travel_home)//60:02d}:{(current_min+travel_home)%60:02d}"
+    return jsonify({'date':date,'home':home,'plan':plan,'arrive_home':arrive_home})
+
 @tongbot_bp.route('/admin/tongbot/monitor')
 def admin_tongbot_monitor():
     if session.get('role') not in ('admin', 'leader'):
