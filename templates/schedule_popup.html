@@ -66,11 +66,14 @@
 
     <!-- 빈 시간 찾기 -->
     <div id="tabFind" style="display:none;">
+        <input type="text" id="findTitle" class="form-control mb-2" placeholder="약속 제목 (예: 회의, 점심)">
         <div class="row g-2 mb-2">
             <div class="col-6"><input type="date" id="findDate" class="form-control"></div>
             <div class="col-3"><input type="number" id="findDuration" class="form-control" placeholder="분" value="60" min="30" step="30"></div>
             <div class="col-3"><button class="btn btn-primary w-100" onclick="findSlots()">찾기</button></div>
         </div>
+        <div id="slotResult" class="small"></div>
+    </div>
         <div id="slotResult" class="small">        </div>
     </div>
     </div></div>
@@ -160,6 +163,7 @@ function deleteEvent(id) {
 function findSlots() {
     const date = document.getElementById('findDate').value;
     const dur = parseInt(document.getElementById('findDuration').value) || 60;
+    const title = document.getElementById('findTitle').value.trim() || '약속';
     if (!date) return alert('날짜를 선택하세요.');
     const checked = document.querySelectorAll('.friend-check:checked');
     const fids = Array.from(checked).map(c=>c.value);
@@ -167,14 +171,28 @@ function findSlots() {
         findMySlots(date, dur);
         return;
     }
-    // 교차 체크
     fetch('/api/bot/schedule/common', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body:JSON.stringify({date, duration: dur, friend_ids: fids})
     }).then(r=>r.json()).then(d => {
         const el = document.getElementById('slotResult');
         if (!d.slots||d.slots.length===0) el.innerHTML = '<div class="text-muted py-2">'+d.friend_count+'명 모두 '+dur+'분 이상 가능한 시간이 없습니다.</div>';
-        else el.innerHTML = '<div class="alert alert-success py-2"><strong>🔍 '+date+' ('+d.friend_count+'명)</strong><br>'+d.slots.slice(0,3).map((s,i)=>'✅ #'+(i+1)+' '+s.time+' ~ '+s.free_min+'분').join('<br>')+'</div>';
+        else el.innerHTML = '<div class="alert alert-success py-2"><strong>🔍 '+date+' ('+d.friend_count+'명)</strong><br>'
+            + d.slots.slice(0,3).map((s,i)=>
+                '✅ #'+(i+1)+' '+s.time+' ~ '+s.free_min+'분 '
+                + '<button class="btn btn-sm btn-primary py-0" onclick="sendAppt(\''+title+'\',\''+date+'\',\''+s.time+'\','+dur+',['+fids+'])">📨 보내기</button>'
+            ).join('<br>')+'</div>';
+    });
+}
+
+function sendAppt(title, date, time, dur, fids) {
+    if (!confirm(title + '\n' + date + ' ' + time + ' (' + dur + '분)\n\n벗들에게 약속을 제안할까요?')) return;
+    fetch('/api/bot/schedule/invite', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({title, date, time, duration: dur, friend_ids: fids})
+    }).then(r=>r.json()).then(d => {
+        if (d.success) alert(d.msg || '약속 제안을 보냈습니다!');
+        else alert(d.error||'실패');
     });
 }
 

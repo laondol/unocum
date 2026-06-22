@@ -439,7 +439,20 @@ def schedule_popup():
     if not session.get('user_id'):
         return redirect(url_for('login', next='/schedule'))
     user = User.query.get(session['user_id'])
-    return render_template('schedule_popup.html', user=user)
+    # 약속 수락/거절 처리
+    accept_uid = request.args.get('accept', type=int)
+    decline_uid = request.args.get('decline', type=int)
+    event_date = request.args.get('date','')
+    title = request.args.get('title','약속')
+    msg = ''
+    if accept_uid and event_date:
+        s = TongBotSchedule(user_id=user.id, title=f'{title} (수락)', event_date=datetime.fromisoformat(event_date))
+        db.session.add(s)
+        db.session.commit()
+        msg = '약속이 일정에 등록되었습니다!'
+    if decline_uid:
+        msg = '약속을 거절했습니다.'
+    return render_template('schedule_popup.html', user=user, msg=msg)
 
 @tongbot_bp.route('/api/bot/schedule/common', methods=['POST'])
 def schedule_common():
@@ -482,6 +495,26 @@ def schedule_common():
             if free_min >= duration:
                 slots.append({"time":time,"free_min":free_min})
     return jsonify({"slots":slots,"friend_count":len(all_ids),"date":date})
+
+@tongbot_bp.route('/api/bot/schedule/invite', methods=['POST'])
+def schedule_invite():
+    uid = session.get('user_id')
+    if not uid: return jsonify({"error":"로그인"}),401
+    data = request.get_json()
+    title = data.get('title','약속')
+    date = data.get('date','')
+    time = data.get('time','')
+    duration = data.get('duration',60)
+    friend_ids = data.get('friend_ids',[])
+    if not date or not time: return jsonify({"error":"날짜/시간 필요"})
+    sender = User.query.get(uid)
+    event_date = f"{date} {time}:00"
+    for fid in friend_ids:
+        msg = f'<div style="text-align:center;padding:10px;"><strong>📅 약속 제안: {title}</strong><br><small>{sender.username}님의 제안</small><br>🕐 {date} {time} ({duration}분)<hr style="margin:5px 0;"><a href="https://test.unocum.kr/schedule?accept={uid}&date={event_date}&title={title}" style="display:inline-block;padding:6px 12px;background:#198754;color:#fff;border-radius:6px;text-decoration:none;margin:2px;">✅ 수락</a> <a href="https://test.unocum.kr/schedule?decline={uid}" style="display:inline-block;padding:6px 12px;background:#dc3545;color:#fff;border-radius:6px;text-decoration:none;margin:2px;">❌ 거절</a></div>'
+        db.session.add(Message(sender_id=uid, sender_name=sender.username, receiver_id=fid,
+            subject=f'📅 약속 제안: {title}', content=msg, sender_role='member'))
+    db.session.commit()
+    return jsonify({"success":True,"msg":f"{len(friend_ids)}명에게 약속 제안을 보냈습니다!"})
 
 @tongbot_bp.route('/admin/tongbot/monitor')
 def admin_tongbot_monitor():
