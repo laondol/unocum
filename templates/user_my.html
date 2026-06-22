@@ -462,9 +462,13 @@ function sendChatMsg() {
     .then(r=>r.json()).then(d=>{ input.value=''; loadChatMsgs(); });
 }
 // URL 해시로 탭 전환
-if (window.location.hash) {
-    const t = document.querySelector('#botTabs .nav-link[data-tab="' + window.location.hash.replace('#tab','') + '"]');
-    if (t) t.click();
-}
+document.addEventListener('DOMContentLoaded', function() {
+    var h = window.location.hash;
+    if (h) {
+        var tabName = h.replace('#tab','');
+        var t = document.querySelector('#botTabs .nav-link[data-tab="' + tabName + '"]');
+        if (t) setTimeout(function() { t.click(); }, 200);
+    }
+});
 </script>
 {% endblock %}

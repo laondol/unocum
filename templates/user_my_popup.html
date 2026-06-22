@@ -326,10 +326,14 @@ function addSchedule() {
 }
 
 // URL 해시 기반 탭 전환
-if (window.location.hash) {
-    const tab = document.querySelector('#botTabs .nav-link[data-tab="' + window.location.hash.replace('#tab','') + '"]');
-    if (tab) tab.click();
-}
+document.addEventListener('DOMContentLoaded', function() {
+    var h = window.location.hash;
+    if (h) {
+        var tabName = h.replace('#tab','');
+        var tab = document.querySelector('#botTabs .nav-link[data-tab=\"' + tabName + '\"]');
+        if (tab) setTimeout(function() { tab.click(); }, 200);
+    }
+});
 </script>
 </body>
 </html>
