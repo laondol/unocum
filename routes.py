@@ -3013,6 +3013,9 @@ def register_routes(app):
             content=f'{accepter.real_name or accepter.username}님이 벗 신청을 수락했습니다. 이제 벗입니다!'
         )
         db.session.add(msg)
+        from tongbot_routes import _rebuild_friend_cache
+        _rebuild_friend_cache(uid)
+        _rebuild_friend_cache(other_id)
         db.session.commit()
         return jsonify({'status':'success'})
 
