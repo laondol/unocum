@@ -2227,9 +2227,11 @@ def register_routes(app):
             return jsonify({"error": "로그인이 필요합니다."}), 401
         from models import User
         user = User.query.get(user_id)
-        if not user or not user.curr_village:
-            return jsonify({"error": "등록된 주소(리)가 없습니다."}), 400
-        to_address = f"경기 양평군 {user.curr_town or ''} {user.curr_village}"
+        if not user or (not user.village and not user.curr_village):
+            return jsonify({"error": "등록된 주소가 없습니다. 마이페이지에서 설정해 주세요."}), 400
+        home_town = user.town or user.curr_town or ''
+        home_village = user.village or user.curr_village or ''
+        to_address = f"경기 양평군 {home_town} {home_village}".strip()
         from config import Config
         kakao_key = Config.KAKAO_REST_API_KEY
         naver_id = Config.NAVER_SEARCH_CLIENT_ID or Config.NAVER_CLIENT_ID
@@ -2288,27 +2290,29 @@ def register_routes(app):
             return jsonify({"error": "로그인이 필요합니다."}), 401
         from models import User
         user = User.query.get(uid)
-        if not user or not user.curr_village:
+        if not user or (not user.village and not user.curr_village):
             return jsonify({"error": "등록된 주소가 없습니다."}), 400
+        home_town = user.town or user.curr_town or ''
+        home_village = user.village or user.curr_village or ''
         from services.transit import suggest_optimal_departure, lookup_village_coords, haversine_km
         from services.geocode import gps_to_town_village
         gps_result = gps_to_town_village(from_lat, from_lng)
         gps_town = gps_result[0] if gps_result else ""
         gps_village = gps_result[1] if gps_result else ""
-        same_village = bool(gps_town and gps_town == user.curr_town and gps_village == user.curr_village)
+        same_village = bool(gps_town and gps_town == home_town and gps_village == home_village)
         if same_village:
             return jsonify({
                 "already_home": True,
-                "message": f"현재 위치가 등록된 주소({user.curr_town} {user.curr_village})와 동일합니다. 막차 안내가 필요하지 않습니다.",
+                "message": f"현재 위치가 등록된 주소({home_town} {home_village})와 동일합니다. 막차 안내가 필요하지 않습니다.",
                 "current_town": gps_town,
                 "current_village": gps_village,
-                "home_town": user.curr_town,
-                "home_village": user.curr_village,
+                "home_town": home_town,
+                "home_village": home_village,
             })
-        suggestion = suggest_optimal_departure(from_lat, from_lng, user.curr_town, user.curr_village)
+        suggestion = suggest_optimal_departure(from_lat, from_lng, home_town, home_village)
         if not suggestion:
             return jsonify({"error": "경로를 찾을 수 없습니다."}), 404
-        home_coords = lookup_village_coords(user.curr_town, user.curr_village)
+        home_coords = lookup_village_coords(home_town, home_village)
         if home_coords:
             suggestion["home_coords"] = {"lat": home_coords[0], "lng": home_coords[1]}
             suggestion["home_distance_km"] = round(haversine_km(
