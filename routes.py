@@ -1907,17 +1907,22 @@ def register_routes(app):
             })
         return jsonify({"status": "success", "items": items})
 
-    @app.route('/share-report/toggle/<int:report_id>/<string:action>')
+    @app.route('/share-report/toggle/<int:report_id>/<string:action>', methods=['GET', 'POST'])
     def share_report_toggle(report_id, action):
         if session.get('role') not in ['admin', 'leader']:
-            return "권한 없음", 403
+            return jsonify({"status":"error","msg":"권한 없음"}), 403
         report = ShareReport.query.get_or_404(report_id)
         if action == 'approve':
             report.status = 'approved'
+            report.updated_at = datetime.now()
         elif action == 'reject':
             report.status = 'rejected'
-        report.updated_at = datetime.now()
+            report.updated_at = datetime.now()
+            # AI 학습: rejected 이미지는 AI가 다시 참고하도록 기록
+            report.moderation_reason = (report.moderation_reason or '') + ' | 관리자 반려'
         db.session.commit()
+        if request.method == 'POST':
+            return jsonify({"status":"success","action":action})
         return redirect(request.referrer or url_for('admin_share_reports'))
 
     @app.route('/share-report/like/<int:report_id>', methods=['POST'])

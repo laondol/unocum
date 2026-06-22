@@ -89,44 +89,30 @@
                         </td>
                         <td>
                             {% if r.is_moderated and r.moderation_result == 'flagged' %}
-                            <span class="badge bg-danger">🚫</span>
+                            <span class="badge bg-danger">🚫 차단</span>
                             {% elif r.is_moderated and r.moderation_result == 'person' %}
-                            <span class="badge bg-warning text-dark">👤</span>
+                            <span class="badge bg-danger">👤 인물</span>
                             {% elif r.is_moderated and r.moderation_result == 'person_accepted' %}
                             <span class="badge bg-info">👤✅</span>
                             {% elif r.is_moderated and r.moderation_result == 'clean' %}
-                            <span class="badge bg-success">✅</span>
+                            <span class="badge bg-success">✅ 클린</span>
                             {% elif r.is_moderated and r.moderation_result == 'pending' %}
-                            <span class="badge bg-warning text-dark">⏳</span>
+                            <span class="badge bg-danger">⏳ 검토중</span>
                             {% else %}
                             <span class="badge bg-secondary">분석중</span>
                             {% endif %}
+                            {% if r.moderation_reason %}
+                            <small class="d-block text-danger">{{ r.moderation_reason[:50] }}</small>
+                            {% endif %}
                         </td>
                         <td>
-                            {% if r.status == 'approved' %}
-                            <span class="badge bg-success">승인</span>
-                            {% elif r.status == 'rejected' %}
-                            <span class="badge bg-danger">반려</span>
-                            {% elif r.status == 'flagged' %}
-                            <span class="badge bg-danger">차단</span>
-                            {% elif r.status == 'pending_person' %}
-                            <span class="badge bg-warning text-dark">👤 인물</span>
-                            {% else %}
-                            <span class="badge bg-warning text-dark">대기</span>
-                            {% endif %}
+                            <label class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" {{ 'checked' if r.status == 'approved' else '' }} onchange="toggleStatus({{ r.id }}, this.checked)">
+                                <span class="form-check-label small">{{ '승인' if r.status == 'approved' else '미승인' }}</span>
+                            </label>
                         </td>
                         <td class="text-muted">{{ r.created_at.strftime('%m/%d %H:%M') }}</td>
                         <td>
-                            {% if r.status == 'pending' or r.status == 'pending_person' %}
-                            <a href="/share-report/toggle/{{ r.id }}/approve" class="btn btn-sm btn-success me-1">승인</a>
-                            <a href="/share-report/toggle/{{ r.id }}/reject" class="btn btn-sm btn-outline-danger me-1" onclick="return confirm('반려하시겠습니까?')">반려</a>
-                            {% elif r.status == 'approved' %}
-                            <a href="/share-report/toggle/{{ r.id }}/reject" class="btn btn-sm btn-outline-danger me-1" onclick="return confirm('반려하시겠습니까?')">반려</a>
-                            {% elif r.status == 'flagged' %}
-                            <a href="/share-report/toggle/{{ r.id }}/approve" class="btn btn-sm btn-success me-1">승인</a>
-                            {% elif r.status == 'rejected' %}
-                            <a href="/share-report/toggle/{{ r.id }}/approve" class="btn btn-sm btn-success me-1">승인</a>
-                            {% endif %}
                             {% if r.image_path and not r.video_path %}
                             <button onclick="mosaicShare({{ r.id }})" class="btn btn-sm btn-warning me-1" title="AI 모자이크">🎭</button>
                             {% endif %}
@@ -156,6 +142,13 @@
 </div>
 
 <script>
+function toggleStatus(id, checked) {
+    const action = checked ? 'approve' : 'reject';
+    if (!checked && !confirm('비승인 하시겠습니까? AI가 학습합니다.')) return location.reload();
+    fetch('/share-report/toggle/' + id + '/' + action, {method:'POST'})
+    .then(r=>r.json()).then(d=>{ if(d.status==='success') location.reload(); else alert(d.msg||'오류'); });
+}
+
 function mosaicShare(id) {
     if (!confirm('AI 모자이크를 적용하시겠습니까?')) return;
     fetch('/share-report/mosaic/' + id, {method:'POST'})
