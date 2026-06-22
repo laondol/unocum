@@ -138,6 +138,8 @@ function previewFile(input) {
     const preview = document.getElementById('fileUploadPreview');
     if (!input.files || !input.files[0]) return;
     const file = input.files[0];
+    hasImage = true;
+    checkReady();
     const reader = new FileReader();
     reader.onload = function(e) {
         if (file.type.startsWith('image/')) {
@@ -155,15 +157,16 @@ function previewFile(input) {
 function autoGetLocation() {
     const status = document.getElementById('locationStatus');
     const submitBtn = document.getElementById('submitBtn');
+    submitBtn.textContent = '📍 위치 확인 + 📸 이미지를 선택해 주세요';
     
     if (!navigator.geolocation) {
         status.textContent = '❌ 이 브라우저는 위치정보를 지원하지 않습니다.';
         status.className = 'mb-2 text-center text-danger small';
-        submitBtn.disabled = false;
+        checkReady();
         return;
     }
     
-    status.textContent = '📍 현재 위치를 자동으로 수집 중입니다... (브라우저에서 "허용" 눌러주세요)';
+    status.textContent = '📍 현재 위치를 자동으로 수집 중입니다...';
     status.className = 'mb-2 text-center text-primary small';
     
     navigator.geolocation.getCurrentPosition(
@@ -174,7 +177,7 @@ function autoGetLocation() {
             document.getElementById('longitude').value = lon;
             status.textContent = '✅ 위치 수집 완료';
             status.className = 'mb-2 text-center text-success small';
-            submitBtn.disabled = false;
+            checkReady();
             const mapDiv = document.getElementById('mapPreview');
             mapDiv.style.display = 'block';
             if (window.shareMap) {
@@ -190,10 +193,26 @@ function autoGetLocation() {
         err => {
             status.textContent = '⚠️ 위치 수집 실패: ' + err.message + ' (수동 입력 가능)';
             status.className = 'mb-2 text-center text-warning small';
-            submitBtn.disabled = false;
+            checkReady();
         },
         { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
+}
+
+let hasImage = false;
+function checkReady() {
+    const btn = document.getElementById('submitBtn');
+    const hasLoc = document.getElementById('latitude').value !== '';
+    if (hasImage && hasLoc) {
+        btn.disabled = false;
+        btn.textContent = '📤 공유 접수하기';
+    } else if (!hasImage) {
+        btn.disabled = true;
+        btn.textContent = '📸 이미지를 선택해 주세요';
+    } else {
+        btn.disabled = true;
+        btn.textContent = '📍 위치 확인 중...';
+    }
 }
 
 // 카메라 지원 감지
