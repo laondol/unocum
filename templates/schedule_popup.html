@@ -161,32 +161,24 @@ function findSlots() {
     const date = document.getElementById('findDate').value;
     const dur = parseInt(document.getElementById('findDuration').value) || 60;
     if (!date) return alert('날짜를 선택하세요.');
-    const dayScheds = schedules.filter(s => s.event_date && s.event_date.startsWith(date))
-        .map(s => { const t = s.event_date.split(' ')[1]; return t ? t.substring(0,5) : ''; }).filter(t=>t).sort();
-    const slots = [];
-    for (let h = 6; h < 23; h++) {
-        for (let m = 0; m < 60; m += 30) {
-            const time = String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
-            const busy = dayScheds.some(t => t === time);
-            slots.push({time, busy});
-        }
+    const checked = document.querySelectorAll('.friend-check:checked');
+    const fids = Array.from(checked).map(c=>c.value);
+    if (fids.length === 0) {
+        findMySlots(date, dur);
+        return;
     }
-    // Find consecutive free slots
-    const results = [];
-    for (let i = 0; i < slots.length; i++) {
-        if (slots[i].busy) continue;
-        let freeCount = 0;
-        for (let j = i; j < slots.length && !slots[j].busy; j++) freeCount++;
-        const freeMin = freeCount * 30;
-        if (freeMin >= dur) {
-            results.push(slots[i].time + ' ~ ' + freeMin + '분 가능');
-            i += freeCount - 1;
-        }
-    }
-    const el = document.getElementById('slotResult');
-    if (results.length === 0) el.innerHTML = '<div class="text-muted py-2">'+dur+'분 이상 빈 시간이 없습니다.</div>';
-    else el.innerHTML = '<div class="alert alert-success py-2"><strong>🔍 '+date+'</strong><br>'+results.map(r=>'✅ '+r).join('<br>')+'</div>';
+    // 교차 체크
+    fetch('/api/bot/schedule/common', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({date, duration: dur, friend_ids: fids})
+    }).then(r=>r.json()).then(d => {
+        const el = document.getElementById('slotResult');
+        if (!d.slots||d.slots.length===0) el.innerHTML = '<div class="text-muted py-2">'+d.friend_count+'명 모두 '+dur+'분 이상 가능한 시간이 없습니다.</div>';
+        else el.innerHTML = '<div class="alert alert-success py-2"><strong>🔍 '+date+' ('+d.friend_count+'명)</strong><br>'+d.slots.slice(0,3).map((s,i)=>'✅ #'+(i+1)+' '+s.time+' ~ '+s.free_min+'분').join('<br>')+'</div>';
+    });
 }
+
+function findMySlots(date, dur) {
 
 loadEvents();
 renderCal();

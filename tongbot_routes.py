@@ -441,6 +441,48 @@ def schedule_popup():
     user = User.query.get(session['user_id'])
     return render_template('schedule_popup.html', user=user)
 
+@tongbot_bp.route('/api/bot/schedule/common', methods=['POST'])
+def schedule_common():
+    uid = session.get('user_id')
+    if not uid: return jsonify({"error":"로그인"}),401
+    data = request.get_json()
+    date = data.get('date','')
+    duration = data.get('duration',60)
+    friend_ids = data.get('friend_ids',[])
+    if not date: return jsonify({"slots":[]})
+    all_ids = [uid] + friend_ids
+    all_busy = {}
+    import json
+    for fid in all_ids:
+        schedules = TongBotSchedule.query.filter_by(user_id=fid).all()
+        busy_times = []
+        for s in schedules:
+            if s.event_date and str(s.event_date)[:10] == date:
+                t = str(s.event_date)[11:16]
+                busy_times.append(t)
+        all_busy[fid] = set(busy_times)
+    # Find common free slots
+    slots = []
+    for h in range(6, 23):
+        for m in range(0, 60, 30):
+            time = f"{h:02d}:{m:02d}"
+            if any(time in busy for busy in all_busy.values()):
+                continue
+            # Count consecutive free minutes
+            free_min = 0
+            tm = h*60 + m
+            while tm < 23*60:
+                ct = f"{tm//60:02d}:{tm%60:02d}"
+                if any(ct in busy for busy in all_busy.values()):
+                    break
+                free_min += 30
+                tm += 30
+                if free_min >= duration:
+                    break
+            if free_min >= duration:
+                slots.append({"time":time,"free_min":free_min})
+    return jsonify({"slots":slots,"friend_count":len(all_ids),"date":date})
+
 @tongbot_bp.route('/admin/tongbot/monitor')
 def admin_tongbot_monitor():
     if session.get('role') not in ('admin', 'leader'):
