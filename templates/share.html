@@ -79,7 +79,7 @@
         {% for r in reports %}
         <div class="col-12 col-md-6 col-lg-4">
                 <div class="card border-0 shadow-sm h-100 share-card" style="border-radius: 16px; overflow: hidden;">
-                    {% if r.status and r.status != 'approved' and session.get('role') in ('admin','leader') %}
+                    {% if r.status and r.status != 'approved' and (session.get('role') in ('admin','leader') or r.user_id == session.get('user_id')) %}
                     <div class="position-absolute top-0 end-0 m-2">
                         <span class="badge {% if r.status == 'pending' %}bg-warning{% elif r.status == 'flagged' %}bg-danger{% else %}bg-secondary{% endif %}">
                             {{ {'pending':'승인대기','flagged':'차단됨','approved':'승인됨'}.get(r.status, r.status) }}
