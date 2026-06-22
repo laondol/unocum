@@ -158,7 +158,7 @@
             <div class="col-5"><h6 class="small text-muted">👥 내 벗</h6><div id="friendList" class="list-group small" style="max-height:300px;overflow-y:auto;">불러오는 중...</div></div>
             <div class="col-7">
                 <div id="chatRoomListPop">{% if not chat_rooms %}<div class="text-muted py-3">참여 중인 채팅방이 없습니다.</div>{% endif %}</div>
-                <button class="btn btn-sm btn-primary mt-2" onclick="createChatFromFriends()">+ 선택 벗과 채팅</button>
+                <button class="btn btn-sm btn-primary mt-2" onclick="showChatOptions()">+ 선택 벗과 채팅</button>
                 <div id="activeChat" style="display:none;" class="card mt-2"><div class="card-header d-flex justify-content-between p-2"><strong class="small" id="activeChatName"></strong><button class="btn btn-sm btn-outline-secondary" onclick="closeChatRoom()">✕</button></div><div id="activeChatMsgs" class="card-body p-2" style="max-height:200px;overflow-y:auto;"></div><div class="card-footer p-2"><div class="input-group input-group-sm"><input type="text" id="chatMsgInput" class="form-control" placeholder="메시지..." onkeypress="if(event.key==='Enter')sendChatMsg()"><button class="btn btn-primary" onclick="sendChatMsg()">전송</button></div></div></div>
             </div>
         </div>
@@ -348,15 +348,26 @@ function loadFriendList() {
     });
 }
 
-function createChatFromFriends() {
+function createChatFromFriends(mode) {
     const checked = document.querySelectorAll('.friend-check:checked');
     if (checked.length===0) return alert('벗을 선택해 주세요.');
+    const fids = Array.from(checked).map(c=>parseInt(c.value));
     const name = prompt('채팅방 제목:','우리들의 대화');
     if (!name) return;
-    const fids = Array.from(checked).map(c=>parseInt(c.value));
-    const mode = confirm('"확인" = 바로 개설\n"취소" = 예약 설정');
-    if (mode) createRoom(name, fids, null);
-    else { const sd = prompt('예약 날짜/시간:',''); if (sd) createRoom(name, fids, {title:name, event_date:sd, description:''}); else createRoom(name, fids, null); }
+    if (mode==='now') createRoom(name, fids, null);
+    else {
+        const sd = prompt('예약 날짜/시간 (예: 2026-07-01 14:00):','');
+        if (sd) createRoom(name, fids, {title:name, event_date:sd, description:''});
+        else createRoom(name, fids, null);
+    }
+}
+
+function showChatOptions() {
+    const checked = document.querySelectorAll('.friend-check:checked');
+    if (checked.length===0) return alert('벗을 먼저 선택해 주세요.');
+    const html = '<div class="text-center p-3"><strong>채팅방 만들기</strong><hr><button class="btn btn-success w-100 mb-2" onclick="this.parentElement.parentElement.remove();createChatFromFriends(\"now\")">⚡ 바로 채팅</button><button class="btn btn-outline-primary w-100" onclick="this.parentElement.parentElement.remove();createChatFromFriends(\"later\")">📅 예약 채팅</button></div>';
+    const el = document.getElementById('chatRoomListPop');
+    el.innerHTML = html;
 }
 
 function createRoom(name, fids, schedule) {
