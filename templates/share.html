@@ -108,11 +108,13 @@
                         <strong>📰 관련 지역 소식:</strong><br>
                         {{ r.ai_region_news[:150] }}{% if r.ai_region_news|length > 150 %}...{% endif %}
                         {% if r.ai_news_links %}
-                        {% set links = r.ai_news_links|fromjson %}
-                        {% if links %}
+                        {% set raw_links = r.ai_news_links|fromjson %}
+                        {% if raw_links and raw_links is iterable %}
                         <div class="mt-1">
-                            {% for link in links[:2] %}
-                            <a href="{{ link.url }}" target="_blank" class="text-decoration-none small text-primary d-block">📄 {{ link.title[:40] }}</a>
+                            {% for link in raw_links[:2] %}
+                            {% if link is mapping %}
+                            <a href="{{ link.url }}" target="_blank" class="text-decoration-none small text-primary d-block">📄 {{ link.title[:40] if link.title else '링크' }}</a>
+                            {% endif %}
                             {% endfor %}
                         </div>
                         {% endif %}
