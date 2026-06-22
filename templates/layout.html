@@ -254,15 +254,17 @@
         document.getElementById('globalIframe').src = '';
     }
     {% if session.get('username') %}
-    if (!sessionStorage.getItem('loc_sent')) {
-        navigator.geolocation && navigator.geolocation.getCurrentPosition(p => {
+    document.addEventListener('DOMContentLoaded', function() {
+        if (sessionStorage.getItem('loc_sent')) return;
+        if (!navigator.geolocation) return;
+        navigator.geolocation.getCurrentPosition(function(p) {
             sessionStorage.setItem('loc_sent','1');
-            fetch('/user/location/refresh', {
-                method:'POST',headers:{'Content-Type':'application/json'},
-                body:JSON.stringify({lat:p.coords.latitude, lon:p.coords.longitude})
-            }).catch(()=>{});
-        }, ()=>{}, {enableHighAccuracy:false, timeout:5000, maximumAge:300000});
-    }
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/user/location/refresh', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.send(JSON.stringify({lat: p.coords.latitude, lon: p.coords.longitude}));
+        }, function(){}, {enableHighAccuracy: false, timeout: 8000, maximumAge: 300000});
+    });
     {% endif %}
     </script>
 </body>
