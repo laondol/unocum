@@ -337,6 +337,67 @@ function addSchedule() {
     .then(r=>r.json()).then(d=>{ if(d.success) location.reload(); });
 }
 
+// --- 벗 채팅 기능 ---
+let activeRoomId = null, chatPollTimer = null;
+
+function loadFriendList() {
+    fetch('/api/chat/friends').then(r=>r.json()).then(d=>{
+        const el = document.getElementById('friendList');
+        if (!d.friends||d.friends.length===0) { el.innerHTML='<div class="text-muted py-2">아직 벗이 없습니다.<br><small>다른 회원님 프로필에서 벗 신청을 해보세요!</small></div>'; return; }
+        el.innerHTML = d.friends.map(f=>'<label class="list-group-item"><input type="checkbox" class="friend-check" value="'+f.id+'"> '+f.name+' <small class="text-muted">@'+f.username+'</small></label>').join('');
+    });
+}
+
+function createChatFromFriends() {
+    const checked = document.querySelectorAll('.friend-check:checked');
+    if (checked.length===0) return alert('벗을 선택해 주세요.');
+    const name = prompt('채팅방 제목:','우리들의 대화');
+    if (!name) return;
+    const fids = Array.from(checked).map(c=>parseInt(c.value));
+    const mode = confirm('"확인" = 바로 개설\n"취소" = 예약 설정');
+    if (mode) createRoom(name, fids, null);
+    else { const sd = prompt('예약 날짜/시간:',''); if (sd) createRoom(name, fids, {title:name, event_date:sd, description:''}); else createRoom(name, fids, null); }
+}
+
+function createRoom(name, fids, schedule) {
+    fetch('/api/chat/rooms', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name,friends:fids,schedule})})
+    .then(r=>r.json()).then(d=>{ if(d.id){alert('채팅방 개설! 2시간 유지됩니다.'); location.reload();} else alert(d.error||'실패'); });
+}
+
+function openChatRoom(id) {
+    activeRoomId=id; document.getElementById('activeChat').style.display='';
+    document.getElementById('activeChatName').textContent='채팅방 #'+id;
+    loadChatMsgs(); chatPollTimer=setInterval(loadChatMsgs,3000);
+}
+
+function closeChatRoom() {
+    activeRoomId=null; clearInterval(chatPollTimer);
+    document.getElementById('activeChat').style.display='none';
+}
+
+function loadChatMsgs() {
+    if (!activeRoomId) return;
+    fetch('/api/chat/messages/'+activeRoomId).then(r=>r.json()).then(d=>{
+        document.getElementById('activeChatMsgs').innerHTML = d.messages.map(m=>{
+            const cls = m.is_bot?'text-center text-muted fst-italic':'';
+            return '<div class="mb-1 '+cls+'"><span class="badge bg-'+(m.is_bot?'warning':'primary')+' small">'+m.username+'</span> '+m.message+' <small class="text-muted">'+m.time+'</small></div>';
+        }).join('');
+    });
+}
+
+function sendChatMsg() {
+    const input = document.getElementById('chatMsgInput'), msg = input.value.trim();
+    if (!msg||!activeRoomId) return;
+    fetch('/api/chat/messages/'+activeRoomId, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message:msg})})
+    .then(r=>r.json()).then(d=>{ input.value=''; loadChatMsgs(); });
+}
+
+// 탭 전환 시 벗목록 로드
+document.querySelectorAll('#botTabs .nav-link').forEach(tab => {
+    tab.addEventListener('click', function() {
+        if (this.dataset.tab === 'friendchat') loadFriendList();
+    });
+});
 // URL 해시 기반 탭 전환
 document.addEventListener('DOMContentLoaded', function() {
     var h = window.location.hash;
