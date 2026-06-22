@@ -179,6 +179,22 @@ function findSlots() {
 }
 
 function findMySlots(date, dur) {
+    const dayScheds = schedules.filter(s => s.event_date && s.event_date.startsWith(date))
+        .map(s => { const t = s.event_date.split(' ')[1]; return t ? t.substring(0,5) : ''; }).filter(t=>t).sort();
+    const results = [];
+    for (let h = 6; h < 23; h++) {
+        for (let m = 0; m < 60; m += 30) {
+            const time = String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+            if (dayScheds.includes(time)) continue;
+            let freeMin = 0, tm = h*60+m;
+            while (tm < 23*60 && !dayScheds.includes(String(Math.floor(tm/60)).padStart(2,'0')+':'+String(tm%60).padStart(2,'0'))) { freeMin += 30; tm += 30; }
+            if (freeMin >= dur) { results.push(time + ' ~ ' + freeMin + '분 가능'); h = 23; break; }
+        }
+    }
+    const el = document.getElementById('slotResult');
+    if (results.length === 0) el.innerHTML = '<div class="text-muted py-2">'+dur+'분 이상 빈 시간이 없습니다.</div>';
+    else el.innerHTML = '<div class="alert alert-success py-2"><strong>🔍 '+date+'</strong><br>'+results.map(r=>'✅ '+r).join('<br>')+'</div>';
+}
 
 document.addEventListener('DOMContentLoaded', function() {
     loadEvents();
