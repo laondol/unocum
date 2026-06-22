@@ -17,13 +17,19 @@
 </style>
 </head>
 <body>
-<div class="container py-3" style="max-width:600px;">
+<div class="container py-3" style="max-width:700px;">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="fw-bold mb-0">📅 일정 관리</h5>
         <a href="#" onclick="window.close(); return false;" class="btn btn-sm btn-outline-secondary">✕ 닫기</a>
     </div>
 
-    <ul class="nav nav-tabs mb-3" id="schedTabs">
+    <div class="row g-3">
+        <div class="col-4">
+            <h6 class="small text-muted">👥 벗</h6>
+            <div id="friendList" class="list-group small" style="max-height:400px;overflow-y:auto;">불러오는 중...</div>
+        </div>
+        <div class="col-8">
+            <ul class="nav nav-tabs mb-3" id="schedTabs">
         <li class="nav-item"><a class="nav-link active" href="#" data-tab="view">📅 달력</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-tab="add">➕ 추가</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-tab="find">🔍 빈 시간</a></li>
@@ -65,9 +71,9 @@
             <div class="col-3"><input type="number" id="findDuration" class="form-control" placeholder="분" value="60" min="30" step="30"></div>
             <div class="col-3"><button class="btn btn-primary w-100" onclick="findSlots()">찾기</button></div>
         </div>
-        <div id="slotResult" class="small"></div>
+        <div id="slotResult" class="small">        </div>
     </div>
-</div>
+    </div></div>
 
 <script>
 let calYear, calMonth, schedules = [];
@@ -138,8 +144,10 @@ function addEvent() {
     const start = document.getElementById('addStart').value;
     if (!title || !date || !start) return alert('제목, 날짜, 시간을 입력하세요.');
     const eventDate = date + ' ' + start + ':00';
+    const checked = document.querySelectorAll('.friend-check:checked');
+    const invited = Array.from(checked).map(c=>parseInt(c.value)).join(',');
     fetch('/api/bot/schedule', {method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({title, description:document.getElementById('addDesc').value, event_date:eventDate})})
+        body:JSON.stringify({title, description:document.getElementById('addDesc').value, event_date:eventDate, invited})})
     .then(r=>r.json()).then(d => { if(d.success) { alert('등록 완료'); loadEvents(); } });
 }
 
@@ -182,6 +190,15 @@ function findSlots() {
 
 loadEvents();
 renderCal();
+loadFriendList();
+
+function loadFriendList() {
+    fetch('/api/chat/friends').then(r=>r.json()).then(d=>{
+        const el = document.getElementById('friendList');
+        if (!d.friends||d.friends.length===0) { el.innerHTML='<div class="text-muted py-2">벗 없음</div>'; return; }
+        el.innerHTML = d.friends.map(f=>'<label class="list-group-item"><input type="checkbox" class="friend-check" value="'+f.id+'"> '+f.name+'</label>').join('');
+    });
+}
 </script>
 </body>
 </html>
