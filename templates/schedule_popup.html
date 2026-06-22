@@ -312,16 +312,18 @@ function savePlan() {
     var d = window._lastPlan;
     if (!d || !d.plan) return alert('먼저 계산하기를 실행하세요.');
     if (!confirm('계산된 일정을 저장할까요?')) return;
-    var descPrefix = '🚌 출발: ' + d.from + ' → ' + d.leave_time + ' 출발 | 🏠 귀가: ' + d.arrive_home + ' 도착';
+    var fromEnc = encodeURIComponent(d.from);
     var promises = d.plan.map(function(p) {
-        var desc = descPrefix + ' | 📍 ' + (p.title || '');
+        var locEnc = encodeURIComponent(p.title + ' ' + (p.loc || ''));
+        var maps = '<br>🗺️ <a href=\"https://map.kakao.com/?sName='+fromEnc+'&eName='+locEnc+'\" target=\"_blank\">카카오맵</a> | <a href=\"https://map.naver.com/index.nhn?stitle='+fromEnc+'&etitle='+locEnc+'&pathType=1\" target=\"_blank\">네이버지도</a>';
+        var desc = '🚌 출발: ' + d.from + ' → ' + d.leave_time + ' 출발 | 🏠 귀가: ' + d.arrive_home + ' 도착 | 📍 ' + p.title + maps;
         return fetch('/api/bot/schedule', {
             method:'POST', headers:{'Content-Type':'application/json'},
             body:JSON.stringify({title: p.title, description: desc, event_date: d.date + ' ' + p.arrive + ':00', memo: desc})
         });
     });
     Promise.all(promises).then(function() {
-        alert('출발/귀가시간이 포함된 일정이 저장되었습니다!');
+        alert('지도 링크가 포함된 일정이 저장되었습니다!');
         loadEvents();
     });
 }
