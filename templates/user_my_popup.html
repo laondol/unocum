@@ -378,7 +378,14 @@ function showChatOptions() {
 
 function createRoom(name, fids, schedule) {
     fetch('/api/chat/rooms', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name,friends:fids,schedule})})
-    .then(r=>r.json()).then(d=>{ if(d.id){alert('채팅방 개설! 2시간 유지됩니다.'); location.reload();} else alert(d.error||'실패'); });
+    .then(r=>r.json()).then(d=>{
+        if(d.id) {
+            alert('채팅방 개설! 2시간 유지됩니다.');
+            openChatRoom(d.id);
+            loadFriendList();
+            document.getElementById('chatRoomListPop').innerHTML = '';
+        } else alert(d.error||'실패');
+    });
 }
 
 function openChatRoom(id) {
