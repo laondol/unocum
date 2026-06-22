@@ -254,18 +254,18 @@
         document.getElementById('globalIframe').src = '';
     }
     {% if session.get('username') %}
-    document.addEventListener('DOMContentLoaded', function() {
-        if (!navigator.geolocation) return;
-        var lastSent = parseInt(sessionStorage.getItem('loc_sent_ts')||'0');
-        if (Date.now() - lastSent < 600000) return;
-        navigator.geolocation.getCurrentPosition(function(p) {
-            sessionStorage.setItem('loc_sent_ts', Date.now());
-            var xhr = new XMLHttpRequest();
-            xhr.open('POST', '/user/location/refresh', true);
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.send(JSON.stringify({lat: p.coords.latitude, lon: p.coords.longitude}));
-        }, function(){}, {enableHighAccuracy: true, timeout: 8000, maximumAge: 60000});
-    });
+    if (!sessionStorage.getItem('loc_updated')) {
+        document.addEventListener('DOMContentLoaded', function() {
+            if (!navigator.geolocation) return;
+            navigator.geolocation.getCurrentPosition(function(p) {
+                sessionStorage.setItem('loc_updated','1');
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', '/user/location/refresh', true);
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                xhr.send(JSON.stringify({lat: p.coords.latitude, lon: p.coords.longitude}));
+            }, function(){}, {enableHighAccuracy: true, timeout: 8000, maximumAge: 60000});
+        });
+    }
     {% endif %}
     </script>
 </body>
