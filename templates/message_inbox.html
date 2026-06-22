@@ -29,7 +29,7 @@
                     <small class="text-muted">{{ m.created_at.strftime('%m/%d %H:%M') }}</small>
                 </div>
                 <div class="small text-muted mb-1">{{ m.sender_name }}{% if m.sender_role == 'admin' %} (관리자){% elif m.sender_role == 'leader' %} (책임자){% endif %}</div>
-                <div class="mt-2 p-2 bg-light rounded">{{ m.content }}</div>
+                <div class="mt-2 p-2 bg-light rounded">{% if m.content.startswith('<div') %}{{ m.content|safe }}{% else %}{{ m.content }}{% endif %}</div>
                 {% if not m.is_read %}
                 <div class="text-end mt-1">
                     <button class="btn btn-sm btn-outline-success" onclick="markRead({{ m.id }}, this)">✅ 읽음</button>
@@ -54,7 +54,7 @@
                     <small class="text-muted">{{ m.created_at.strftime('%m/%d %H:%M') }}</small>
                 </div>
                 <div class="small text-muted mb-1">→ {{ m.receiver_name or '알수없음' }}</div>
-                <div class="mt-2 p-2 bg-light rounded">{{ m.content }}</div>
+                <div class="mt-2 p-2 bg-light rounded">{% if m.content.startswith('<div') %}{{ m.content|safe }}{% else %}{{ m.content }}{% endif %}</div>
             </div>
         </div>
         {% endfor %}
