@@ -324,6 +324,12 @@ function addSchedule() {
     fetch('/api/bot/schedule', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
     .then(r=>r.json()).then(d=>{ if(d.success) location.reload(); });
 }
+
+// URL 해시 기반 탭 전환
+if (window.location.hash) {
+    const tab = document.querySelector('#botTabs .nav-link[data-tab="' + window.location.hash.replace('#tab','') + '"]');
+    if (tab) tab.click();
+}
 </script>
 </body>
 </html>

@@ -461,5 +461,10 @@ function sendChatMsg() {
     fetch('/api/chat/messages/'+activeRoomId, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message:msg})})
     .then(r=>r.json()).then(d=>{ input.value=''; loadChatMsgs(); });
 }
+// URL 해시로 탭 전환
+if (window.location.hash) {
+    const t = document.querySelector('#botTabs .nav-link[data-tab="' + window.location.hash.replace('#tab','') + '"]');
+    if (t) t.click();
+}
 </script>
 {% endblock %}
