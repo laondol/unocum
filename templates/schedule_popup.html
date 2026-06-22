@@ -185,12 +185,10 @@ renderCal();
 loadFriendList();
 
 function loadFriendList() {
-    var el = document.getElementById('friendList');
-    fetch('/api/chat/friends').then(function(r){return r.json()}).then(function(d){
-        if (!d.friends||d.friends.length===0) { el.innerHTML='<div class="text-muted py-2">벗 없음</div>'; return; }
-        el.innerHTML = d.friends.map(function(f){
-            return '<label class="list-group-item"><input type="checkbox" class="friend-check" value="'+f.id+'"> '+f.name+'</label>';
-        }).join('');
+    fetch('/api/chat/friends').then(r=>r.json()).then(d=>{
+        const el = document.getElementById('friendList');
+        if (!d.friends||d.friends.length===0) { el.innerHTML='<div class="text-muted py-2">아직 벗이 없습니다.<br><small>프로필에서 벗 신청을 해보세요!</small></div>'; return; }
+        el.innerHTML = d.friends.map(f=>'<label class="list-group-item"><input type="checkbox" class="friend-check" value="'+f.id+'"> '+f.name+' <small class="text-muted">@'+f.username+'</small></label>').join('');
     });
 }
 </script>
