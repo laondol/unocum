@@ -182,17 +182,27 @@ function findMySlots(date, dur) {
 
 loadEvents();
 renderCal();
-loadFriendList();
+// 벗목록 캐싱
+var cached = sessionStorage.getItem('friendListCache');
+var cacheTime = parseInt(sessionStorage.getItem('friendListTime')||'0');
+if (cached && (Date.now() - cacheTime < 60000)) {
+    document.getElementById('friendList').innerHTML = cached;
+} else {
+    loadFriendList();
+}
 
 function loadFriendList() {
     var el = document.getElementById('friendList');
     if (!el) return;
     el.innerHTML = '불러오는 중...';
     fetch('/api/chat/friends').then(function(r){return r.json()}).then(function(d){
-        if (!d.friends||d.friends.length===0) { el.innerHTML='<div class="text-muted py-2">벗이 없습니다</div>'; return; }
-        el.innerHTML = d.friends.map(function(f){
+        if (!d.friends||d.friends.length===0) { el.innerHTML='<div class="text-muted py-2">벗이 없습니다</div>'; sessionStorage.removeItem('friendListCache'); return; }
+        var html = d.friends.map(function(f){
             return '<label class="list-group-item"><input type="checkbox" class="friend-check" value="'+f.id+'"> '+f.name+' <small class="text-muted">@'+f.username+'</small></label>';
         }).join('');
+        el.innerHTML = html;
+        sessionStorage.setItem('friendListCache', html);
+        sessionStorage.setItem('friendListTime', Date.now());
     }).catch(function(){ el.innerHTML = '불러오기 실패'; });
 }
 </script>
