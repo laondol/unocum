@@ -81,7 +81,10 @@
                         </td>
                         <td>
                             {% if a.source_url %}
-                            <a href="#" onclick="openExternal('{{ a.source_url }}','원문: {{ a.title[:30] }}'); return false;" class="btn btn-sm btn-outline-primary" title="{{ a.source_url }}">🔗 원문보기</a>
+                            <a href="{{ a.source_url }}" target="_blank" class="btn btn-sm btn-outline-primary">🔗 원문보기</a>
+                            {% if a.source_url %}
+                            <button class="btn btn-sm btn-outline-info ms-1" onclick="openExternal('/api/news/translate?url={{ a.source_url|urlencode }}&title={{ a.title|urlencode }}','🌐 번역: {{ a.title[:30] }}'); return false;">🌐 번역</button>
+                            {% endif %}
                             {% else %}
                             <span class="text-muted small">-</span>
                             {% endif %}

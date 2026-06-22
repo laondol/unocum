@@ -831,6 +831,22 @@ def register_routes(app):
         if session.get('role') not in ['admin', 'leader']:
             return "권한 없음", 403
         article = NewsArticle.query.get_or_404(news_id)
+        translated = ''
+        if request.args.get('translate') == '1' and article.source_url:
+            try:
+                import requests as req
+                r = req.get(article.source_url, headers={'User-Agent':'Mozilla/5.0'}, timeout=10)
+                text = r.text[:3000]
+                key = current_app.config.get('GROQ_API_KEY','')
+                if key:
+                    prompt = f"다음 내용을 한국어로 번역하세요. 원문 그대로 상세히 번역하세요.\n\n{text}"
+                    rr = req.post("https://api.groq.com/openai/v1/chat/completions",
+                        headers={"Authorization":f"Bearer {key}","Content-Type":"application/json"},
+                        json={"model":"llama-3.1-8b-instant","messages":[{"role":"user","content":prompt}],"max_tokens":1500},
+                        timeout=30)
+                    if rr.status_code == 200:
+                        translated = rr.json()["choices"][0]["message"]["content"]
+            except: pass
         if request.method == 'POST':
             article.title = request.form.get('title', '').strip()
             article.summary = request.form.get('summary', '')
@@ -865,7 +881,7 @@ def register_routes(app):
                 pass
             db.session.commit()
             return redirect(url_for('admin_news'))
-        return render_template('admin_news_create.html', article=article)
+        return render_template('admin_news_create.html', article=article, translated=translated)
 
     @app.route('/admin/news/clean-cjk', methods=['POST'])
     def admin_news_clean_cjk():
@@ -2108,7 +2124,30 @@ def register_routes(app):
         back = request.args.get('back', request.headers.get('Referer', '/construction'))
         return render_template('go.html', url=url, title=title, back=back)
 
-    # --- [위치기반안내] ---
+    # --- [소식 번역] ---
+    @app.route('/api/news/translate')
+    def news_translate():
+        url = request.args.get('url','')
+        title = request.args.get('title','')
+        if not url:
+            return "<p>URL이 필요합니다.</p>"
+        try:
+            import requests as req
+            r = req.get(url, headers={'User-Agent':'Mozilla/5.0'}, timeout=10)
+            text = r.text[:3000]
+            key = current_app.config.get('GROQ_API_KEY','')
+            if key:
+                prompt = f"다음 웹페이지 내용을 한국어로 5문장 이내로 요약 번역하세요.\n\n제목: {title}\n내용: {text}"
+                rr = req.post("https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization":f"Bearer {key}","Content-Type":"application/json"},
+                    json={"model":"llama-3.1-8b-instant","messages":[{"role":"user","content":prompt}],"max_tokens":500},
+                    timeout=20)
+                if rr.status_code == 200:
+                    result = rr.json()["choices"][0]["message"]["content"]
+                    return f"<div style='padding:20px;font-size:0.9rem;line-height:1.8;'><h5>🌐 번역 요약</h5><a href='{url}' target='_blank' style='font-size:0.8rem;'>원문보기</a><hr>{result.replace(chr(10),'<br>')}</div>"
+            return f"<p>번역을 불러올 수 없습니다. <a href='{url}' target='_blank'>원문보기</a></p>"
+        except Exception as e:
+            return f"<p>오류: {str(e)[:100]}</p>"
     @app.route('/construction')
     @app.route('/construction')
     def construction():
