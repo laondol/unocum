@@ -1631,14 +1631,16 @@ def register_routes(app):
                 return jsonify({"status": "error", "msg": "위치 수집이 필요합니다. 새로고침 후 위치 허용해주세요."}), 400
             
             image_path = None
-            if 'image' in request.files:
-                file = request.files['image']
-                if file and file.filename:
-                    img_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'share_reports')
-                    if not os.path.exists(img_dir): os.makedirs(img_dir)
-                    fname = f"share_{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(file.filename)}"
-                    file.save(os.path.join(img_dir, fname))
-                    image_path = f"/static/uploads/share_reports/{fname}"
+            for field in ['image', 'camera_image']:
+                if field in request.files:
+                    file = request.files[field]
+                    if file and file.filename:
+                        img_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'share_reports')
+                        if not os.path.exists(img_dir): os.makedirs(img_dir)
+                        fname = f"share_{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(file.filename)}"
+                        file.save(os.path.join(img_dir, fname))
+                        image_path = f"/static/uploads/share_reports/{fname}"
+                        break
             
             drawing_path = None
             drawing = request.form.get('drawing_data')
