@@ -507,7 +507,7 @@ def chat_rooms():
             except: pass
         # 초대 쪽지 발송
         creator = User.query.get(uid)
-        invite_msg = f'💬 채팅 초대: {name}\n\n{creator.username}님이 채팅방에 초대했습니다.\n\n✅ 입장: /chat?room={room.id}&action=join\n❌ 거절: /chat?room={room.id}&action=decline\n👁️ 모니터링: /chat?room={room.id}&action=monitor'
+        invite_msg = f'💬 채팅 초대: {name}\n\n{creator.username}님이 채팅방에 초대했습니다.\n\n✅ 입장: https://test.unocum.kr/chat?room={room.id}&action=join\n❌ 거절: https://test.unocum.kr/chat?room={room.id}&action=decline\n👁️ 모니터링: https://test.unocum.kr/chat?room={room.id}&action=monitor'
         for fid in friends:
             db.session.add(Message(sender_id=uid, sender_name=creator.username, receiver_id=fid,
                 subject=f'💬 채팅 초대: {name}', content=invite_msg, sender_role='member'))
