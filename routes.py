@@ -1809,9 +1809,14 @@ def register_routes(app):
         village = request.args.get('village', '')
         category = request.args.get('category', '')
         role = session.get('role', '')
+        uid = session.get('user_id')
         
         if role in ('admin', 'leader'):
             query = ShareReport.query
+        elif uid:
+            query = ShareReport.query.filter(
+                db.or_(ShareReport.status == 'approved', ShareReport.user_id == uid)
+            )
         else:
             query = ShareReport.query.filter_by(status='approved')
         if town:
