@@ -439,6 +439,7 @@ def schedule_popup():
     if not session.get('user_id'):
         return redirect(url_for('login', next='/schedule'))
     user = User.query.get(session['user_id'])
+    bot = _get_bot(user.id)
     # 약속 수락/거절 처리
     accept_uid = request.args.get('accept', type=int)
     decline_uid = request.args.get('decline', type=int)
@@ -452,7 +453,7 @@ def schedule_popup():
         msg = '약속이 일정에 등록되었습니다!'
     if decline_uid:
         msg = '약속을 거절했습니다.'
-    return render_template('schedule_popup.html', user=user, msg=msg)
+    return render_template('schedule_popup.html', user=user, bot=bot, msg=msg)
 
 @tongbot_bp.route('/api/bot/schedule/common', methods=['POST'])
 def schedule_common():
