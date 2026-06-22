@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>벗 채팅</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>body{background:#f8f9fa;}</style>
+</head>
+<body>
+<div class="container py-3" style="max-width:600px;">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-bold mb-0">👥 벗 채팅</h5>
+        <div>
+            <span class="badge bg-warning me-1">🤖 {{ bot.bot_name }}</span>
+            <a href="/user/my" class="btn btn-sm btn-outline-secondary">통벗</a>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-5">
+            <h6 class="small text-muted">내 벗</h6>
+            <div id="friendList" class="list-group small" style="max-height:400px;overflow-y:auto;">불러오는 중...</div>
+        </div>
+        <div class="col-7">
+            <div id="chatRoomList">
+                {% for r in chat_rooms %}
+                <div class="card mb-2" style="cursor:pointer;" onclick="openChatRoom({{ r.id }})">
+                    <div class="card-body p-2 small"><strong>{{ r.name }}</strong> <small class="text-muted float-end">{{ r.created_at.strftime('%H:%M') if r.created_at else '' }}</small></div>
+                </div>
+                {% endfor %}
+                {% if not chat_rooms %}<div class="text-muted py-3">참여 중인 채팅방이 없습니다.<br><small>벗을 선택하고 채팅을 시작하세요!</small></div>{% endif %}
+            </div>
+            <button class="btn btn-primary btn-sm mt-2 w-100" id="chatCreateBtn">+ 선택 벗과 채팅</button>
+            <div id="activeChat" style="display:none;" class="card mt-2">
+                <div class="card-header d-flex justify-content-between p-2"><strong class="small" id="activeChatName"></strong><button class="btn btn-sm btn-outline-secondary" onclick="closeChatRoom()">✕</button></div>
+                <div id="activeChatMsgs" class="card-body p-2" style="max-height:300px;overflow-y:auto;"></div>
+                <div class="card-footer p-2"><div class="input-group input-group-sm"><input type="text" id="chatMsgInput" class="form-control" placeholder="메시지..." onkeypress="if(event.key==='Enter')sendChatMsg()"><button class="btn btn-primary" onclick="sendChatMsg()">전송</button></div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let activeRoomId = null, chatPollTimer = null;
+
+document.getElementById('chatCreateBtn').addEventListener('click', showChatOptions);
+
+function loadFriendList() {
+    fetch('/api/chat/friends').then(r=>r.json()).then(d=>{
+        const el = document.getElementById('friendList');
+        if (!d.friends||d.friends.length===0) { el.innerHTML='<div class="text-muted py-2">아직 벗이 없습니다.<br><small>프로필에서 벗 신청을 해보세요!</small></div>'; return; }
+        el.innerHTML = d.friends.map(f=>'<label class="list-group-item"><input type="checkbox" class="friend-check" value="'+f.id+'"> '+f.name+' <small class="text-muted">@'+f.username+'</small></label>').join('');
+    });
+}
+
+function showChatOptions() {
+    const checked = document.querySelectorAll('.friend-check:checked');
+    if (checked.length===0) return alert('벗을 먼저 선택해 주세요.');
+    if (confirm('⚡ 바로 채팅을 시작할까요?\n\n[확인] = 바로 채팅\n[취소] = 예약 채팅')) {
+        createChatFromFriends('now');
+    } else {
+        createChatFromFriends('later');
+    }
+}
+
+function createChatFromFriends(mode) {
+    const checked = document.querySelectorAll('.friend-check:checked');
+    if (checked.length===0) return alert('벗을 선택해 주세요.');
+    const fids = Array.from(checked).map(c=>parseInt(c.value));
+    const name = prompt('채팅방 제목:','우리들의 대화');
+    if (!name) return;
+    if (mode==='now') createRoom(name, fids, null);
+    else { const sd = prompt('예약 날짜/시간:',''); if (sd) createRoom(name, fids, {title:name, event_date:sd, description:''}); else createRoom(name, fids, null); }
+}
+
+function createRoom(name, fids, schedule) {
+    fetch('/api/chat/rooms', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name,friends:fids,schedule})})
+    .then(r=>r.json()).then(d=>{
+        if(d.id) {
+            alert('채팅방 개설! 2시간 유지됩니다.');
+            openChatRoom(d.id); loadFriendList();
+        } else alert(d.error||'실패');
+    });
+}
+
+function openChatRoom(id) {
+    activeRoomId=id; document.getElementById('activeChat').style.display='';
+    document.getElementById('activeChatName').textContent='채팅방 #'+id;
+    loadChatMsgs(); chatPollTimer=setInterval(loadChatMsgs,3000);
+}
+
+function closeChatRoom() {
+    activeRoomId=null; clearInterval(chatPollTimer);
+    document.getElementById('activeChat').style.display='none';
+}
+
+function loadChatMsgs() {
+    if (!activeRoomId) return;
+    fetch('/api/chat/messages/'+activeRoomId).then(r=>r.json()).then(d=>{
+        document.getElementById('activeChatMsgs').innerHTML = d.messages.map(m=>{
+            const cls = m.is_bot?'text-center text-muted fst-italic':'';
+            return '<div class="mb-1 '+cls+'"><span class="badge bg-'+(m.is_bot?'warning':'primary')+' small">'+m.username+'</span> '+m.message+' <small class="text-muted">'+m.time+'</small></div>';
+        }).join('');
+    });
+}
+
+function sendChatMsg() {
+    const input = document.getElementById('chatMsgInput'), msg = input.value.trim();
+    if (!msg||!activeRoomId) return;
+    fetch('/api/chat/messages/'+activeRoomId, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message:msg})})
+    .then(r=>r.json()).then(d=>{ input.value=''; loadChatMsgs(); });
+}
+
+loadFriendList();
+</script>
+</body>
+</html>

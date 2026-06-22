@@ -47,6 +47,18 @@ def my_page():
     tpl = 'user_my_popup.html' if popup else 'user_my.html'
     return render_template(tpl, user=user, bot=bot, drafts=drafts, schedules=schedules, stamps_count=stamps_count, greeting=greeting, chat_rooms=chat_rooms, json=json, active_tab=active_tab)
 
+@tongbot_bp.route('/chat')
+def chat_page():
+    if not session.get('user_id'):
+        return redirect(url_for('login', next='/chat'))
+    user = User.query.get(session['user_id'])
+    if not user:
+        return redirect(url_for('login'))
+    bot = _get_bot(user.id)
+    import json
+    chat_rooms = ChatRoom.query.filter(ChatRoom.is_active==True, ChatRoom.participants.contains(str(user.id))).order_by(ChatRoom.created_at.desc()).limit(10).all()
+    return render_template('chat.html', user=user, bot=bot, chat_rooms=chat_rooms, json=json)
+
 @tongbot_bp.route('/api/bot/rename', methods=['POST'])
 def bot_rename():
     uid = session.get('user_id')
