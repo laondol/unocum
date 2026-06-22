@@ -1998,10 +1998,10 @@ def register_routes(app):
     def share_detail(report_id):
         report = ShareReport.query.get_or_404(report_id)
         role = session.get('role', '')
-        if report.status != 'approved' and role not in ('admin', 'leader'):
+        uid = session.get('user_id')
+        if report.status != 'approved' and role not in ('admin', 'leader') and report.user_id != uid:
             return "승인된 공유만 볼 수 있습니다.", 403
         comments = ShareComment.query.filter_by(share_id=report_id, parent_id=None).order_by(ShareComment.created_at.asc()).all()
-        uid = session.get('user_id')
         # 위치 기반 가까운 공유 (정렬: 내글→같은리→같은면→같은군)
         nearby_shares = []
         if report.latitude and report.longitude and report.town:
