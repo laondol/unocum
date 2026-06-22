@@ -429,9 +429,9 @@ def chat_friends():
     for f in f1: friend_ids.add(f.receiver_id)
     for f in f2: friend_ids.add(f.requester_id)
     friends = []
-    for fid in friend_ids:
-        u = User.query.get(fid)
-        if u:
+    if friend_ids:
+        users = User.query.filter(User.id.in_(friend_ids)).all()
+        for u in users:
             friends.append({"id":u.id,"username":u.username,"name":u.real_name or u.username,"town":u.town or "","village":u.village or ""})
     return jsonify({"friends":friends})
 
