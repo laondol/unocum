@@ -526,10 +526,15 @@ def chat_friends():
     if not uid: return jsonify({"error":"로그인"}),401
     import json
     cache = FriendCache.query.get(uid)
-    if not cache:
-        _rebuild_friend_cache(uid)
-        cache = FriendCache.query.get(uid)
-    friend_ids = json.loads(cache.friend_ids or '[]') if cache else []
+    if cache:
+        friend_ids = json.loads(cache.friend_ids or '[]')
+    else:
+        from models import Friend
+        f1 = Friend.query.filter_by(requester_id=uid, status='accepted').all()
+        f2 = Friend.query.filter_by(receiver_id=uid, status='accepted').all()
+        friend_ids = list(set([f.receiver_id for f in f1] + [f.requester_id for f in f2]))
+        db.session.add(FriendCache(user_id=uid, friend_ids=json.dumps(friend_ids)))
+        db.session.commit()
     users = User.query.filter(User.id.in_(friend_ids)).all() if friend_ids else []
     return jsonify({"friends":[{"id":u.id,"username":u.username,"name":u.real_name or u.username,"town":u.town or "","village":u.village or ""} for u in users]})
 
