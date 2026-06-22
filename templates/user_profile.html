@@ -106,7 +106,7 @@
                         {% else %}<span class="badge {% if m.is_read %}bg-secondary{% else %}bg-warning text-dark{% endif %}">{{ '읽음' if m.is_read else '읽지않음' }}</span>{% endif %}
                     </div>
                     <strong>{{ m.subject }}</strong>
-                    <small class="text-muted d-block">{{ m.content[:80] }}{% if m.content|length > 80 %}...{% endif %}</small>
+                    <small class="text-muted d-block">{% if m.content.startswith('<div') %}{{ m.content|safe }}{% else %}{{ m.content[:80] }}{% if m.content|length > 80 %}...{% endif %}{% endif %}</small>
                 </a>
                 {% else %}
                 <div class="list-group-item text-center text-muted py-4">쪽지가 없습니다.</div>
