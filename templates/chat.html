@@ -113,6 +113,9 @@ function sendChatMsg() {
 }
 
 loadFriendList();
+{% if open_room %}
+setTimeout(function() { openChatRoom({{ open_room }}); }, 500);
+{% endif %}
 </script>
 </body>
 </html>

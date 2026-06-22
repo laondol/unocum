@@ -55,9 +55,14 @@ def chat_page():
     if not user:
         return redirect(url_for('login'))
     bot = _get_bot(user.id)
+    room_id = request.args.get('room', type=int)
+    action = request.args.get('action', '')
+    if room_id and action:
+        _handle_chat_action(user.id, room_id, action)
     import json
     chat_rooms = ChatRoom.query.filter(ChatRoom.is_active==True, ChatRoom.participants.contains(str(user.id))).order_by(ChatRoom.created_at.desc()).limit(10).all()
-    return render_template('chat.html', user=user, bot=bot, chat_rooms=chat_rooms, json=json)
+    open_room = room_id if room_id else 0
+    return render_template('chat.html', user=user, bot=bot, chat_rooms=chat_rooms, json=json, open_room=open_room)
 
 @tongbot_bp.route('/api/bot/rename', methods=['POST'])
 def bot_rename():
@@ -502,7 +507,7 @@ def chat_rooms():
             except: pass
         # 초대 쪽지 발송
         creator = User.query.get(uid)
-        invite_msg = f'<div style="border:2px solid #0d6efd;border-radius:12px;padding:12px;text-align:center;"><strong>{name}</strong><br><small>{creator.username}님이 채팅방에 초대했습니다</small><hr style="margin:8px 0;"><a href="/user/my?popup=1&tab=friendchat&room={room.id}&action=join" class="btn btn-success btn-sm" style="margin:2px;">✅ 입장</a> <a href="/user/my?popup=1&tab=friendchat&room={room.id}&action=decline" class="btn btn-outline-danger btn-sm" style="margin:2px;">❌ 거절</a> <a href="/user/my?popup=1&tab=friendchat&room={room.id}&action=monitor" class="btn btn-outline-secondary btn-sm" style="margin:2px;">👁️ 모니터링</a></div>'
+        invite_msg = f'💬 채팅 초대: {name}\n\n{creator.username}님이 채팅방에 초대했습니다.\n\n✅ 입장: /chat?room={room.id}&action=join\n❌ 거절: /chat?room={room.id}&action=decline\n👁️ 모니터링: /chat?room={room.id}&action=monitor'
         for fid in friends:
             db.session.add(Message(sender_id=uid, sender_name=creator.username, receiver_id=fid,
                 subject=f'💬 채팅 초대: {name}', content=invite_msg, sender_role='member'))
