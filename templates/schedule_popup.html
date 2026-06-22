@@ -185,11 +185,15 @@ renderCal();
 loadFriendList();
 
 function loadFriendList() {
-    fetch('/api/chat/friends').then(r=>r.json()).then(d=>{
-        const el = document.getElementById('friendList');
-        if (!d.friends||d.friends.length===0) { el.innerHTML='<div class="text-muted py-2">벗 없음</div>'; return; }
-        el.innerHTML = d.friends.map(f=>'<label class="list-group-item"><input type="checkbox" class="friend-check" value="'+f.id+'"> '+f.name+'</label>').join('');
-    });
+    var el = document.getElementById('friendList');
+    if (!el) return;
+    el.innerHTML = '불러오는 중...';
+    fetch('/api/chat/friends').then(function(r){return r.json()}).then(function(d){
+        if (!d.friends||d.friends.length===0) { el.innerHTML='<div class="text-muted py-2">벗이 없습니다</div>'; return; }
+        el.innerHTML = d.friends.map(function(f){
+            return '<label class="list-group-item"><input type="checkbox" class="friend-check" value="'+f.id+'"> '+f.name+' <small class="text-muted">@'+f.username+'</small></label>';
+        }).join('');
+    }).catch(function(){ el.innerHTML = '불러오기 실패'; });
 }
 </script>
 </body>
