@@ -15,7 +15,7 @@
     
     <ul class="nav nav-tabs mb-4" id="infoTabs">
         <li class="nav-item"><a class="nav-link active" href="#" data-type="heritage">🏛️ 국가유산</a></li>
-        <li class="nav-item"><a class="nav-link" href="#" data-type="scenery">🌄 풍경</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" data-type="scenery" id="sceneryTab">🌄 풍경</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-type="localstore">🏪 동네가게</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-type="home">🏠 집으로</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-type="traffic">🚗 교통</a></li>
@@ -169,6 +169,9 @@ function loadScenery() {
     el.innerHTML = '<div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> 풍경사진 불러오는 중...</div>';
     fetch('/construction/local-scenery').then(r=>r.json()).then(data => {
         if (data.error) { el.innerHTML = '<div class="alert alert-warning">'+data.error+'</div>'; return; }
+        var tabEl = document.getElementById('sceneryTab');
+        if (tabEl && data.village) tabEl.textContent = '🌄 ' + data.village;
+        else if (tabEl && data.town) tabEl.textContent = '🌄 ' + data.town;
         if (!data.sceneries||data.sceneries.length===0) { el.innerHTML = '<div class="text-center py-5 text-muted"><div class="fs-1 mb-3">🌄</div><p>'+data.town+' '+data.village+'에 '+data.season+' 풍경사진이 없습니다.</p><p class="small"><a href="/share-report">공유마당에 사진 등록하기</a></p></div>'; return; }
         let html = '<div class="mb-3"><span class="badge bg-success">'+data.town+' '+data.village+'</span> <span class="badge bg-info ms-1">'+data.season+'</span> <small class="text-muted ms-1">사진 '+data.sceneries.length+'장</small></div><div class="row g-3">';
         data.sceneries.forEach(s => {
