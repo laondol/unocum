@@ -1449,10 +1449,32 @@ def register_routes(app):
             bot_name = bot.bot_name
         bot_message = ''
         if is_own and bot_name:
-            h = datetime.now().hour
-            if h < 12: bot_message = f'좋은 아침이에요! 오늘도 힘찬 하루 되세요 💪'
-            elif h < 18: bot_message = f'오후도 화이팅! 잠시 산책 어때요? 🌤️'
-            else: bot_message = f'수고 많았어요. 편안한 저녁 보내세요 🌙'
+            try:
+                h = datetime.now().hour
+                time_ctx = '아침' if h < 12 else ('오후' if h < 18 else '저녁')
+                import random
+                tips = ['오늘 양평 날씨에 맞는 옷차림을 추천해 드릴까요?',
+                    '잠시 스트레칭 어떠세요? 건강이 최고예요!',
+                    '오늘 하루 감사한 일 세 가지만 떠올려 보세요.',
+                    '좋아하는 음악 한 곡 들으면서 잠시 쉬어 가세요.',
+                    '오늘 양평의 맛집 정보가 궁금하신가요?']
+                try:
+                    from config import Config
+                    import requests
+                    key = getattr(Config, 'GROQ_API_KEY', '')
+                    if key:
+                        prompt = f'회원 {user.username}님에게 {time_ctx}에 어울리는 따뜻한 한마디를 20자 내외로 해주세요.'
+                        r = requests.post('https://api.groq.com/openai/v1/chat/completions',
+                            headers={'Authorization':f'Bearer {key}','Content-Type':'application/json'},
+                            json={'model':'llama-3.1-8b-instant','messages':[{'role':'user','content':prompt}],'max_tokens':60},
+                            timeout=5)
+                        if r.status_code == 200:
+                            bot_message = r.json()['choices'][0]['message']['content'].strip()
+                except: pass
+                if not bot_message:
+                    bot_message = random.choice(tips)
+            except:
+                bot_message = '오늘도 행복한 하루 되세요! 💕'
         # 게시글 모음
         from models import Post, ShareReport
         own_posts = Post.query.filter_by(user_id=user.id).order_by(Post.created_at.desc()).limit(10).all()
