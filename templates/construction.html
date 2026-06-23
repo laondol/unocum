@@ -72,7 +72,13 @@
     {% endif %}
 
     <div id="heritageSection" style="display:block;"><div id="heritageList"><div class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm"></span> 불러오는 중...</div></div></div>
-    <div id="scenerySection" style="display:none;"><div id="sceneryContent"><div class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm"></span> 불러오는 중...</div></div></div>
+    <div id="scenerySection" style="display:none;">
+        <div class="d-flex gap-1 mb-2 flex-wrap">
+            <button class="btn btn-sm btn-outline-secondary" onclick="document.querySelector('#infoTabs .nav-link[data-type=localstore]').click()">🏪 동네가게</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="document.querySelector('#infoTabs .nav-link[data-type=traffic]').click()">🚗 교통</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="document.querySelector('#infoTabs .nav-link[data-type=alert]').click()">🚨 알림</button>
+        </div>
+        <div id="sceneryContent"><div class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm"></span> 불러오는 중...</div></div></div>
     <div id="homeSection" style="display:none;"><div id="homeContent"><div class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm"></span> 불러오는 중...</div></div></div>
     <div id="localStoresSection" style="display:none;"><div id="localStoresContent"><div class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm"></span> 불러오는 중...</div></div></div>
 </div>
