@@ -31,7 +31,7 @@
                     {% endif %}
                     {% if is_own %}
                     <div class="mt-2 d-flex gap-1">
-                        <a href="/logout" class="btn btn-sm btn-outline-danger" onclick="return confirm('로그아웃 하시겠습니까?')">🚪</a>
+                        <a href="/logout" class="btn btn-sm btn-outline-danger" onclick="return confirm('로그아웃 하시겠습니까?')">🚪 로그아웃</a>
                         <button class="btn btn-sm btn-outline-success" onclick="neighborVerify()">🏠 이웃인증</button>
                         <div class="form-check form-switch mb-0 ms-1"><input class="form-check-input" type="checkbox" id="locationShareToggle" {{ 'checked' if profile_user.location_share }} onchange="toggleLocationShare(this.checked)"><label class="form-check-label small" for="locationShareToggle">위치공유</label></div>
                     </div>
