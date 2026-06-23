@@ -2487,6 +2487,15 @@ def api_user_unread():
     count = Message.query.filter_by(receiver_id=uid, is_read=False).count()
     return jsonify({"count": count})
 
+@app.route('/api/construction/unread')
+def api_construction_unread():
+    uid = session.get('user_id')
+    user = User.query.get(uid) if uid else None
+    alerts = 0
+    if user and user.town:
+        alerts = VillageAlert.query.filter_by(is_active=True, town=user.town).count()
+    return jsonify({"alerts": alerts, "heritage": 0, "scenery": 0})
+
     @app.route('/api/user/location')
     def api_user_location():
         uid = session.get('user_id')

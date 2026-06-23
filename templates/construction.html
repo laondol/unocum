@@ -14,8 +14,8 @@
     {% endif %}
     
     <ul class="nav nav-tabs mb-4" id="infoTabs">
-        <li class="nav-item"><a class="nav-link active" href="#" data-type="heritage">🏛️ 국가유산</a></li>
-        <li class="nav-item"><a class="nav-link" href="#" data-type="scenery" id="sceneryTab">🌄 풍경</a></li>
+        <li class="nav-item"><a class="nav-link active" href="#" data-type="heritage">🏛️ 국가유산 <span class="badge bg-danger ms-1 d-none" id="heritageBadge" style="font-size:0.6rem;"></span></a></li>
+        <li class="nav-item"><a class="nav-link" href="#" data-type="scenery" id="sceneryTab">🌄 풍경 <span class="badge bg-danger ms-1 d-none" id="sceneryBadge" style="font-size:0.6rem;"></span></a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-type="home">🏠 집으로</a></li>
     </ul>
     
@@ -334,5 +334,8 @@ if (tab) {
 } else {
     loadHeritage();
 }
+fetch('/api/construction/unread').then(r=>r.json()).then(d=>{
+    if (d.alerts > 0) { var b = document.getElementById('sceneryBadge'); b.textContent = d.alerts; b.classList.remove('d-none'); }
+}).catch(()=>{});
 </script>
 {% endblock %}
