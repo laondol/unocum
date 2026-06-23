@@ -56,12 +56,17 @@ def get_incidents():
 def get_yangpyeong_incidents():
     incidents, err = get_incidents()
     if err: return [], err
-    yangpyeong_kw = ['양평','용문','지평','옥천','양서','양동','서종','단월','청운','개군','강상','강하']
+    yangpyeong_roads = ['중앙고속','영동고속','서울양양','국도6호선','국도37호선','국도44호선']
     result = []
     for inc in incidents:
         text = f"{inc['title']} {inc['addr']} {inc['road']}"
-        if any(kw in text for kw in yangpyeong_kw):
+        if '양평군' in inc.get('addr',''):
             result.append(inc)
+            continue
+        for r in yangpyeong_roads:
+            if r in inc.get('road','') or r in inc.get('title',''):
+                result.append(inc)
+                break
     return result, None
 
 def traffic_summary():
