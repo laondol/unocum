@@ -319,6 +319,14 @@ if (emptyE) emptyE.style.display = 'none';
 const al = document.getElementById('alertList');
 if (al) al.style.display = 'none';
 document.querySelectorAll('.notice-item').forEach(item => item.style.display = 'none');
-loadHeritage();
+var params = new URLSearchParams(window.location.search);
+var tab = params.get('tab');
+if (tab) {
+    var tabEl = document.querySelector('#infoTabs .nav-link[data-type=\"' + tab + '\"]');
+    if (tabEl) tabEl.click();
+    else loadHeritage();
+} else {
+    loadHeritage();
+}
 </script>
 {% endblock %}
