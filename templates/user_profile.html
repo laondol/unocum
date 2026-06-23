@@ -94,9 +94,14 @@
                     {% for f in recent_friends[:8] %}
                     <a href="/user/{{ f.id }}" class="badge bg-light text-dark text-decoration-none">{{ f.name }}</a>
                     {% endfor %}
-                </div>
-            </div>
-            {% endif %}
+        </div>
+    </div>
+    <div class="d-flex gap-2 justify-content-center mt-2">
+        <a href="/construction" class="btn btn-sm btn-outline-secondary" title="집으로">🏠</a>
+        <a href="/construction" class="btn btn-sm btn-outline-secondary" title="국가유산">🏛️</a>
+        <a href="/construction" class="btn btn-sm btn-outline-secondary" title="풍경">🌄</a>
+    </div>
+    {% endif %}
             <div class="list-group list-group-flush" style="max-height:250px;overflow-y:auto;">
                 {% for m in messages %}
                 <a href="/message/read/{{ m.id }}" class="list-group-item list-group-item-action {% if not m.is_read and is_own %}fw-bold bg-light{% endif %} small">
