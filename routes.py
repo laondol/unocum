@@ -2480,6 +2480,13 @@ def register_routes(app):
         db.session.commit()
         return redirect('/admin/alerts')
 
+@app.route('/api/user/unread')
+def api_user_unread():
+    uid = session.get('user_id')
+    if not uid: return jsonify({"count": 0})
+    count = Message.query.filter_by(receiver_id=uid, is_read=False).count()
+    return jsonify({"count": count})
+
     @app.route('/api/user/location')
     def api_user_location():
         uid = session.get('user_id')

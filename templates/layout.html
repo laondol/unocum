@@ -127,7 +127,10 @@
 
                     {% if session.get('username') %}
                     <li class="nav-item me-1">
-                        <a href="/user/{{ session.get('user_id') }}" class="badge bg-light text-dark p-2 text-decoration-none" title="내 프로필">💎 {{ session.get('username') }}님</a>
+                        <a href="/user/{{ session.get('user_id') }}" class="badge bg-light text-dark p-2 text-decoration-none position-relative" title="내 프로필">
+                            💎 {{ session.get('username') }}님
+                            <span id="unreadBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;font-size:0.6rem;"></span>
+                        </a>
                     </li>
                     <li class="nav-item me-1">
                         <a class="nav-link px-2 position-relative" href="/message/inbox" title="쪽지">
@@ -266,6 +269,13 @@
             }, function(){}, {enableHighAccuracy: true, timeout: 8000, maximumAge: 60000});
         });
     }
+    fetch('/api/user/unread').then(r=>r.json()).then(d=>{
+        if (d.count > 0) {
+            var b = document.getElementById('unreadBadge');
+            b.textContent = d.count;
+            b.style.display = '';
+        }
+    }).catch(()=>{});
     {% endif %}
     </script>
 </body>
