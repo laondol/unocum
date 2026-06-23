@@ -57,6 +57,11 @@
                     </div>
                     {% endif %}
                 </div>
+                {% if is_own and bot_message %}
+                <div class="text-center mt-2">
+                    <small class="text-muted fst-italic">{{ bot_message }}</small>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>

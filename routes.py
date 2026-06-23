@@ -1447,6 +1447,12 @@ def register_routes(app):
                 db.session.add(bot)
                 db.session.commit()
             bot_name = bot.bot_name
+        bot_message = ''
+        if is_own and bot_name:
+            h = datetime.now().hour
+            if h < 12: bot_message = f'좋은 아침이에요! 오늘도 힘찬 하루 되세요 💪'
+            elif h < 18: bot_message = f'오후도 화이팅! 잠시 산책 어때요? 🌤️'
+            else: bot_message = f'수고 많았어요. 편안한 저녁 보내세요 🌙'
         # 게시글 모음
         from models import Post, ShareReport
         own_posts = Post.query.filter_by(user_id=user.id).order_by(Post.created_at.desc()).limit(10).all()
@@ -1485,7 +1491,8 @@ def register_routes(app):
             bot_name=bot_name,
             posts=posts,
             curr_location=curr_location,
-            recent_friends=recent_friends
+            recent_friends=recent_friends,
+            bot_message=bot_message
         )
 
     @app.route('/user/location/refresh', methods=['POST'])
