@@ -71,9 +71,9 @@
     <div id="heritageSection" style="display:block;"><div id="heritageList"><div class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm"></span> 불러오는 중...</div></div></div>
     <div id="scenerySection" style="display:none;">
         <div class="d-flex gap-1 mb-2 flex-wrap">
-            <button class="btn btn-sm btn-outline-secondary" onclick="document.querySelector('#infoTabs .nav-link[data-type=localstore]').click()">🏪 동네가게</button>
-            <button class="btn btn-sm btn-outline-secondary" onclick="document.querySelector('#infoTabs .nav-link[data-type=traffic]').click()">🚗 교통</button>
-            <button class="btn btn-sm btn-outline-secondary" onclick="document.querySelector('#infoTabs .nav-link[data-type=alert]').click()">🚨 알림</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('localstore')">🏪 동네가게</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('traffic')">🚗 교통</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('alert')">🚨 알림</button>
         </div>
         <div id="sceneryContent"><div class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm"></span> 불러오는 중...</div></div></div>
     <div id="homeSection" style="display:none;"><div id="homeContent"><div class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm"></span> 불러오는 중...</div></div></div>
@@ -85,6 +85,24 @@ let transitData = null, suggestData = null, alarmTimer = null;
 
 function switchToHeritage() {
     document.querySelector('#infoTabs .nav-link[data-type=heritage]').click();
+}
+
+function switchTab(type) {
+    ['heritageSection','scenerySection','homeSection','localStoresSection'].forEach(id => document.getElementById(id).style.display='none');
+    document.querySelectorAll('.notice-item').forEach(item => item.style.display='none');
+    if (document.getElementById('emptyNotices')) document.getElementById('emptyNotices').style.display='none';
+    if (document.getElementById('alertList')) document.getElementById('alertList').style.display='none';
+    if (type === 'localstore') { document.getElementById('localStoresSection').style.display=''; loadLocalStores(); }
+    else if (type === 'traffic') {
+        document.querySelectorAll('.notice-item').forEach(item => {
+            var dt = item.dataset.type;
+            if (dt==='traffic_incident'||dt==='traffic_congestion'||dt==='road_construction') item.style.display='';
+        });
+    }
+    else if (type === 'alert') {
+        if (document.getElementById('alertList')) document.getElementById('alertList').style.display='';
+        if (document.getElementById('emptyNotices')) document.getElementById('emptyNotices').style.display='';
+    }
 }
 
 document.querySelectorAll('#infoTabs .nav-link').forEach(tab => {
