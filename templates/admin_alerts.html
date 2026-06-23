@@ -20,7 +20,7 @@
                                 <span class="badge {% if a.urgency == 'urgent' %}bg-danger{% elif a.urgency == 'important' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
                                     {{ {'urgent':'🔴 긴급','important':'🟡 중요','normal':'🔵 일반'}.get(a.urgency, a.urgency) }}
                                 </span>
-                                <span class="badge bg-info">{{ {'missing':'실종','disaster':'재난','safety':'안전','traffic':'교통','festival':'축제','general':'일반'}.get(a.alert_type, a.alert_type) }}</span>
+                                <span class="badge bg-info">{{ {'missing':'실종','disaster':'재난','safety':'안전','traffic':'교통','general':'일반'}.get(a.alert_type, a.alert_type) }}</span>
                                 {% if a.is_active %}
                                 <span class="badge bg-success">활성</span>
                                 {% else %}
