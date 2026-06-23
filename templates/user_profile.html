@@ -50,12 +50,12 @@
                         <a href="#" onclick="window.open('/chat','chatPopup','width=500,height=700,left=100,top=50'); return false;" class="btn btn-sm btn-outline-info">👥 채팅</a>
                         <a href="#" onclick="window.open('/schedule','schedPopup','width=700,height=700,left=100,top=50'); return false;" class="btn btn-sm btn-outline-secondary">📅 일정</a>
                     </div>
-                    <div class="mt-2 px-2">
-                        <div class="input-group input-group-sm">
-                            <input type="text" id="profileChatInput" class="form-control form-control-sm" placeholder="통벗에게 물어보세요..." onkeypress="if(event.key==='Enter')profileChat()">
-                            <button class="btn btn-outline-warning btn-sm" onclick="profileChat()">전송</button>
-                        </div>
-                        <div id="profileChatReply" class="small text-muted mt-1 fst-italic"></div>
+                    <div class="mt-2">
+                        <a href="#" onclick="window.open('/user/my?popup=1','tongbotPopup','width=700,height=700,left=100,top=50'); return false;" class="text-decoration-none">
+                            <div class="p-2 bg-warning bg-opacity-10 rounded small text-muted fst-italic" style="border-left:3px solid #ffc107;">
+                                {{ bot_message or '통벗과 대화를 시작해 보세요!' }}
+                            </div>
+                        </a>
                     </div>
                     {% else %}
                     <div class="text-muted py-4">
@@ -63,11 +63,6 @@
                     </div>
                     {% endif %}
                 </div>
-                {% if is_own and bot_message %}
-                <div class="text-center mt-2">
-                    <small class="text-muted fst-italic">{{ bot_message }}</small>
-                </div>
-                {% endif %}
             </div>
         </div>
     </div>
@@ -200,16 +195,6 @@ function refreshLocation() {
         fetch('/user/location/refresh', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({lat:p.coords.latitude, lon:p.coords.longitude})})
         .then(r=>r.json()).then(d=>{ if(d.status==='success') location.reload(); else alert(d.msg); });
     }, err => alert('GPS 오류: '+err.message), {enableHighAccuracy:true, timeout:10000});
-}
-
-function profileChat() {
-    var input = document.getElementById('profileChatInput');
-    var msg = input.value.trim();
-    if (!msg) return;
-    var reply = document.getElementById('profileChatReply');
-    reply.textContent = '생각 중...';
-    fetch('/api/bot/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message:msg})})
-    .then(r=>r.json()).then(d=>{ reply.textContent = d.reply; input.value = ''; });
 }
 </script>
 {% endif %}
