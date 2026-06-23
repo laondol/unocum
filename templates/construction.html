@@ -57,7 +57,7 @@
                 <div class="card-body p-3">
                     <div class="d-flex justify-content-between">
                         <h6 class="fw-bold mb-2">{% if a.urgency == 'urgent' %}🔴{% elif a.urgency == 'important' %}🟡{% else %}🔵{% endif %} {{ a.title }}</h6>
-                        <span class="badge {% if a.alert_type == 'missing' %}bg-danger{% elif a.alert_type == 'disaster' %}bg-dark{% elif a.alert_type == 'safety' %}bg-warning text-dark{% else %}bg-info{% endif %}">{{ {'missing':'실종','disaster':'재난','safety':'안전','traffic':'교통','general':'일반'}.get(a.alert_type, a.alert_type) }}</span>
+                        <span class="badge {% if a.alert_type == 'missing' %}bg-danger{% elif a.alert_type == 'disaster' %}bg-dark{% elif a.alert_type == 'safety' %}bg-warning text-dark{% elif a.alert_type == 'festival' %}bg-success{% else %}bg-info{% endif %}">{{ {'missing':'실종','disaster':'재난','safety':'안전','traffic':'교통','festival':'축제','general':'일반'}.get(a.alert_type, a.alert_type) }}</span>
                     </div>
                     {% if a.content %}<p class="small text-muted mb-2">{{ a.content[:300] }}{% if a.content|length > 300 %}...{% endif %}</p>{% endif %}
                     <div class="d-flex gap-3 flex-wrap small text-muted"><span>📍 {{ a.town or '' }} {{ a.village or '' }}</span><span>👤 {{ a.author_name or '-' }}</span><span>📅 {{ a.created_at.strftime('%Y-%m-%d %H:%M') if a.created_at else '-' }}</span></div>

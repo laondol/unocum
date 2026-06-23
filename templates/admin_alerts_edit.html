@@ -17,7 +17,7 @@
             <div class="col-4">
                 <label class="form-label">알림 유형</label>
                 <select name="alert_type" class="form-select">
-                    {% for t in [('general','일반'),('missing','실종'),('disaster','재난'),('safety','안전'),('traffic','교통')] %}
+                    {% for t in [('general','일반'),('missing','실종'),('disaster','재난'),('safety','안전'),('traffic','교통'),('festival','축제')] %}
                     <option value="{{ t[0] }}" {% if alert.alert_type == t[0] %}selected{% endif %}>{{ t[1] }}</option>
                     {% endfor %}
                 </select>
