@@ -115,6 +115,25 @@
         </div>
     </div>
     
+    {% endif %}
+    
+    <!-- 주변 공사/건축 정보 -->
+    {% if nearby_construction %}
+    <div class="card border-0 shadow-sm mb-4" style="border-radius: 18px; border-left: 4px solid #fd7e14;">
+        <div class="card-body p-3">
+            <h6 class="fw-bold mb-2">🚧 이 근처 공사 정보</h6>
+            {% for n in nearby_construction[:3] %}
+            <div class="border-bottom py-1 small">
+                <span class="badge bg-warning text-dark">{{ {'traffic_incident':'교통','traffic_congestion':'정체','road_construction':'도로','building_permit':'건축'}.get(n.notice_type, n.notice_type) }}</span>
+                <strong>{{ n.title }}</strong>
+                {% if n.location %}<br><small>📍 {{ n.location }}</small>{% endif %}
+                {% if n.start_date %}<br><small>🕐 {{ n.start_date.strftime('%m/%d') }} ~ {{ n.end_date.strftime('%m/%d') if n.end_date else '' }}</small>{% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
     <!-- 지도 -->
     {% if report.latitude and report.longitude %}
     <div class="card border-0 shadow-sm mb-4" style="border-radius: 18px; overflow: hidden;">

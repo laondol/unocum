@@ -2105,7 +2105,16 @@ def register_routes(app):
             local_links = get_quick_links(town=report.town, village=report.village)
         except:
             pass
-        return render_template('share_detail.html', report=report, comments=comments, nearby_shares=nearby_shares, local_news=local_news, local_links=local_links)
+        # 주변 건축/공사 정보
+        nearby_construction = []
+        if report.latitude and report.longitude:
+            from services.geocode import haversine
+            notices = ConstructionNotice.query.filter_by(is_active=True).all()
+            for n in notices:
+                if n.latitude and n.longitude:
+                    if haversine(report.latitude, report.longitude, n.latitude, n.longitude) < 10:
+                        nearby_construction.append(n)
+        return render_template('share_detail.html', report=report, comments=comments, nearby_shares=nearby_shares, local_news=local_news, local_links=local_links, nearby_construction=nearby_construction)
 
     @app.route('/share/comment/<int:report_id>', methods=['POST'])
     def share_add_comment(report_id):
