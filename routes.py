@@ -2362,14 +2362,12 @@ def register_routes(app):
 
     @app.route('/construction/traffic/gg')
     def construction_traffic_gg():
-        from services.gg_traffic import traffic_summary, get_all_traffic, CONG_LABEL, CONG_COLOR
-        mode = request.args.get('mode', 'summary')
-        if mode == 'all':
-            data, err = get_all_traffic()
-            if err:
-                return jsonify({"error": err, "available": False})
-            return jsonify({"available": True, "count": len(data), "data": data[:50]})
-        summary = traffic_summary()
+        from services.gg_traffic import traffic_summary as gg_summary
+        from services.utic_traffic import traffic_summary as utic_summary
+        utic = utic_summary()
+        if utic.get("available") and utic.get("yangpyeong", 0) > 0:
+            return jsonify(utic)
+        summary = gg_summary()
         return jsonify(summary)
 
     @app.route('/construction/local-stores')

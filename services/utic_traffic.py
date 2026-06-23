@@ -1,4 +1,4 @@
-import requests
+import requests, xml.etree.ElementTree as ET
 from datetime import datetime
 
 UTIC_KEY = None
@@ -17,73 +17,72 @@ def _get_key():
         UTIC_KEY = os.getenv("UTIC_API_KEY", "")
     return UTIC_KEY
 
-def _call_utic(url, params=None):
+def get_incidents():
     key = _get_key()
-    if not key:
-        return None, "API 키가 설정되지 않았습니다."
-    if params is None:
-        params = {}
-    params["key"] = key
+    if not key: return [], "키 없음"
     try:
-        r = requests.get(url, params=params, timeout=15)
-        if r.status_code != 200:
-            return None, f"HTTP {r.status_code}"
-        data = r.json()
-        if isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict):
-            if data[0].get("resultCode") in ("03", "04"):
-                return None, f"UTIC IP 제한: {data[0].get('resultMsg', '')}"
-        return data, None
+        r = requests.get("http://www.utic.go.kr/guide/imsOpenData.do", params={"key": key}, timeout=15)
+        if r.status_code != 200: return [], f"HTTP {r.status_code}"
+        root = ET.fromstring(r.text)
+        incidents = []
+        for rec in root.findall(".//record"):
+            x = rec.findtext("locationDataX","")
+            y = rec.findtext("locationDataY","")
+            try:
+                lat = float(y) if y else None
+                lng = float(x) if x else None
+            except:
+                lat = lng = None
+            title = rec.findtext("incidentTitle","")
+            typ = rec.findtext("incidenteSubTypeCd","")
+            type_map = {'2':'사고','8':'고장','4':'공사','5':'정체'}
+            title_clean = title.split(',')[0].strip() if title else ''
+            incidents.append({
+                "id": rec.findtext("incidentId",""),
+                "title": title_clean,
+                "desc": title,
+                "type": type_map.get(typ, typ),
+                "road": rec.findtext("roadName",""),
+                "addr": rec.findtext("addressJibun",""),
+                "lat": lat, "lng": lng,
+                "start": rec.findtext("startDate",""),
+                "end": rec.findtext("endDate",""),
+                "update": rec.findtext("updateDate",""),
+            })
+        return incidents, None
     except Exception as e:
-        return None, str(e)
+        return [], str(e)
 
-def get_traffic_info():
-    data, err = _call_utic("http://www.utic.go.kr/etc/telMap.do")
-    if err:
-        return {"error": err, "available": False}
-    return {"available": True, "data": data, "type": "소통정보"}
-
-def get_incident_info():
-    data, err = _call_utic("http://www.utic.go.kr/guide/imsOpenData.do")
-    if err:
-        return {"error": err, "available": False}
-    return {"available": True, "data": data, "type": "돌발정보"}
-
-def get_cctv_info():
-    data, err = _call_utic("http://www.utic.go.kr/guide/cctvOpenData.do")
-    if err:
-        return {"error": err, "available": False}
-    return {"available": True, "data": data, "type": "CCTV"}
-
-def get_traffic_safety():
-    data, err = _call_utic("http://www.utic.go.kr/guide/tsdmsOpenData.do")
-    if err:
-        return {"error": err, "available": False}
-    return {"available": True, "data": data, "type": "교통안전"}
-
-def get_road_risk_forecast():
-    data, err = _call_utic("http://www.utic.go.kr/guide/getRoadAccJson.do")
-    if err:
-        return {"error": err, "available": False}
-    return {"available": True, "data": data, "type": "도로위험예보"}
-
-def get_construction_info():
-    data, err = _call_utic("http://www.utic.go.kr/guide/tcsOpenData.do")
-    if err:
-        return {"error": err, "available": False}
-    return {"available": True, "data": data, "type": "공사정보"}
+def get_yangpyeong_incidents():
+    incidents, err = get_incidents()
+    if err: return [], err
+    yangpyeong_kw = ['양평','용문','지평','옥천','양서','양동','서종','단월','청운','개군','강상','강하']
+    result = []
+    for inc in incidents:
+        text = f"{inc['title']} {inc['addr']} {inc['road']}"
+        if any(kw in text for kw in yangpyeong_kw):
+            result.append(inc)
+    return result, None
 
 def traffic_summary():
     key = _get_key()
-    if not key:
-        return {"error": "키 미설정", "available": False}
-    traffic, _ = _call_utic("http://www.utic.go.kr/etc/telMap.do")
-    incident, _ = _call_utic("http://www.utic.go.kr/guide/imsOpenData.do")
-    construction, _ = _call_utic("http://www.utic.go.kr/guide/tcsOpenData.do")
-    available = isinstance(traffic, list) or isinstance(incident, list) or isinstance(construction, list)
+    if not key: return {"error":"키 없음","available":False}
+    all_inc, err = get_incidents()
+    if err: return {"error":err,"available":False}
+    yp_inc, _ = get_yangpyeong_incidents()
     return {
-        "available": available,
-        "traffic": len(traffic) if isinstance(traffic, list) else 0,
-        "incident": len(incident) if isinstance(incident, list) else 0,
-        "construction": len(construction) if isinstance(construction, list) else 0,
+        "available": True,
+        "total": len(all_inc),
+        "yangpyeong": len(yp_inc),
         "updated": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "incidents": [{
+            "title": i["title"][:60],
+            "desc": i["desc"][:100],
+            "type": i["type"],
+            "road": i["road"],
+            "addr": i["addr"],
+            "lat": i["lat"], "lng": i["lng"],
+            "start": i["start"],
+            "end": i["end"],
+        } for i in yp_inc[:20]],
     }

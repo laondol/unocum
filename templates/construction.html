@@ -83,6 +83,29 @@
 <script>
 let transitData = null, suggestData = null, alarmTimer = null;
 
+function loadTrafficLive() {
+    var parent = document.getElementById('alertList');
+    var el = document.getElementById('trafficLive');
+    if (!el) { el = document.createElement('div'); el.id = 'trafficLive'; document.getElementById('scenerySection').insertAdjacentElement('beforebegin', el); }
+    el.innerHTML = '<div class="text-center py-2"><span class="spinner-border spinner-border-sm"></span> 교통정보 확인 중...</div>';
+    fetch('/construction/traffic/gg').then(function(r){return r.json()}).then(function(d){
+        if (!d.available || !d.incidents || d.incidents.length===0) {
+            el.innerHTML = '<div class="text-muted text-center py-2">현재 양평군 교통 이슈가 없습니다.</div>'; return;
+        }
+        var html = '<div class="small mb-1 text-muted">🕐 UTIC 실시간 (' + d.yangpyeong + '건)</div>';
+        d.incidents.forEach(function(i){
+            html += '<div class="card mb-2 border-start border-3 border-danger"><div class="card-body p-2 small">';
+            html += '<span class="badge bg-danger me-1">'+i.type+'</span><strong>'+i.title+'</strong>';
+            if (i.road) html += '<br><small>🛣️ '+i.road+'</small>';
+            if (i.addr) html += ' <small>📍 '+i.addr+'</small>';
+            if (i.start) html += '<br><small>🕐 '+i.start+'</small>';
+            html += '</div></div>';
+        });
+        html += '<small class="text-muted">출처: 도시교통정보센터(UTIC)</small>';
+        el.innerHTML = html;
+    }).catch(function(){ el.innerHTML = '<div class="text-danger">불러오기 실패</div>'; });
+}
+
 function switchToHeritage() {
     document.querySelector('#infoTabs .nav-link[data-type=heritage]').click();
 }
@@ -98,6 +121,7 @@ function switchTab(type) {
             var dt = item.dataset.type;
             if (dt==='traffic_incident'||dt==='traffic_congestion'||dt==='road_construction') item.style.display='';
         });
+        loadTrafficLive();
     }
     else if (type === 'alert') {
         if (document.getElementById('alertList')) document.getElementById('alertList').style.display='';
