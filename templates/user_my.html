@@ -1,6 +1,9 @@
 {% extends 'layout.html' %}
 {% block content %}
 <div class="container mt-4" style="max-width: 800px;">
+    {% if request.args.get('popup') == '1' %}
+    <style>.navbar{display:none!important}.navbar+.container{margin-top:0!important}</style>
+    {% endif %}
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h3 class="fw-bold mb-0">
             <span id="botNameDisplay">{{ bot.bot_name }}</span>
@@ -47,8 +50,7 @@
     </div>
 
     <ul class="nav nav-tabs mb-4" id="botTabs">
-        <li class="nav-item"><a class="nav-link active" href="#" data-tab="chat">💬 대화</a></li>
-        <li class="nav-item"><a class="nav-link" href="#" data-tab="write">✍️ 글쓰기</a></li>
+        <li class="nav-item"><a class="nav-link active" href="#" data-tab="write">✍️ 글쓰기</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-tab="friendchat">👥 벗 채팅</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-tab="schedule">📅 일정</a></li>
     </ul>

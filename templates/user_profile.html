@@ -43,7 +43,7 @@
                 <div class="col-6 text-center">
                     {% if is_own and bot_name %}
                     <div class="mb-2">
-                        <a href="#" onclick="window.open('/user/my','tongbotPopup','width=700,height=700,left=100,top=50'); return false;" class="btn btn-warning btn-sm">🤖 통벗-{{ bot_name }}</a>
+                        <a href="#" onclick="window.open('/user/my?popup=1','tongbotPopup','width=700,height=700,left=100,top=50'); return false;" class="btn btn-warning btn-sm">🤖 통벗-{{ bot_name }}</a>
                     </div>
                     <div class="d-flex flex-wrap gap-1 justify-content-center">
                         <a href="#" onclick="window.open('/chat','chatPopup','width=500,height=700,left=100,top=50'); return false;" class="btn btn-sm btn-outline-primary">💬 대화</a>
