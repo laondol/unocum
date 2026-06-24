@@ -1740,6 +1740,18 @@ def register_routes(app):
                 report.moderation_reason = '동영상은 승인 후 공개됩니다'
             else:
                 report.status = 'approved'
+                # 실시간 이미지 검사
+                if image_path:
+                    try:
+                        from services.ai_service import moderate_image
+                        abs_path = os.path.join(current_app.root_path, image_path.lstrip('/'))
+                        flagged, reason, cat = moderate_image(abs_path)
+                        if flagged:
+                            report.status = 'pending_person' if cat == 'person' else 'flagged'
+                            report.moderation_result = cat
+                            report.moderation_reason = reason
+                    except:
+                        pass
             db.session.add(report)
             db.session.commit()
 
