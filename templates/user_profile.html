@@ -34,6 +34,7 @@
                         <a href="/logout" class="btn btn-sm btn-outline-danger" onclick="return confirm('로그아웃 하시겠습니까?')">🚪 로그아웃</a>
                         <button class="btn btn-sm btn-outline-success" onclick="neighborVerify()">🏠 이웃인증</button>
                         <div class="form-check form-switch mb-0 ms-1"><input class="form-check-input" type="checkbox" id="locationShareToggle" {{ 'checked' if profile_user.location_share }} onchange="toggleLocationShare(this.checked)"><label class="form-check-label small" for="locationShareToggle">위치공유</label></div>
+                        <div class="form-check form-switch mb-0 ms-1"><input class="form-check-input" type="checkbox" id="villageNotifyToggle" {{ 'checked' if profile_user.village_notify != False }} onchange="toggleVillageNotify(this.checked)"><label class="form-check-label small" for="villageNotifyToggle">마을소식</label></div>
                     </div>
                     {% elif session.get('user_id') and session.get('user_id') != profile_user.id %}
                     <div class="mt-2">{% if is_friend %}<span class="badge bg-success">👥 벗</span>{% else %}<button class="btn btn-sm btn-outline-primary" onclick="sendFriendRequest({{ profile_user.id }})">👋 벗 신청</button>{% endif %}</div>
@@ -188,6 +189,7 @@ function updateVillageOptions(town){const s=document.getElementById('editVillage
 function updateAddress(e){e.preventDefault();const f=new FormData(document.getElementById('addressForm'));fetch('/user/update-address',{method:'POST',body:f}).then(r=>r.json()).then(d=>{if(d.status==='success'){alert(d.msg);location.reload();}else alert(d.msg);});}
 function neighborVerify(){if(!navigator.geolocation)return alert('GPS가 필요합니다.');if(!confirm('현재 GPS 위치로 이웃주민 인증을 진행합니다. 계속하시겠습니까?'))return;navigator.geolocation.getCurrentPosition(pos=>{const f=new FormData();f.append('lat',pos.coords.latitude);f.append('lon',pos.coords.longitude);fetch('/neighbor/verify',{method:'POST',body:f}).then(r=>r.json()).then(d=>{alert(d.msg);if(d.status==='success')location.reload();});},err=>alert('GPS 오류: '+err.message),{enableHighAccuracy:true,timeout:15000});}
 function toggleLocationShare(enabled){fetch('/user/location/share/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({value:enabled?'friends':'off'})}).then(r=>r.json()).then(d=>{if(d.status!=='success')alert(d.msg);});}
+function toggleVillageNotify(enabled){fetch('/user/village/notify/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({value:enabled})}).then(r=>r.json()).then(d=>{if(d.status!=='success')alert(d.msg);});}
 
 function refreshLocation() {
     if (!navigator.geolocation) return alert('GPS가 필요합니다.');

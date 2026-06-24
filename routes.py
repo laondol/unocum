@@ -1555,6 +1555,16 @@ def register_routes(app):
         db.session.commit()
         return jsonify({"status": "success", "value": val})
 
+    @app.route('/user/village/notify/toggle', methods=['POST'])
+    def user_village_notify_toggle():
+        if not session.get('username'):
+            return jsonify({"status":"error","msg":"로그인 필요"}), 401
+        user = User.query.get(session['user_id'])
+        val = request.get_json().get('value', True)
+        user.village_notify = val
+        db.session.commit()
+        return jsonify({"status":"success"})
+
     @app.route('/message/inbox')
     def message_inbox():
         if not session.get('username'):
@@ -2385,13 +2395,14 @@ def register_routes(app):
 
     @app.route('/construction/traffic/gg')
     def construction_traffic_gg():
-        from services.gg_traffic import traffic_summary as gg_summary
+        import json
+        # 캐시 우선 조회
+        cache = VillageCache.query.filter_by(data_type='traffic').order_by(VillageCache.updated_at.desc()).first()
+        if cache and cache.updated_at and (datetime.now() - cache.updated_at).seconds < 600:
+            data = json.loads(cache.data_json or '[]')
+            return jsonify({"available":True,"yangpyeong":cache.data_count,"incidents":data,"cached":True})
         from services.utic_traffic import traffic_summary as utic_summary
-        utic = utic_summary()
-        if utic.get("available") and utic.get("yangpyeong", 0) > 0:
-            return jsonify(utic)
-        summary = gg_summary()
-        return jsonify(summary)
+        return jsonify(utic_summary())
 
     @app.route('/construction/local-stores')
     def construction_local_stores():
@@ -2495,6 +2506,17 @@ def register_routes(app):
                 author_name=session.get('username', '')
             )
             db.session.add(alert)
+            db.session.flush()
+            # 마을주민 자동 쪽지
+            if town:
+                recipients = User.query.filter(User.village_notify != False, User.town == town)
+                if village:
+                    recipients = recipients.filter(User.village == village)
+                for r in recipients.all():
+                    db.session.add(Message(sender_id=session.get('user_id'), sender_name=session.get('username','관리자'),
+                        receiver_id=r.id, subject=f'🚨 마을소식: {title}',
+                        content=f'[{town} {village}] {title}\n\n{content}\n\n자세한 내용은 위치기반안내 > 알림에서 확인하세요.',
+                        sender_role=session.get('role','admin')))
             db.session.commit()
             return redirect('/admin/alerts')
         user_town = session.get('town', '')

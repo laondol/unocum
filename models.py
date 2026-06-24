@@ -43,6 +43,7 @@ class User(db.Model):
     login_village = db.Column(db.String(50))             # 마지막 로그인 리
     login_location_share = db.Column(db.Boolean, default=False) # 벗에게 로그인 위치 공유 동의
     location_share = db.Column(db.Boolean, default=False) # 위치 공유 동의
+    village_notify = db.Column(db.Boolean, default=True) # 마을소식 알림
     is_neighbor = db.Column(db.Boolean, default=False)  # 이웃주민 (집에서 위치인증 완료)
 
     # SNS 연동 로그인
@@ -325,6 +326,15 @@ class ChatMessage(db.Model):
 class FriendCache(db.Model):
     user_id = db.Column(db.Integer, primary_key=True)
     friend_ids = db.Column(db.Text, default='[]')
+    updated_at = db.Column(db.DateTime, default=datetime.now)
+
+class VillageCache(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    town = db.Column(db.String(50))
+    village = db.Column(db.String(50))
+    data_type = db.Column(db.String(30))
+    data_json = db.Column(db.Text)
+    data_count = db.Column(db.Integer, default=0)
     updated_at = db.Column(db.DateTime, default=datetime.now)
 
 class LegalPost(db.Model):

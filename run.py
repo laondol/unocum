@@ -40,6 +40,20 @@ def create_app():
     register_routes(app)
     app.register_blueprint(tongbot_bp)
     
+    # 백그라운드 캐시 갱신 스케줄러
+    import threading, time
+    def cache_scheduler():
+        time.sleep(10)  # 앱 시작 후 10초 대기
+        while True:
+            try:
+                with app.app_context():
+                    from services.cache_refresh import refresh_all_caches
+                    refresh_all_caches()
+            except Exception as e:
+                print(f"[CACHE] error: {e}")
+            time.sleep(600)  # 10분마다 갱신
+    threading.Thread(target=cache_scheduler, daemon=True).start()
+    
     # DB 마이그레이션: 누락된 컬럼 자동 추가
     def migrate_news_article():
         with app.app_context():
