@@ -171,7 +171,7 @@ JSON: {"flagged": true/false, "reason": "이유", "category": "person/privacy/vi
     category = data.get('category', 'clean')
     return flagged, data.get('reason', '') if flagged else "", category
 
-VALUABLE_CATEGORIES = {'사건', '풍경', '장소', '맛집'}
+VALUABLE_CATEGORIES = {'사건', '풍경', '장소', '맛집', '가게'}
 
 def extract_video_frames(video_path, max_frames=3):
     frames = []
