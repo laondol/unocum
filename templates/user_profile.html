@@ -33,8 +33,6 @@
                     <div class="mt-2 d-flex gap-1">
                         <a href="/logout" class="btn btn-sm btn-outline-danger" onclick="return confirm('로그아웃 하시겠습니까?')">🚪 로그아웃</a>
                         <button class="btn btn-sm btn-outline-success" onclick="neighborVerify()">🏠 이웃인증</button>
-                        <div class="form-check form-switch mb-0 ms-1"><input class="form-check-input" type="checkbox" id="locationShareToggle" {{ 'checked' if profile_user.location_share }} onchange="toggleLocationShare(this.checked)"><label class="form-check-label small" for="locationShareToggle">위치공유</label></div>
-                        <div class="form-check form-switch mb-0 ms-1"><input class="form-check-input" type="checkbox" id="villageNotifyToggle" {{ 'checked' if profile_user.village_notify != False }} onchange="toggleVillageNotify(this.checked)"><label class="form-check-label small" for="villageNotifyToggle">마을소식</label></div>
                     </div>
                     {% elif session.get('user_id') and session.get('user_id') != profile_user.id %}
                     <div class="mt-2">{% if is_friend %}<span class="badge bg-success">👥 벗</span>{% else %}<button class="btn btn-sm btn-outline-primary" onclick="sendFriendRequest({{ profile_user.id }})">👋 벗 신청</button>{% endif %}</div>
@@ -67,6 +65,38 @@
             </div>
         </div>
     </div>
+
+    <!-- 위치 관리 (본인만) - 2번째 블록 -->
+    {% if is_own %}
+    <div class="card border-0 shadow-sm mb-3" style="border-radius: 18px;">
+        <div class="card-body p-2">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <small class="text-muted">📍</small>
+                <span class="fw-bold small">{{ profile_user.town }} {{ profile_user.village }}</span>
+                <small class="text-muted">|</small>
+                <span class="small">{{ curr_location or '-' }}</span>
+                <button class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="showAddressEdit()">✏️</button>
+                <button class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="refreshLocation()" title="현재위치 갱신">🔄</button>
+                <button class="btn btn-sm btn-outline-success py-0 px-1" onclick="neighborVerify()">🏠</button>
+                <a href="/logout" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="return confirm('로그아웃 하시겠습니까?')">🚪</a>
+                <a href="/construction?tab=home" class="btn btn-sm btn-outline-secondary py-0 px-1" title="집으로">🏠</a>
+                <a href="/construction?tab=heritage" class="btn btn-sm btn-outline-secondary py-0 px-1" title="국가유산">🏛️</a>
+                <a href="/construction?tab=scenery" class="btn btn-sm btn-outline-secondary py-0 px-1" title="풍경">🌄</a>
+                <div class="ms-auto d-flex gap-1">
+                    <div class="form-check form-switch mb-0 small"><input class="form-check-input" type="checkbox" id="locationShareToggle" {{ 'checked' if profile_user.location_share }} onchange="toggleLocationShare(this.checked)"><label class="form-check-label" for="locationShareToggle">위치</label></div>
+                    <div class="form-check form-switch mb-0 small"><input class="form-check-input" type="checkbox" id="villageNotifyToggle" {{ 'checked' if profile_user.village_notify != False }} onchange="toggleVillageNotify(this.checked)"><label class="form-check-label" for="villageNotifyToggle">소식</label></div>
+                </div>
+            </div>
+            <div id="addressEditForm" class="mt-2 p-2 bg-light rounded" style="display:none;">
+                <form id="addressForm" onsubmit="updateAddress(event)" class="row g-1">
+                    <div class="col-5"><select name="town" class="form-select form-select-sm" id="editTown" required onchange="updateVillageOptions(this.value)"><option value="">읍/면</option>{% for t in ['양평읍','강상면','강하면','양서면','옥천면','서종면','단월면','청운면','양동면','지평면','용문면','개군면','관외'] %}<option value="{{ t }}" {{ 'selected' if profile_user.town == t }}>{{ t }}</option>{% endfor %}</select></div>
+                    <div class="col-5"><select name="village" class="form-select form-select-sm" id="editVillage"><option value="">리</option></select></div>
+                    <div class="col-2"><button type="submit" class="btn btn-sm btn-success w-100">저장</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- 닢 내역 (숨김) -->
     <div id="nipSection" class="card border-0 shadow-sm mb-3 d-none" style="border-radius: 18px;">
@@ -135,33 +165,6 @@
                     <small class="text-muted float-end">{{ p.date }}</small>
                 </a>
                 {% endfor %}
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- 위치 관리 (본인만) -->
-    {% if is_own %}
-    <div class="card border-0 shadow-sm mb-3" style="border-radius: 18px;">
-        <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center" style="border-radius: 18px 18px 0 0;">
-            <span>📍 내 위치 관리</span>
-            <span>
-                <a href="/construction?tab=home" class="btn btn-sm btn-outline-secondary py-0 px-1" title="집으로">🏠</a>
-                <a href="/construction?tab=heritage" class="btn btn-sm btn-outline-secondary py-0 px-1" title="국가유산">🏛️</a>
-                <a href="/construction?tab=scenery" class="btn btn-sm btn-outline-secondary py-0 px-1" title="풍경">🌄</a>
-            </span>
-        </div>
-        <div class="card-body p-3">
-            <div class="row g-2">
-                <div class="col-6"><small class="text-muted">기본주소</small><br><span class="fw-bold small">{{ profile_user.town }} {{ profile_user.village }}</span> <button class="btn btn-sm btn-outline-secondary" onclick="showAddressEdit()">✏️</button></div>
-                <div class="col-6"><small class="text-muted">현재위치</small> <button class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="refreshLocation()" title="현재위치 갱신">🔄</button><br><span class="fw-bold small" id="currLocText">{{ curr_location or '-' }}</span>{% if profile_user.location_updated_at %}<br><small class="text-muted">{{ profile_user.location_updated_at.strftime('%m/%d %H:%M') }}</small>{% endif %}</div>
-            </div>
-            <div id="addressEditForm" class="mt-2 p-2 bg-light rounded" style="display:none;">
-                <form id="addressForm" onsubmit="updateAddress(event)" class="row g-1">
-                    <div class="col-5"><select name="town" class="form-select form-select-sm" id="editTown" required onchange="updateVillageOptions(this.value)"><option value="">읍/면</option>{% for t in ['양평읍','강상면','강하면','양서면','옥천면','서종면','단월면','청운면','양동면','지평면','용문면','개군면','관외'] %}<option value="{{ t }}" {{ 'selected' if profile_user.town == t }}>{{ t }}</option>{% endfor %}</select></div>
-                    <div class="col-5"><select name="village" class="form-select form-select-sm" id="editVillage"><option value="">리</option></select></div>
-                    <div class="col-2"><button type="submit" class="btn btn-sm btn-success w-100">저장</button></div>
-                </form>
             </div>
         </div>
     </div>
