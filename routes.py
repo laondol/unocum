@@ -2523,21 +2523,21 @@ def register_routes(app):
         count = Message.query.filter_by(receiver_id=uid, is_read=False).count()
         return jsonify({"count": count})
 
-@app.route('/api/construction/unread')
-def api_construction_unread():
-    uid = session.get('user_id')
-    user = User.query.get(uid) if uid else None
-    alerts = 0
-    if user and user.town:
-        alerts = VillageAlert.query.filter_by(is_active=True, town=user.town).count()
-    return jsonify({"alerts": alerts, "heritage": 0, "scenery": 0})
+    @app.route('/api/construction/unread')
+    def api_construction_unread():
+        uid = session.get('user_id')
+        user = User.query.get(uid) if uid else None
+        alerts = 0
+        if user and user.town:
+            alerts = VillageAlert.query.filter_by(is_active=True, town=user.town).count()
+        return jsonify({"alerts": alerts, "heritage": 0, "scenery": 0})
 
-@app.route('/construction/safetydata')
-def construction_safetydata():
-    from services.safetydata import get_yangpyeong_safety, TYPE_NAMES
-    data = get_yangpyeong_safety()
-    total = sum(len(v) for v in data.values())
-    return jsonify({"available": True, "total": total, "types": {k: {"name": TYPE_NAMES.get(k,k), "items": v[:10]} for k, v in data.items() if v}}) 
+    @app.route('/construction/safetydata')
+    def construction_safetydata():
+        from services.safetydata import get_yangpyeong_safety, TYPE_NAMES
+        data = get_yangpyeong_safety()
+        total = sum(len(v) for v in data.values())
+        return jsonify({"available": True, "total": total, "types": {k: {"name": TYPE_NAMES.get(k,k), "items": v[:10]} for k, v in data.items() if v}}) 
 
     @app.route('/api/user/location')
     def api_user_location():
