@@ -1738,6 +1738,8 @@ def register_routes(app):
                 report.status = 'pending_review'
                 report.moderation_result = 'video'
                 report.moderation_reason = '동영상은 승인 후 공개됩니다'
+            else:
+                report.status = 'approved'
             db.session.add(report)
             db.session.commit()
 
