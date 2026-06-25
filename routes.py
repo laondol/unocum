@@ -1580,12 +1580,20 @@ def register_routes(app):
         # 수동 위치 입력 처리
         if manual_loc:
             parts = manual_loc.strip().split()
-            if len(parts) >= 2:
-                user.curr_town = parts[0]
-                user.curr_village = parts[1]
+            town = village = ''
+            YT = {'양평읍','강상면','강하면','양서면','옥천면','서종면','단월면','청운면','양동면','지평면','용문면','개군면'}
+            for p in parts:
+                if p in YT: town = p
+                elif p.endswith('리') and len(p) <= 4: village = p
+            if not town:
+                for t in YT:
+                    if t in manual_loc: town = t; break
+            if town:
+                user.curr_town = town
+                user.curr_village = village or ''
                 user.location_updated_at = datetime.now()
                 from services.transit import lookup_village_coords, haversine_km
-                coords = lookup_village_coords(parts[0], parts[1])
+                coords = lookup_village_coords(town, village)
                 if coords and gps_lat and gps_lng:
                     dist = haversine_km(gps_lat, gps_lng, coords[0], coords[1])
                     if dist <= 1.0:
