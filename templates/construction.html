@@ -394,7 +394,6 @@ fetch('/api/construction/unread').then(r=>r.json()).then(d=>{
     if (d.alerts > 0) { var b = document.getElementById('sceneryBadge'); b.textContent = d.alerts; b.classList.remove('d-none'); }
 }).catch(()=>{});
 function manualLocCorrect() {
-    alert('보정 시작');
     var input = document.querySelector('#manualLoc, #manualLoc2');
     if (!input) { alert('입력창을 찾을 수 없습니다.'); return; }
     var loc = input.value.trim();
