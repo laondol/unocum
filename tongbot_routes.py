@@ -1,7 +1,7 @@
-import random, string
+import random, string, re, requests
 from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template, current_app
 from models import db, User, TongBot, TongBotDraft, TongBotSchedule, ChatRoom, ChatMessage, Message, FriendCache, BotKnowledge
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import os, uuid
 
 tongbot_bp = Blueprint('tongbot', __name__)
@@ -149,7 +149,39 @@ def bot_chat():
         counselor_msg = {'type':'legal','msg':'법률 고민이 있으신가요? 전문 노무사와 상담을 연결해 드릴까요? (50닢 소요)','url':'/legal/list'}
     elif counselor == 'psycho':
         counselor_msg = {'type':'psycho','msg':'마음이 힘드신가요? 심리상담사와 대화를 연결해 드릴까요? (30닢 소요)','url':'/psycho/list'}
-    return jsonify({"reply": reply, "bot_name": bot.bot_name, "talent": talent, "mood": bot.mood, "level": bot.level, "counselor": counselor_msg})
+
+    # 일정 생성 의도 감지
+    schedule_info = None
+    if _detect_schedule_intent(msg):
+        parsed = _parse_schedule_from_text(msg, uid)
+        if parsed.get('event_date'):
+            loc_info = _resolve_location(parsed.get('location',''), uid)
+            try:
+                s = TongBotSchedule(
+                    user_id=uid,
+                    title=parsed['title'],
+                    description=msg,
+                    event_date=parsed['event_date'],
+                    location=loc_info['address'] if loc_info else parsed.get('location',''),
+                    memo=f"통벗 대화로 생성됨"
+                )
+                db.session.add(s)
+                db.session.commit()
+                kst = parsed['event_date'].astimezone(timezone(timedelta(hours=9)))
+                date_str = kst.strftime('%m월 %d일 %H:%M')
+                loc_str = f"\n📍 {loc_info['name']} ({loc_info['address']})" if loc_info else (f"\n📍 {parsed['location']}" if parsed['location'] else '')
+                travel_str = f"\n🚶 예상 소요시간: 약 {loc_info['travel_min']}분 ({loc_info['distance_km']}km)" if loc_info and loc_info.get('travel_min') else ''
+                schedule_info = {
+                    'id': s.id,
+                    'title': parsed['title'],
+                    'date': date_str,
+                    'location': parsed.get('location',''),
+                    'loc_detail': loc_str + travel_str
+                }
+            except Exception as e:
+                pass
+
+    return jsonify({"reply": reply, "bot_name": bot.bot_name, "talent": talent, "mood": bot.mood, "level": bot.level, "counselor": counselor_msg, "schedule": schedule_info})
 
 @tongbot_bp.route('/api/bot/history')
 def bot_history():
@@ -170,6 +202,104 @@ def bot_history():
 MOODS = ['neutral','happy','excited','thoughtful','caring','playful']
 MOOD_EMOJI = {'neutral':'😊','happy':'😄','excited':'🤩','thoughtful':'🤔','caring':'🥰','playful':'😜'}
 LEVEL_NAMES = {1:'🥚 알',2:'🐣 새싹',3:'🌱 묘목',4:'🪴 나무',5:'🌸 꽃',6:'🌟 별',7:'👑 수호자'}
+
+SCHEDULE_KEYWORDS = ['일정', '약속', '캘린더', '예약', '스케줄', '추가해', '등록해', '만들어줘', '생성해', '넣어줘', '기록해', '잡아줘']
+
+def _detect_schedule_intent(msg):
+    """일정 생성 의도 감지: 키워드 + 미래 시간 표현"""
+    msg_lower = msg.lower()
+    keyword_hit = any(kw in msg_lower for kw in SCHEDULE_KEYWORDS)
+    if not keyword_hit:
+        return False
+    has_time = bool(re.search(r'(\d{1,2}시|오전|오후|내일|모레|다음주|주말|월요일|화요일|수요일|목요일|금요일|토요일|일요일|\d{1,2}월\s*\d{1,2}일|\d{1,2}/\d{1,2}|오늘)', msg))
+    return keyword_hit and has_time
+
+def _parse_schedule_from_text(msg, uid):
+    """자연어에서 일정 정보 추출: title, event_date, location"""
+    result = {'title': '', 'event_date': None, 'location': '', 'description': ''}
+    KST = timezone(timedelta(hours=9))
+    now = datetime.now(KST)
+
+    # 1) dateparser로 날짜/시간 추출
+    try:
+        import dateparser
+        settings = {'PREFER_DATES_FROM': 'future', 'RELATIVE_BASE': now.replace(tzinfo=None)}
+        dt = dateparser.parse(msg, settings=settings)
+        if dt:
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=KST)
+            result['event_date'] = dt
+    except:
+        pass
+
+    # 2) 장소 추출: "~에서", "장소는 ~", "~로 가는"
+    loc_match = re.search(r'(?:에서|에\s*가는|장소[는은]\s*|위치[는은]\s*|곳[은는]\s*|에\s+있는)\s*[\w가-힣\s]+?(?=[,.~]|$|\s*(?:일정|약속|추가|등록|$))', msg)
+    if not loc_match:
+        loc_match = re.search(r'(?:에\s+갈|을\s+갈|를\s+갈)', msg)
+        if not loc_match:
+            loc_match = re.search(r'(?<=\s)[\w가-힣]+(?:에|에서|으로|로)\s*(?=일정|약속|추가|등록|예약|\d|$)', msg)
+    if loc_match:
+        loc_raw = loc_match.group().strip()
+        loc_raw = re.sub(r'(에서|에\s*가는|장소[는은]|위치[는은]|곳[은은])\s*', '', loc_raw).strip()
+        if len(loc_raw) >= 2:
+            result['location'] = loc_raw
+
+    # 3) 제목 추출: 시간/장소 제외한 나머지
+    title = msg
+    if result['event_date']:
+        kst_date = result['event_date'].astimezone(KST)
+        for pat in [r'\d{1,2}시(\d{1,2}분)?', r'오전\s*\d{1,2}시', r'오후\s*\d{1,2}시', r'\d{4}년\s*\d{1,2}월\s*\d{1,2}일', r'\d{1,2}월\s*\d{1,2}일', r'\d{1,2}/\d{1,2}']:
+            title = re.sub(pat, '', title)
+    if result['location']:
+        title = title.replace(result['location'], '')
+    for kw in SCHEDULE_KEYWORDS:
+        title = re.sub(rf'{kw}\S*', '', title)
+    title = re.sub(r'\s+', ' ', title).strip(' ,.~')
+    if not title or len(title) < 2:
+        title = '일정'
+    result['title'] = title[:100]
+    return result
+
+def _resolve_location(location_name, uid):
+    """카카오 키워드 검색으로 장소→좌표,주소,소요시간"""
+    if not location_name:
+        return None
+    try:
+        user = User.query.get(uid)
+        kakao_key = current_app.config.get('KAKAO_REST_API_KEY', '')
+        if not kakao_key:
+            return None
+        # 위치 기반으로 검색 (사용자 주소 근처)
+        search_query = location_name
+        if user and user.town:
+            search_query = f'{user.town} {location_name}'
+        resp = requests.get('https://dapi.kakao.com/v2/local/search/keyword.json', params={
+            'query': search_query,
+            'size': 1
+        }, headers={'Authorization': f'KakaoAK {kakao_key}'}, timeout=3)
+        if resp.status_code == 200:
+            docs = resp.json().get('documents', [])
+            if docs:
+                p = docs[0]
+                lat = float(p.get('y', 0))
+                lng = float(p.get('x', 0))
+                addr = p.get('road_address_name', '') or p.get('address_name', '')
+                place_name = p.get('place_name', location_name)
+
+                # 소요시간: 사용자 집 → 장소 (transit.py 사용)
+                time_min = None
+                if user and (user.curr_latitude or user.latitude):
+                    from services.transit import haversine_km
+                    home_lat = user.curr_latitude or user.latitude or 0
+                    home_lng = user.curr_longitude or user.longitude or 0
+                    if home_lat and home_lng:
+                        dist = haversine_km(home_lat, home_lng, lat, lng)
+                        time_min = round(dist * 15)  # 15min/km walking
+
+                return {'name': place_name, 'address': addr, 'latitude': lat, 'longitude': lng, 'travel_min': time_min, 'distance_km': round(dist, 1) if home_lat else None}
+    except:
+        pass
+    return None
 
 PLATFORM_GUIDE = """[함께사는양평 플랫폼 안내 - 회원 질문에 반드시 이 정보를 우선 참고하세요]
 
