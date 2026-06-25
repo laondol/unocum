@@ -2458,23 +2458,30 @@ def register_routes(app):
         if not uid:
             return jsonify({"error": "로그인이 필요합니다."}), 401
         user = User.query.get(uid)
-        if not user or not user.curr_town or not user.curr_village:
-            return jsonify({"error": "등록된 주소(리)가 없습니다."}), 400
+        if not user or (not user.town and not user.curr_town):
+            return jsonify({"error": "등록된 주소가 없습니다."}), 400
+        town = user.town or user.curr_town
+        village = user.village or user.curr_village
         stores = ShareReport.query.filter_by(
-            town=user.curr_town,
-            village=user.curr_village,
-            status='approved'
-        ).order_by(ShareReport.created_at.desc()).limit(30).all()
+            town=town, village=village, status='approved'
+        ).order_by(ShareReport.created_at.desc()).limit(50).all()
+        # 그룹화: 같은 이름+비슷한 위치끼리 묶기
+        grouped = {}
+        for s in stores:
+            key = (s.title or '제목없음').strip()[:20]
+            lat_key = round(s.latitude or 0, 4) if s.latitude else 0
+            lng_key = round(s.longitude or 0, 4) if s.longitude else 0
+            group_key = f"{key}|{lat_key}|{lng_key}"
+            if group_key not in grouped:
+                grouped[group_key] = {"name": s.title or "제목없음", "posts": [], "image": s.image_path, "lat": s.latitude, "lng": s.longitude}
+            grouped[group_key]["posts"].append({
+                "id": s.id, "title": s.title, "desc": (s.description or "")[:100],
+                "user": s.author_name or "익명", "image": s.image_path,
+                "date": s.created_at.strftime("%m/%d") if s.created_at else ""
+            })
         result = {
-            "town": user.curr_town,
-            "village": user.curr_village,
-            "stores": [{
-                "id": s.id,
-                "title": s.title or "제목없음",
-                "image_path": s.image_path,
-                "description": (s.description or "")[:100],
-                "created_at": s.created_at.strftime("%Y-%m-%d %H:%M") if s.created_at else "",
-            } for s in stores],
+            "town": town, "village": village,
+            "stores": list(grouped.values())[:20],
         }
         return jsonify(result)
 

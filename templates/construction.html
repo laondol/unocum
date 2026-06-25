@@ -156,11 +156,18 @@ function showInline(type) {
         el.innerHTML = '<div class="text-center py-2"><span class="spinner-border spinner-border-sm"></span> 동네가게 불러오는 중...</div>';
         fetch('/construction/local-stores').then(r=>r.json()).then(d=>{
             if (!d.stores||d.stores.length===0) { el.innerHTML = '<div class="text-muted text-center py-2 small">등록된 가게가 없습니다.</div>'; return; }
-            var html = '<div class="row g-2">';
-            d.stores.forEach(function(s){
-                html += '<div class="col-4"><a href="/share/detail/'+s.id+'" target="_blank" class="text-decoration-none"><div class="card">'+(s.image_path?'<img src="'+s.image_path+'" style="height:80px;object-fit:cover;">':'<div style="height:80px;background:#eee;">')+'<div class="p-1 small text-dark text-center">'+s.title+'</div></div></a></div>';
+            var html = '';
+            d.stores.forEach(function(g){
+                html += '<div class="card mb-2"><div class="card-body p-2">';
+                html += '<div class="d-flex gap-2">';
+                if (g.image) html += '<img src="'+g.image+'" style="width:60px;height:60px;object-fit:cover;border-radius:8px;">';
+                html += '<div class="flex-grow-1"><strong>'+g.name+'</strong>';
+                html += '<br><small class="text-muted">게시글 '+g.posts.length+'개</small>';
+                g.posts.forEach(function(p){
+                    html += '<br><small>📝 '+p.user+': '+(p.desc||p.title)+'</small>';
+                });
+                html += '</div></div></div></div>';
             });
-            html += '</div>';
             el.innerHTML = html;
         });
     } else if (type === 'alert') {
