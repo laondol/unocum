@@ -397,7 +397,12 @@ function manualLocCorrect() {
 
 function submitManualLoc(loc, gps_lat, gps_lng) {
     fetch('/user/location/correct', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({manual_loc: loc, gps_lat: gps_lat, gps_lng: gps_lng})})
-    .then(r=>r.json()).then(d=>{ alert(d.msg||'수정 완료'); if(d.status==='success') location.reload(); });
+    .then(r=>r.json()).then(d=>{
+        if(d.status==='success') {
+            alert(d.msg||'수정 완료');
+            location.reload();
+        } else alert(d.msg||'실패');
+    });
 }
 </script>
 {% endblock %}
