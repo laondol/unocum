@@ -1450,7 +1450,7 @@ def register_routes(app):
         bot_message = ''
         if is_own and bot_name:
             try:
-                h = datetime.now().hour
+                h = (datetime.now() + timedelta(hours=9)).hour
                 time_ctx = '아침' if h < 12 else ('오후' if h < 18 else '저녁')
                 import random
                 tips = ['오늘 양평 날씨에 맞는 옷차림을 추천해 드릴까요?',
