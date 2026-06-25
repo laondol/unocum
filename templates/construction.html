@@ -154,20 +154,17 @@ function showInline(type) {
         });
     } else if (type === 'localstore') {
         el.innerHTML = '<div class="text-center py-2"><span class="spinner-border spinner-border-sm"></span> 동네가게 불러오는 중...</div>';
-        fetch('/construction/local-stores').then(r=>r.json()).then(d=>{
+        fetch('/construction/local-stores').then(function(r){return r.json()}).then(function(d){
             if (!d.stores||d.stores.length===0) { el.innerHTML = '<div class="text-muted text-center py-2 small">등록된 가게가 없습니다.</div>'; return; }
-            var html = '';
+            var html = '<div class="row g-2">';
             d.stores.forEach(function(g){
-                html += '<div class="card mb-2"><div class="card-body p-2">';
-                html += '<div class="d-flex gap-2">';
-                if (g.image) html += '<img src="'+g.image+'" style="width:60px;height:60px;object-fit:cover;border-radius:8px;">';
-                html += '<div class="flex-grow-1"><strong>'+g.name+'</strong>';
-                html += '<br><small class="text-muted">게시글 '+g.posts.length+'개</small>';
-                g.posts.forEach(function(p){
-                    html += '<br><small>📝 '+p.user+': '+(p.desc||p.title)+'</small>';
-                });
-                html += '</div></div></div></div>';
+                html += '<div class="col-6"><div class="card"><div class="card-body p-2 text-center">';
+                if (g.image) html += '<img src="'+g.image+'" style="width:100%;height:100px;object-fit:cover;border-radius:8px;"><br>';
+                html += '<strong class="small">'+g.name+'</strong><br>';
+                html += '<small class="text-muted">글 '+g.posts.length+'개</small>';
+                html += '</div></div></div>';
             });
+            html += '</div>';
             el.innerHTML = html;
         });
     } else if (type === 'alert') {
