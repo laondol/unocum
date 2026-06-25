@@ -278,16 +278,21 @@ function loadScenery() {
         var tabEl = document.getElementById('sceneryTab');
         if (tabEl && data.village) tabEl.textContent = '🌄 ' + data.village;
         else if (tabEl && data.town) tabEl.textContent = '🌄 ' + data.town;
-        if (!data.sceneries||data.sceneries.length===0) { el.innerHTML = '<div class="text-center py-5 text-muted"><div class="fs-1 mb-3">🌄</div><p>'+data.town+' '+data.village+'에 '+data.season+' 풍경사진이 없습니다.</p><p class="small"><a href="/share-report">공유마당에 사진 등록하기</a></p></div>'; return; }
-        let html = '<div class="mb-3"><span class="badge bg-success">'+data.town+' '+data.village+'</span> <span class="badge bg-info ms-1">'+data.season+'</span> <small class="text-muted ms-1">사진 '+data.sceneries.length+'장</small></div><div class="row g-3">';
+        if (!data.sceneries||data.sceneries.length===0) {
+            el.innerHTML = '<div class="text-muted text-center py-2 small">'+data.town+' '+data.village+'에 '+data.season+' 풍경사진이 없습니다.</div>';
+            return;
+        }
+        // 풍경사진은 inlineContent에만 저장하고 기본표시는 안함
+        let html = '<div class="mb-2"><span class="badge bg-success">'+data.town+' '+data.village+'</span> <span class="badge bg-info ms-1">'+data.season+'</span> <small class="text-muted ms-1">사진 '+data.sceneries.length+'장</small></div><div class="row g-3">';
         data.sceneries.forEach(s => {
             html += '<div class="col-6 col-md-4"><a href="/share/detail/'+s.id+'" target="_blank" class="text-decoration-none"><div class="card border-0 shadow-sm h-100" style="border-radius:16px;">';
-            if (s.image_path) html += '<img src="'+s.image_path+'" class="card-img-top" style="height:140px;object-fit:cover;border-radius:16px 16px 0 0;" alt="'+s.title+'" onerror="this.src=\'https://placehold.co/300x200/e9ecef/6c757d?text=No+Image\'">';
+            if (s.image_path) html += '<img src="'+s.image_path+'" class="card-img-top" style="height:140px;object-fit:cover;border-radius:16px 16px 0 0;" alt="'+s.title+'">';
             else html += '<div class="bg-light d-flex align-items-center justify-content-center" style="height:140px;border-radius:16px 16px 0 0;font-size:2rem;">🌄</div>';
             html += '<div class="card-body p-2 text-center"><p class="small fw-bold text-dark mb-0" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+s.title+'</p></div></div></a></div>';
         });
         html += '</div><div class="text-center mt-3"><a href="/share-report" class="btn btn-sm btn-outline-primary">내 사진도 등록하기</a></div>';
-        el.innerHTML = html;
+        document.getElementById('inlineContent').innerHTML = html;
+        el.innerHTML = '<div class="text-muted text-center py-2 small">🌄 버튼을 눌러 풍경사진을 확인하세요.</div>';
     }).catch(() => el.innerHTML = '<div class="alert alert-danger">불러오기 실패</div>');
 }
 
