@@ -2616,8 +2616,22 @@ def register_routes(app):
         total = sum(len(v) for v in data.values())
         return jsonify({"available": True, "total": total, "types": {k: {"name": TYPE_NAMES.get(k,k), "items": v[:10]} for k, v in data.items() if v}}) 
 
-    @app.route('/api/user/location')
+    @app.route('/api/user/location', methods=['GET','POST'])
     def api_user_location():
+        if request.method == 'POST':
+            uid = session.get('user_id')
+            if not uid: return jsonify({"status":"error","msg":"login"})
+            user = User.query.get(uid)
+            loc = request.get_json().get('manual_loc','')
+            if not loc: return jsonify({"status":"error","msg":"need location"})
+            parts = loc.strip().split()
+            if len(parts) >= 2:
+                user.curr_town = parts[0]
+                user.curr_village = parts[1]
+                user.location_updated_at = datetime.now()
+                db.session.commit()
+                return jsonify({"status":"success","msg":"ok"})
+            return jsonify({"status":"error","msg":"format"})
         uid = session.get('user_id')
         if not uid:
             return jsonify({"error": "login"}), 401
