@@ -286,7 +286,7 @@ function renderHome(data, loc) {
         var walkMin = Math.round(km * 15);
         var walkH = Math.floor(walkMin / 60), walkM = walkMin % 60;
         var walkTime = walkH > 0 ? walkH + '시간 ' + walkM + '분' : walkM + '분';
-        html += '<div class="card border-0 shadow-sm mb-3 border-start border-4 border-success" style="border-radius:16px;"><div class="card-body p-3 text-center"><h6 class="fw-bold text-success mb-2">🚶 같은 리에서 걸어가기</h6><p class="fw-bold text-success mb-0" style="font-size:1.2rem;">약 ' + walkTime + ' 소요</p><p class="small text-muted mt-1">직선거리 ' + km + 'km · 도보 15분/km 기준</p><p class="small mb-1">📍 현재위치: <strong>' + dep + '</strong></p><p class="small mb-2">🏠 기본주소: <strong>' + dest + '</strong></p><div class="d-flex gap-2 justify-content-center"><input type="text" id="manualLoc" class="form-control form-control-sm" style="width:150px;" placeholder="예: 양서면 양수리"><button class="btn btn-sm btn-outline-secondary loc-correct-btn">📍 보정</button></div></div></div>';
+        html += '<div class="card border-0 shadow-sm mb-3 border-start border-4 border-success" style="border-radius:16px;"><div class="card-body p-3 text-center"><h6 class="fw-bold text-success mb-2">🚶 같은 리에서 걸어가기</h6><p class="fw-bold text-success mb-0" style="font-size:1.2rem;">약 ' + walkTime + ' 소요</p><p class="small text-muted mt-1">직선거리 ' + km + 'km · 도보 15분/km 기준</p><p class="small mb-1">📍 현재위치: <strong>' + dep + '</strong></p><p class="small mb-2">🏠 기본주소: <strong>' + dest + '</strong></p><div class="d-flex gap-2 justify-content-center"><input type="text" id="manualLoc" class="form-control form-control-sm" style="width:150px;" placeholder="예: 양서면 양수리"><button class="btn btn-sm btn-outline-secondary loc-correct-btn" onclick="window.manualLocCorrect()">📍 보정</button></div></div></div>';
         el.innerHTML = html;
         return;
     } else if (suggestData && suggestData.optimal_departure) {
@@ -396,12 +396,13 @@ function manualLocCorrect() {
     var input = document.querySelector('#manualLoc, #manualLoc2');
     if (!input) { alert('입력창을 찾을 수 없습니다.'); return; }
     var loc = input.value.trim();
-    if (!loc) { alert('위치를 입력하세요.\n예: 양평읍 양근리'); return; }
+    if (!loc) { alert('위치를 입력하세요.\n예: 양서면 양수리'); return; }
     if (!navigator.geolocation) { submitManualLoc(loc, 0, 0); return; }
     navigator.geolocation.getCurrentPosition(function(p) {
         submitManualLoc(loc, p.coords.latitude, p.coords.longitude);
     }, function() { submitManualLoc(loc, 0, 0); }, {enableHighAccuracy:true, timeout:5000});
 }
+window.manualLocCorrect = manualLocCorrect;
 
 function submitManualLoc(loc, gps_lat, gps_lng) {
     fetch('/user/location/correct', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({manual_loc: loc, gps_lat: gps_lat, gps_lng: gps_lng})})
