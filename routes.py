@@ -1575,62 +1575,40 @@ def register_routes(app):
         if not session.get('username'):
             return jsonify({"status":"error","msg":"로그인 필요"}), 401
         user = User.query.get(session['user_id'])
-        data = request.get_json()
-        manual_loc = data.get('manual_loc','')
-        gps_lat = data.get('gps_lat', type=float)
-        gps_lng = data.get('gps_lng', type=float)
-        # 수동 위치 입력 처리
-        if manual_loc:
-            parts = manual_loc.strip().split()
-            town = village = ''
-            YT = {'양평읍','강상면','강하면','양서면','옥천면','서종면','단월면','청운면','양동면','지평면','용문면','개군면'}
-            for p in parts:
-                if p in YT: town = p
-                elif p.endswith('리') and len(p) <= 4: village = p
-            if not town:
-                for t in YT:
-                    if t in manual_loc: town = t; break
-            if not town and not village:
-                town = user.curr_town or ''
-                village = user.curr_village or ''
-            if True:
-                if town:
-                    user.curr_town = town
-                    user.curr_village = village or ''
-                user.curr_address = manual_loc.strip()[:200]
-                user.location_updated_at = datetime.now()
-                from services.transit import lookup_village_coords, haversine_km
-                coords = lookup_village_coords(town, village)
-                if coords and gps_lat and gps_lng:
-                    dist = haversine_km(gps_lat, gps_lng, coords[0], coords[1])
-                    if dist <= 1.0:
-                        user.curr_offset_lat = (user.curr_offset_lat or 0) + (coords[0] - gps_lat)
-                        user.curr_offset_lng = (user.curr_offset_lng or 0) + (coords[1] - gps_lng)
-                        user.points = (user.points or 0) + 1
-                        db.session.add(PointHistory(user_id=user.id, change_type='location_correct', amount=1, description=f'위치 보정 학습: {manual_loc}'))
-                        msg = f"'{manual_loc}'(으)로 수정되었습니다. 1닢 지급! (보정거리 {dist:.1f}km)"
-                    else:
-                        user.points = (user.points or 0) + 1
-                        db.session.add(PointHistory(user_id=user.id, change_type='location_correct', amount=1, description=f'위치 수동 변경: {manual_loc}'))
-                        msg = f"'{manual_loc}'(으)로 현재위치가 변경되었습니다. (거리 {dist:.1f}km - 보정값 미저장)"
-                else:
-                    user.points = (user.points or 0) + 1
-                    db.session.add(PointHistory(user_id=user.id, change_type='location_correct', amount=1, description=f'위치 수동 변경: {manual_loc}'))
-                    msg = f"'{manual_loc}'(으)로 수정되었습니다."
-                db.session.commit()
-                return jsonify({"status":"success","msg":msg})
-            return jsonify({"status":"error","msg":"읍면 리 형식으로 입력하세요"})
-        # GPS 좌표 보정 처리
-        real_lat = data.get('real_lat', type=float)
-        real_lng = data.get('real_lng', type=float)
-        if not all([gps_lat, gps_lng, real_lat, real_lng]):
-            return jsonify({"status":"error","msg":"GPS와 실제위치가 필요합니다"})
-        user.curr_offset_lat = (user.curr_offset_lat or 0) + (real_lat - gps_lat)
-        user.curr_offset_lng = (user.curr_offset_lng or 0) + (real_lng - gps_lng)
+        # JSON 또는 폼 POST 모두 지원
+        if request.is_json:
+            data = request.get_json()
+            manual_loc = data.get('manual_loc','').strip()
+            gps_lat = data.get('gps_lat', type=float) or 0
+            gps_lng = data.get('gps_lng', type=float) or 0
+        else:
+            manual_loc = request.form.get('manual_loc','').strip()
+            gps_lat = float(request.form.get('gps_lat', 0) or 0)
+            gps_lng = float(request.form.get('gps_lng', 0) or 0)
+        if not manual_loc:
+            return jsonify({"status":"error","msg":"위치를 입력하세요"})
+        # 상세주소 지오코딩
+        from services.transit import geocode_address, haversine_km
+        from config import Config
+        geo = geocode_address(manual_loc, Config.KAKAO_REST_API_KEY)
+        if geo and geo.get('lat'):
+            dist = haversine_km(gps_lat, gps_lng, geo['lat'], geo['lng']) if gps_lat else 0
+            if gps_lat and dist <= 1.0:
+                user.curr_offset_lat = (user.curr_offset_lat or 0) + (geo['lat'] - gps_lat)
+                user.curr_offset_lng = (user.curr_offset_lng or 0) + (geo['lng'] - gps_lng)
+                learn_msg = f" (GPS 오차 {dist:.2f}km 학습됨)"
+            else:
+                learn_msg = ""
+            user.curr_latitude = geo['lat']
+            user.curr_longitude = geo['lng']
+        user.curr_address = manual_loc[:200]
+        user.location_updated_at = datetime.now()
         user.points = (user.points or 0) + 1
-        db.session.add(PointHistory(user_id=user.id, change_type='location_correct', amount=1, description='GPS 위치 보정 기여'))
+        db.session.add(PointHistory(user_id=user.id, change_type='location_correct', amount=1, description=f'위치 보정: {manual_loc}'))
         db.session.commit()
-        return jsonify({"status":"success","msg":"위치 보정이 저장되었습니다. 1닢이 지급되었습니다!","point":user.points})
+        if request.is_json:
+            return jsonify({"status":"success","msg":f"'{manual_loc}'(으)로 보정되었습니다. 1닢 지급!{learn_msg}"})
+        return redirect('/user/' + str(user.id))
 
     @app.route('/message/inbox')
     def message_inbox():
