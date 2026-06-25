@@ -2665,7 +2665,7 @@ def register_routes(app):
         user = User.query.get(uid)
         if not user:
             return jsonify({"error": "not_found"}), 404
-        return jsonify({"town": user.curr_town or "", "village": user.curr_village or ""})
+        return jsonify({"town": user.curr_town or "", "village": user.curr_village or "", "address": user.curr_address or ""})
 
     @app.route('/construction/refresh')
     def construction_refresh():
