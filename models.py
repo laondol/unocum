@@ -28,6 +28,7 @@ class User(db.Model):
     curr_offset_lng = db.Column(db.Float, default=0)     # GPS 보정 오프셋
     curr_town = db.Column(db.String(50))                 # 현재 읍/면
     curr_village = db.Column(db.String(50))              # 현재 리
+    curr_address = db.Column(db.String(200))             # 현재 상세주소
     location_updated_at = db.Column(db.DateTime)         # 위치 갱신 일시
     
     is_verified_resident = db.Column(db.Boolean, default=False) # 주민 자치인증 완료 여부

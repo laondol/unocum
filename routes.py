@@ -1421,7 +1421,9 @@ def register_routes(app):
         posts = []
         curr_location = ''
         yp_towns = {'양평읍','강상면','강하면','양서면','옥천면','서종면','단월면','청운면','양동면','지평면','용문면','개군면'}
-        if user.curr_town and user.curr_town in yp_towns:
+        if user.curr_address:
+            curr_location = user.curr_address
+        elif user.curr_town and user.curr_town in yp_towns:
             curr_location = f"{user.curr_town} {user.curr_village or ''}"
         elif user.curr_latitude and user.curr_longitude:
             from services.transit import reverse_geocode
@@ -1591,6 +1593,7 @@ def register_routes(app):
             if town:
                 user.curr_town = town
                 user.curr_village = village or ''
+                user.curr_address = manual_loc.strip()[:200]
                 user.location_updated_at = datetime.now()
                 from services.transit import lookup_village_coords, haversine_km
                 coords = lookup_village_coords(town, village)
