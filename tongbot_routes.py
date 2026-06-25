@@ -98,7 +98,8 @@ def bot_tone():
     return jsonify({"success": True, "tone": tone})
 
 def _time_greeting(user):
-    h = datetime.now().hour
+    from datetime import datetime, timedelta, timezone
+    h = (datetime.now(timezone.utc) + timedelta(hours=9)).hour
     if h < 6: return "깊은 밤"
     if h < 9: return "상쾌한 아침"
     if h < 12: return "활기찬 오전"
