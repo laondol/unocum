@@ -2465,20 +2465,39 @@ def register_routes(app):
         stores = ShareReport.query.filter_by(
             town=town, village=village, status='approved'
         ).order_by(ShareReport.created_at.desc()).limit(50).all()
-        # 그룹화: 같은 이름+비슷한 위치끼리 묶기
+        # 그룹화: 이름 같고 근거리(500m이내)면 하나로
+        from services.transit import haversine_km
         grouped = {}
         for s in stores:
-            key = (s.title or '제목없음').strip()[:20]
-            lat_key = round(s.latitude or 0, 4) if s.latitude else 0
-            lng_key = round(s.longitude or 0, 4) if s.longitude else 0
-            group_key = f"{key}|{lat_key}|{lng_key}"
-            if group_key not in grouped:
-                grouped[group_key] = {"name": s.title or "제목없음", "posts": [], "image": s.image_path, "lat": s.latitude, "lng": s.longitude}
-            grouped[group_key]["posts"].append({
-                "id": s.id, "title": s.title, "desc": (s.description or "")[:100],
-                "user": s.author_name or "익명", "image": s.image_path,
-                "date": s.created_at.strftime("%m/%d") if s.created_at else ""
-            })
+            name = (s.title or '제목없음').strip()[:20]
+            slat = s.latitude or 0
+            slng = s.longitude or 0
+            # 기존 그룹 중 이름 같고 500m 이내인 그룹 찾기
+            matched_key = None
+            for gk, gv in grouped.items():
+                if gv["name"][:20] != name:
+                    continue
+                if slat and slng and gv["lat"] and gv["lng"]:
+                    d = haversine_km(float(gv["lat"]), float(gv["lng"]), slat, slng)
+                    if d <= 0.5:
+                        matched_key = gk
+                        break
+            if matched_key:
+                g = grouped[matched_key]
+                g["posts"].append({
+                    "id": s.id, "title": s.title, "desc": (s.description or "")[:100],
+                    "user": s.author_name or "익명", "image": s.image_path,
+                    "date": s.created_at.strftime("%m/%d") if s.created_at else ""
+                })
+                if s.image_path and not g["image"]:
+                    g["image"] = s.image_path
+            else:
+                key = f"{name}|{round(slat,4)}|{round(slng,4)}"
+                grouped[key] = {"name": s.title or "제목없음", "posts": [{
+                    "id": s.id, "title": s.title, "desc": (s.description or "")[:100],
+                    "user": s.author_name or "익명", "image": s.image_path,
+                    "date": s.created_at.strftime("%m/%d") if s.created_at else ""
+                }], "image": s.image_path, "lat": s.latitude, "lng": s.longitude}
         result = {
             "town": town, "village": village,
             "stores": list(grouped.values())[:20],
@@ -2496,10 +2515,21 @@ def register_routes(app):
         stores = ShareReport.query.filter_by(
             town=town, village=village, status='approved'
         ).order_by(ShareReport.created_at.desc()).all()
-        # same grouping as API: title[:20] + lat/lng
-        grouped = [s for s in stores if (s.title or '제목없음').strip()[:20] == store_name.strip()[:20]
-                   and round(s.latitude or 0,4) == round(float(target_lat),4)
-                   and round(s.longitude or 0,4) == round(float(target_lng),4)]
+        from services.transit import haversine_km
+        # 이름 같고 대상좌표 500m 이내 게시글만 모음
+        name = store_name.strip()[:20]
+        target_lat_f = float(target_lat)
+        target_lng_f = float(target_lng)
+        grouped = []
+        for s in stores:
+            if (s.title or '제목없음').strip()[:20] != name:
+                continue
+            if target_lat_f and target_lng_f and s.latitude and s.longitude:
+                d = haversine_km(target_lat_f, target_lng_f, s.latitude, s.longitude)
+                if d <= 0.5:
+                    grouped.append(s)
+            else:
+                grouped.append(s)
         if not grouped:
             grouped = [s for s in stores if (s.title or '제목없음').strip()[:20] == store_name.strip()[:20]]
         if not grouped:
