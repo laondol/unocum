@@ -1582,8 +1582,10 @@ def register_routes(app):
             return jsonify({"status":"error","msg":"GPS와 실제위치가 필요합니다"})
         user.curr_offset_lat = (user.curr_offset_lat or 0) + (real_lat - gps_lat)
         user.curr_offset_lng = (user.curr_offset_lng or 0) + (real_lng - gps_lng)
+        user.points = (user.points or 0) + 1
+        db.session.add(PointHistory(user_id=user.id, change_type='location_correct', amount=1, description='GPS 위치 보정 기여'))
         db.session.commit()
-        return jsonify({"status":"success","msg":"위치 보정이 저장되었습니다"})
+        return jsonify({"status":"success","msg":"위치 보정이 저장되었습니다. 1닢이 지급되었습니다!","point":user.points})
 
     @app.route('/message/inbox')
     def message_inbox():
