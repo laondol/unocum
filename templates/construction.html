@@ -129,6 +129,7 @@ function switchTab(type) {
     document.querySelectorAll('.notice-item').forEach(item => item.style.display='none');
     if (document.getElementById('emptyNotices')) document.getElementById('emptyNotices').style.display='none';
     if (document.getElementById('alertList')) document.getElementById('alertList').style.display='none';
+    var tl = document.getElementById('trafficLive'); if (tl) tl.style.display='none';
     if (type === 'localstore') { document.getElementById('localStoresSection').style.display=''; loadLocalStores(); }
     else if (type === 'traffic') {
         document.querySelectorAll('.notice-item').forEach(item => {
@@ -157,6 +158,7 @@ document.querySelectorAll('#infoTabs .nav-link').forEach(tab => {
         if (alertEl) alertEl.style.display = 'none';
         const alertList = document.getElementById('alertList');
         if (alertList) alertList.style.display = 'none';
+        var tl = document.getElementById('trafficLive'); if (tl) tl.style.display = 'none';
 
         switch(type) {
             case 'heritage': document.getElementById('heritageSection').style.display=''; loadHeritage(); break;
