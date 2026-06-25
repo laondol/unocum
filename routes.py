@@ -2485,6 +2485,25 @@ def register_routes(app):
         }
         return jsonify(result)
 
+    @app.route('/construction/store/<string:store_name>')
+    def construction_store_detail(store_name):
+        uid = session.get('user_id')
+        user = User.query.get(uid) if uid else None
+        town = request.args.get('town','')
+        village = request.args.get('village','')
+        stores = ShareReport.query.filter_by(
+            town=town, village=village, status='approved'
+        ).filter(ShareReport.title.ilike(f'%{store_name}%')).order_by(ShareReport.created_at.desc()).all()
+        if not stores:
+            return "가게를 찾을 수 없습니다.", 404
+        lat = round(stores[0].latitude or 0, 4)
+        lng = round(stores[0].longitude or 0, 4)
+        nearby = ShareReport.query.filter_by(town=town, village=village, status='approved').all()
+        grouped = [s for s in nearby if round(s.latitude or 0,4)==lat and round(s.longitude or 0,4)==lng]
+        if not grouped:
+            grouped = stores
+        return render_template('store_detail.html', store_name=store_name, posts=grouped, town=town, village=village)
+
     @app.route('/construction/local-scenery')
     def construction_local_scenery():
         uid = session.get('user_id')

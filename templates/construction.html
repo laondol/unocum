@@ -158,11 +158,12 @@ function showInline(type) {
             if (!d.stores||d.stores.length===0) { el.innerHTML = '<div class="text-muted text-center py-2 small">등록된 가게가 없습니다.</div>'; return; }
             var html = '<div class="row g-2">';
             d.stores.forEach(function(g){
-                html += '<div class="col-6"><div class="card"><div class="card-body p-2 text-center">';
+                var detailUrl = '/construction/store/' + encodeURIComponent(g.name) + '?town=' + encodeURIComponent(d.town) + '&village=' + encodeURIComponent(d.village);
+                html += '<div class="col-6"><a href="'+detailUrl+'" target="_blank" class="text-decoration-none"><div class="card"><div class="card-body p-2 text-center">';
                 if (g.image) html += '<img src="'+g.image+'" style="width:100%;height:100px;object-fit:cover;border-radius:8px;"><br>';
-                html += '<strong class="small">'+g.name+'</strong><br>';
+                html += '<strong class="small text-dark">'+g.name+'</strong><br>';
                 html += '<small class="text-muted">글 '+g.posts.length+'개</small>';
-                html += '</div></div></div>';
+                html += '</div></div></a></div>';
             });
             html += '</div>';
             el.innerHTML = html;
