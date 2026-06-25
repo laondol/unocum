@@ -207,10 +207,9 @@ document.querySelectorAll('#infoTabs .nav-link').forEach(tab => {
         var tl = document.getElementById('trafficLive'); if (tl) tl.style.display = 'none';
 
         switch(type) {
-            case 'heritage': document.getElementById('heritageSection').style.display=''; loadHeritage(); break;
+            case 'heritage': document.getElementById('heritageSection').style.display=''; loadHeritage(); var ic=document.getElementById('inlineContent');if(ic)ic.style.display='none'; break;
             case 'scenery': document.getElementById('scenerySection').style.display=''; loadScenery(); break;
-            case 'localstore': document.getElementById('localStoresSection').style.display=''; loadLocalStores(); break;
-            case 'home': document.getElementById('homeSection').style.display=''; loadHome(); break;
+            case 'home': document.getElementById('homeSection').style.display=''; loadHome(); var ic=document.getElementById('inlineContent');if(ic)ic.style.display='none'; break;
             case 'traffic':
                 document.querySelectorAll('.notice-item').forEach(item => {
                     const dt = item.dataset.type;
