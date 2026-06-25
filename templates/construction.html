@@ -309,7 +309,7 @@ function renderHome(data, loc) {
     html += '<div class="d-flex align-items-center gap-2 mb-2"><span class="badge bg-primary">📍 현재위치</span><small>'+dep+'</small></div>';
     html += '<div class="d-flex align-items-center gap-2 mb-3"><span class="badge bg-danger">🏠 기본주소</span><small>'+dest+'</small></div>';
     html += '<div class="small text-muted mb-2">📍 직선거리 약 '+km+'km</div>';
-    html += '<div class="d-flex gap-2 align-items-center mb-2 small"><span class="text-muted">현재위치가 다르면</span><input type="text" id="manualLoc2" class="form-control form-control-sm" style="width:130px;" placeholder="읍면 리 입력"><button class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="manualLocCorrect()">📍 보정</button></div>';
+    html += '<div class="d-flex gap-2 align-items-center mb-2 small"><span class="text-muted">현재위치가 다르면</span><input type="text" id="manualLoc2" class="form-control form-control-sm" style="width:130px;" placeholder="읍면 리 입력"><button class="btn btn-sm btn-outline-secondary py-0 px-1 loc-correct-btn">📍 보정</button></div>';
     if (data.last_transit&&data.last_transit.length>0){const lt=data.last_transit[0];const h=Math.floor(lt.total_min/60),m=lt.total_min%60;html+='<div class="p-2 bg-success bg-opacity-10 rounded mb-2"><strong>⏱ 소요시간</strong> 약 '+(h>0?h+'시간 ':'')+m+'분</div>';}
     else if(data.rough_estimate_min){const h=Math.floor(data.rough_estimate_min/60),m=data.rough_estimate_min%60;html+='<div class="alert alert-info py-2 mb-2"><strong>⏱ 예상 소요시간</strong> 약 '+(h>0?h+'시간 ':'')+m+'분 (직선거리 기반 추정)</div>';}
     html += '<hr><div class="mb-2"><label class="form-label small fw-bold">⏱ 희망 도착시간</label><div class="input-group input-group-sm"><input type="time" id="arrivalTime" class="form-control" value="21:00"><button class="btn btn-outline-secondary" onclick="calcDeparture()">계산</button></div></div><div id="departureResult" class="small mb-2"></div>';
@@ -394,8 +394,9 @@ fetch('/api/construction/unread').then(r=>r.json()).then(d=>{
 }).catch(()=>{});
 function manualLocCorrect() {
     var input = document.querySelector('#manualLoc, #manualLoc2');
-    var loc = input ? input.value.trim() : '';
-    if (!loc) return alert('위치를 입력하세요 (예: 양평읍 양근리)');
+    if (!input) { alert('입력창을 찾을 수 없습니다.'); return; }
+    var loc = input.value.trim();
+    if (!loc) { alert('위치를 입력하세요.\n예: 양평읍 양근리'); return; }
     if (!navigator.geolocation) { submitManualLoc(loc, 0, 0); return; }
     navigator.geolocation.getCurrentPosition(function(p) {
         submitManualLoc(loc, p.coords.latitude, p.coords.longitude);
