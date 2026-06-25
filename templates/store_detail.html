@@ -3,7 +3,11 @@
 <div class="container mt-4" style="max-width: 700px;">
     <a href="/construction" class="btn btn-sm btn-outline-secondary mb-3">← 위치기반안내로</a>
     <h4 class="fw-bold mb-1">{{ store_name }}</h4>
-    <p class="text-muted small mb-3">{{ town }} {{ village }}</p>
+    <p class="text-muted small mb-2">{{ town }} {{ village }}</p>
+    <div class="d-flex gap-2 mb-3">
+        {% if smartplace_url %}<a href="{{ smartplace_url }}" target="_blank" class="btn btn-sm btn-success">📍 스마트플레이스</a>{% endif %}
+        {% if naver_map %}<a href="{{ naver_map }}" target="_blank" class="btn btn-sm btn-outline-success">🗺️ 네이버 지도</a>{% endif %}
+    </div>
 
     {% if posts %}
     <div class="row g-3">

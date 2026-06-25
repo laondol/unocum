@@ -226,6 +226,7 @@ class ShareReport(db.Model):
     moderation_at = db.Column(db.DateTime)
     canonical_name = db.Column(db.String(200))
     canonical_source = db.Column(db.String(50))
+    smartplace_url = db.Column(db.String(500))
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now)
 

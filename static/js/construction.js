@@ -70,16 +70,17 @@ function showInline(type) {
                 var imgs = [];
                 g.posts.forEach(function(p){ if (p.image) imgs.push(p.image); });
                 if (!imgs.length && g.image) imgs.push(g.image);
-                html += '<div class="col-6"><a href="'+detailUrl+'" target="_blank" class="text-decoration-none"><div class="store-card">';
+                html += '<div class="col-6"><div class="store-card position-relative">';
                 if (imgs.length) {
-                    html += '<div class="store-img-scroll">';
+                    html += '<a href="'+detailUrl+'" target="_blank" class="text-decoration-none"><div class="store-img-scroll">';
                     imgs.forEach(function(img){ html += '<img src="'+img+'" class="store-img-item">'; });
-                    html += '</div>';
+                    html += '</div></a>';
                 } else {
-                    html += '<div class="store-img-placeholder">🏪</div>';
+                    html += '<a href="'+detailUrl+'" target="_blank" class="text-decoration-none"><div class="store-img-placeholder">🏪</div></a>';
                 }
-                html += '<div class="p-2 text-center"><strong class="small text-dark">'+g.name+'</strong><br><small class="text-muted">글 '+g.posts.length+'개</small></div>';
-                html += '</div></a></div>';
+                html += '<div class="p-2 text-center"><a href="'+detailUrl+'" target="_blank" class="text-decoration-none"><strong class="small text-dark">'+g.name+'</strong></a><br><small class="text-muted">글 '+g.posts.length+'개</small>';
+                if (g.smartplace_url) html += '<br><a href="'+g.smartplace_url+'" target="_blank" class="btn btn-xs btn-outline-success py-0 px-1 mt-1" style="font-size:0.65rem;">📍스마트플레이스</a>';
+                html += '</div></div></div>';
             });
             html += '</div>';
             el.innerHTML = html;

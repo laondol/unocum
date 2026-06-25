@@ -2456,63 +2456,67 @@ def register_routes(app):
         return jsonify(utic_summary())
 
     def _resolve_canonical_store_name(report):
-        """카카오+네이버 API로 가게 정식명칭 조회"""
+        """네이버 역지오코딩으로 건물명 조회 (Smartplace 대체), 실패시 카카오"""
         if not report.latitude or not report.longitude:
             return
         try:
             import requests
-            from services.transit import haversine_km
             best_name = None
             best_source = None
+            smartplace = None
 
-            # 1) 카카오 키워드 검색 (가게명 검색에 가장 적합)
-            kakao_key = current_app.config.get('KAKAO_REST_API_KEY','')
-            if kakao_key:
-                resp = requests.get('https://dapi.kakao.com/v2/local/search/keyword.json', params={
-                    'query': (report.title or '').strip()[:30],
-                    'x': str(report.longitude),
-                    'y': str(report.latitude),
-                    'radius': 1000,
-                    'size': 1
-                }, headers={'Authorization': f'KakaoAK {kakao_key}'}, timeout=3)
+            # 1) 네이버 Reverse Geocoding: 좌표 → 건물명
+            ncp_id = current_app.config.get('NAVER_SEARCH_CLIENT_ID','')
+            ncp_secret = current_app.config.get('NAVER_SEARCH_CLIENT_SECRET','')
+            if ncp_id and ncp_secret:
+                resp = requests.get('https://maps.apigw.ntruss.com/map-reversegeocode/v2/gc', params={
+                    'coords': f'{report.longitude},{report.latitude}',
+                    'orders': 'roadaddr',
+                    'output': 'json'
+                }, headers={
+                    'x-ncp-apigw-api-key-id': ncp_id,
+                    'x-ncp-apigw-api-key': ncp_secret,
+                }, timeout=3)
                 if resp.status_code == 200:
-                    docs = resp.json().get('documents', [])
-                    if docs:
-                        p = docs[0]
-                        d = haversine_km(report.latitude, report.longitude, float(p.get('y',0)), float(p.get('x',0)))
-                        if d <= 1.0:
-                            best_name = p.get('place_name','')
-                            best_source = 'kakao'
-
-            # 2) 네이버 Geocoding (주소 기반 건물명)
-            if not best_name and report.address:
-                ncp_id = current_app.config.get('NAVER_SEARCH_CLIENT_ID','')
-                ncp_secret = current_app.config.get('NAVER_SEARCH_CLIENT_SECRET','')
-                if ncp_id and ncp_secret:
-                    resp = requests.get('https://maps.apigw.ntruss.com/map-geocode/v2/geocode', params={
-                        'query': report.address[:50],
-                        'coordinate': f'{report.longitude},{report.latitude}',
-                        'count': 1
-                    }, headers={
-                        'x-ncp-apigw-api-key-id': ncp_id,
-                        'x-ncp-apigw-api-key': ncp_secret,
-                        'Accept': 'application/json'
-                    }, timeout=3)
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        addrs = data.get('addresses', [])
-                        if addrs:
-                            bldg = None
-                            for el in addrs[0].get('addressElements', []):
-                                if 'BUILDING_NAME' in el.get('types', []):
-                                    bldg = el.get('longName','')
+                    data = resp.json()
+                    for r in data.get('results', []):
+                        if r.get('name') == 'roadaddr':
+                            land = r.get('land', {})
+                            bldg = next((a.get('value','') for a in [land.get('addition0',{}), land.get('addition1',{}), land.get('addition2',{}), land.get('addition3',{}), land.get('addition4',{})] if a.get('type') == 'building'), '')
                             if bldg:
                                 best_name = bldg
                                 best_source = 'naver'
+                            # 네이버 지도 링크 생성
+                            smartplace = f'https://map.naver.com/p?c={report.longitude},{report.latitude},16,0,0,0,dh'
+                            break
+
+            # 2) 카카오 키워드 검색 (fallback)
+            if not best_name:
+                kakao_key = current_app.config.get('KAKAO_REST_API_KEY','')
+                if kakao_key:
+                    resp = requests.get('https://dapi.kakao.com/v2/local/search/keyword.json', params={
+                        'query': (report.title or '').strip()[:30],
+                        'x': str(report.longitude),
+                        'y': str(report.latitude),
+                        'radius': 1000,
+                        'size': 1
+                    }, headers={'Authorization': f'KakaoAK {kakao_key}'}, timeout=3)
+                    if resp.status_code == 200:
+                        docs = resp.json().get('documents', [])
+                        if docs:
+                            from services.transit import haversine_km
+                            p = docs[0]
+                            d = haversine_km(report.latitude, report.longitude, float(p.get('y',0)), float(p.get('x',0)))
+                            if d <= 1.0:
+                                best_name = p.get('place_name','')
+                                best_source = 'kakao'
+                                smartplace = p.get('place_url','') or f'https://map.naver.com/p?c={report.longitude},{report.latitude},16,0,0,0,dh'
 
             if best_name:
                 report.canonical_name = best_name
                 report.canonical_source = best_source
+            if smartplace:
+                report.smartplace_url = smartplace
         except:
             pass
 
@@ -2534,21 +2538,17 @@ def register_routes(app):
         stores = ShareReport.query.filter_by(
             town=town, village=village, status='approved'
         ).order_by(ShareReport.created_at.desc()).limit(50).all()
-        # 그룹화: 이름 같고 1km 이내면 하나로
+        # 그룹화: 100m 이내 같은 위치 → 하나의 가게
         from services.transit import haversine_km
         grouped = {}
         for s in stores:
-            name = _normalize_store_name(s.canonical_name or s.title)
             slat = s.latitude or 0
             slng = s.longitude or 0
-            # 기존 그룹 중 이름 같고 500m 이내인 그룹 찾기
             matched_key = None
             for gk, gv in grouped.items():
-                if gv["name"][:20] != name:
-                    continue
                 if slat and slng and gv["lat"] and gv["lng"]:
                     d = haversine_km(float(gv["lat"]), float(gv["lng"]), slat, slng)
-                    if d <= 1.0:
+                    if d <= 0.1:
                         matched_key = gk
                         break
             if matched_key:
@@ -2560,13 +2560,27 @@ def register_routes(app):
                 })
                 if s.image_path and not g["image"]:
                     g["image"] = s.image_path
+                # canonical_name이 있으면 표시명 업데이트
+                if s.canonical_name and not g.get("_has_canonical"):
+                    g["name"] = s.canonical_name
+                    g["_has_canonical"] = True
+                if s.smartplace_url and not g.get("smartplace_url"):
+                    g["smartplace_url"] = s.smartplace_url
             else:
-                key = f"{name}|{round(slat,4)}|{round(slng,4)}"
-                grouped[key] = {"name": s.canonical_name or s.title or "제목없음", "posts": [{
-                    "id": s.id, "title": s.title, "desc": (s.description or "")[:100],
-                    "user": s.author_name or "익명", "image": s.image_path,
-                    "date": s.created_at.strftime("%m/%d") if s.created_at else ""
-                }], "image": s.image_path, "lat": s.latitude, "lng": s.longitude}
+                key = f"{round(slat,4)}|{round(slng,4)}"
+                display_name = s.canonical_name or s.title or "제목없음"
+                grouped[key] = {
+                    "name": display_name,
+                    "posts": [{
+                        "id": s.id, "title": s.title, "desc": (s.description or "")[:100],
+                        "user": s.author_name or "익명", "image": s.image_path,
+                        "date": s.created_at.strftime("%m/%d") if s.created_at else ""
+                    }],
+                    "image": s.image_path,
+                    "lat": s.latitude, "lng": s.longitude,
+                    "_has_canonical": bool(s.canonical_name),
+                    "smartplace_url": s.smartplace_url
+                }
         result = {
             "town": town, "village": village,
             "stores": list(grouped.values())[:20],
@@ -2585,26 +2599,24 @@ def register_routes(app):
             town=town, village=village, status='approved'
         ).order_by(ShareReport.created_at.desc()).all()
         from services.transit import haversine_km
-        # 이름 정규화 후 비교 (공백 제거)
-        from urllib.parse import unquote
-        name = _normalize_store_name(unquote(store_name))
         target_lat_f = float(target_lat)
         target_lng_f = float(target_lng)
         grouped = []
         for s in stores:
-            if _normalize_store_name(s.canonical_name or s.title) != name:
-                continue
-            if target_lat_f and target_lng_f and s.latitude and s.longitude:
+            if s.latitude and s.longitude and target_lat_f and target_lng_f:
                 d = haversine_km(target_lat_f, target_lng_f, s.latitude, s.longitude)
-                if d <= 1.0:
+                if d <= 0.1:
                     grouped.append(s)
-            else:
-                grouped.append(s)
         if not grouped:
+            from urllib.parse import unquote
+            name = _normalize_store_name(unquote(store_name))
             grouped = [s for s in stores if _normalize_store_name(s.canonical_name or s.title) == name]
         if not grouped:
             return "가게를 찾을 수 없습니다.", 404
-        return render_template('store_detail.html', store_name=store_name, posts=grouped, town=town, village=village)
+        display_name = grouped[0].canonical_name or grouped[0].title or store_name
+        smartplace_url = next((s.smartplace_url for s in grouped if s.smartplace_url), None)
+        naver_map = f'https://map.naver.com/p?c={target_lng},{target_lat},16,0,0,0,dh' if target_lat_f and target_lng_f else None
+        return render_template('store_detail.html', store_name=display_name, posts=grouped, town=town, village=village, smartplace_url=smartplace_url, naver_map=naver_map)
 
     @app.route('/construction/local-scenery')
     def construction_local_scenery():
