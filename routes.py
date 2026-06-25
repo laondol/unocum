@@ -2491,17 +2491,19 @@ def register_routes(app):
         user = User.query.get(uid) if uid else None
         town = request.args.get('town','')
         village = request.args.get('village','')
+        target_lat = request.args.get('lat','0')
+        target_lng = request.args.get('lng','0')
         stores = ShareReport.query.filter_by(
             town=town, village=village, status='approved'
-        ).filter(ShareReport.title.ilike(f'%{store_name}%')).order_by(ShareReport.created_at.desc()).all()
-        if not stores:
-            return "가게를 찾을 수 없습니다.", 404
-        lat = round(stores[0].latitude or 0, 4)
-        lng = round(stores[0].longitude or 0, 4)
-        nearby = ShareReport.query.filter_by(town=town, village=village, status='approved').all()
-        grouped = [s for s in nearby if round(s.latitude or 0,4)==lat and round(s.longitude or 0,4)==lng]
+        ).order_by(ShareReport.created_at.desc()).all()
+        # same grouping as API: title[:20] + lat/lng
+        grouped = [s for s in stores if (s.title or '제목없음').strip()[:20] == store_name.strip()[:20]
+                   and round(s.latitude or 0,4) == round(float(target_lat),4)
+                   and round(s.longitude or 0,4) == round(float(target_lng),4)]
         if not grouped:
-            grouped = stores
+            grouped = [s for s in stores if (s.title or '제목없음').strip()[:20] == store_name.strip()[:20]]
+        if not grouped:
+            return "가게를 찾을 수 없습니다.", 404
         return render_template('store_detail.html', store_name=store_name, posts=grouped, town=town, village=village)
 
     @app.route('/construction/local-scenery')
