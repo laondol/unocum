@@ -71,7 +71,7 @@
     <div id="heritageSection" style="display:block;"><div id="heritageList"><div class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm"></span> 불러오는 중...</div></div></div>
     <div id="scenerySection" style="display:none;">
         <div class="d-flex gap-1 mb-2 flex-wrap">
-            <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('localstore')">🏪 동네가게</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="showInline('localstore')">🏪 동네가게</button>
             <button class="btn btn-sm btn-outline-secondary" onclick="showInline('traffic')">🚗 교통</button>
             <button class="btn btn-sm btn-outline-secondary" onclick="showInline('alert')">🚨 알림</button>
         </div>
@@ -132,27 +132,36 @@ function showInline(type) {
         el.innerHTML = '<div class="text-center py-2"><span class="spinner-border spinner-border-sm"></span> 교통정보 확인 중...</div>';
         fetch('/construction/traffic/gg').then(function(r){return r.json()}).then(function(d){
             if (!d.available || !d.incidents || d.incidents.length===0) {
-                el.innerHTML = '<div class="text-muted text-center py-2">현재 양평군 교통 이슈가 없습니다.</div>'; return;
+                el.innerHTML = '<div class="text-muted text-center py-2 small">현재 양평군 교통 이슈가 없습니다.</div>'; return;
             }
             var html = '<div class="small mb-1 text-muted">🕐 UTIC 실시간 (' + d.yangpyeong + '건)</div>';
             d.incidents.forEach(function(i){
                 html += '<div class="card mb-2 border-start border-3 border-danger"><div class="card-body p-2 small">';
                 html += '<span class="badge bg-danger me-1">'+i.type+'</span><strong>'+i.title+'</strong>';
                 if (i.road) html += '<br><small>🛣️ '+i.road+'</small>';
-                if (i.addr) html += ' <small>📍 '+i.addr+'</small>';
                 if (i.start) html += '<br><small>🕐 '+i.start+'</small>';
                 html += '</div></div>';
             });
-            html += '<small class="text-muted">출처: 도시교통정보센터(UTIC)</small>';
+            el.innerHTML = html;
+        });
+    } else if (type === 'localstore') {
+        el.innerHTML = '<div class="text-center py-2"><span class="spinner-border spinner-border-sm"></span> 동네가게 불러오는 중...</div>';
+        fetch('/construction/local-stores').then(r=>r.json()).then(d=>{
+            if (!d.stores||d.stores.length===0) { el.innerHTML = '<div class="text-muted text-center py-2 small">등록된 가게가 없습니다.</div>'; return; }
+            var html = '<div class="row g-2">';
+            d.stores.forEach(function(s){
+                html += '<div class="col-4"><a href=\"/share/detail/'+s.id+'\" target=\"_blank\" class=\"text-decoration-none\"><div class=\"card\"><img src=\"'+(s.image_path||'')+'\" style=\"height:80px;object-fit:cover;\" onerror=\"this.src=\\\'https://placehold.co/200x100/e9ecef/6c757d?text=No\\'\"><div class=\"p-1 small text-dark text-center\">'+s.title+'</div></div></a></div>';
+            });
+            html += '</div>';
             el.innerHTML = html;
         });
     } else if (type === 'alert') {
-        el.innerHTML = '<div class="text-center py-2"><span class="spinner-border spinner-border-sm"></span> 알림 확인 중...</div>';
-        fetch('/api/construction/unread').then(r=>r.json()).then(d=>{
-            if (d.alerts === 0) { el.innerHTML = '<div class="text-muted text-center py-2">현재 마을 알림이 없습니다.</div>'; return; }
-            var al = document.getElementById('alertList');
-            if (al) { el.innerHTML = al.innerHTML; el.style.display = ''; }
-        });
+        var alHtml = document.getElementById('alertList');
+        if (alHtml && alHtml.innerHTML.trim()) {
+            el.innerHTML = alHtml.innerHTML;
+        } else {
+            el.innerHTML = '<div class="text-muted text-center py-2 small">현재 마을 알림이 없습니다.</div>';
+        }
     }
 }
 
