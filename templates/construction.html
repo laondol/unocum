@@ -71,11 +71,12 @@
     <div id="heritageSection" style="display:block;"><div id="heritageList"><div class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm"></span> 불러오는 중...</div></div></div>
     <div id="scenerySection" style="display:none;">
         <div class="d-flex gap-1 mb-2 flex-wrap">
+            <button class="btn btn-sm btn-outline-secondary" onclick="showInline('scenery')">🌄 풍경</button>
             <button class="btn btn-sm btn-outline-secondary" onclick="showInline('localstore')">🏪 동네가게</button>
             <button class="btn btn-sm btn-outline-secondary" onclick="showInline('traffic')">🚗 교통</button>
             <button class="btn btn-sm btn-outline-secondary" onclick="showInline('alert')">🚨 알림</button>
         </div>
-        <div id="inlineContent" style="display:none;" class="mb-2"></div>
+        <div id="inlineContent" class="mb-2"></div>
         <div id="sceneryContent"><div class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm"></span> 불러오는 중...</div></div></div>
     <div id="homeSection" style="display:none;">
         <div id="homeContent"><div class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm"></span> 불러오는 중...</div></div>
@@ -128,6 +129,10 @@ function switchToHeritage() {
 function showInline(type) {
     var el = document.getElementById('inlineContent');
     el.style.display = '';
+    if (type === 'scenery') {
+        el.innerHTML = document.getElementById('sceneryContent').innerHTML;
+        return;
+    }
     if (type === 'traffic') {
         el.innerHTML = '<div class="text-center py-2"><span class="spinner-border spinner-border-sm"></span> 교통정보 확인 중...</div>';
         fetch('/construction/traffic/gg').then(function(r){return r.json()}).then(function(d){
