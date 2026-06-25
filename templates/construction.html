@@ -286,7 +286,7 @@ function renderHome(data, loc) {
         var walkMin = Math.round(km * 15);
         var walkH = Math.floor(walkMin / 60), walkM = walkMin % 60;
         var walkTime = walkH > 0 ? walkH + '시간 ' + walkM + '분' : walkM + '분';
-        html += '<div class="card border-0 shadow-sm mb-3 border-start border-4 border-success" style="border-radius:16px;"><div class="card-body p-3 text-center"><h6 class="fw-bold text-success mb-2">🚶 같은 리에서 걸어가기</h6><p class="fw-bold text-success mb-0" style="font-size:1.2rem;">약 ' + walkTime + ' 소요</p><p class="small text-muted mt-1">직선거리 ' + km + 'km · 도보 15분/km 기준</p><div class="d-flex gap-2 justify-content-center mt-2"><input type="text" id="manualLoc" class="form-control form-control-sm" style="width:150px;" placeholder="예: 양평읍 양근리"><button class="btn btn-sm btn-outline-secondary" onclick="manualLocCorrect()">📍 위치수정</button></div></div></div>';
+        html += '<div class="card border-0 shadow-sm mb-3 border-start border-4 border-success" style="border-radius:16px;"><div class="card-body p-3 text-center"><h6 class="fw-bold text-success mb-2">🚶 같은 리에서 걸어가기</h6><p class="fw-bold text-success mb-0" style="font-size:1.2rem;">약 ' + walkTime + ' 소요</p><p class="small text-muted mt-1">직선거리 ' + km + 'km · 도보 15분/km 기준</p><div class="d-flex gap-2 justify-content-center mt-2"><input type="text" id="manualLoc" class="form-control form-control-sm" style="width:150px;" placeholder="예: 양평읍 양근리"><button class="btn btn-sm btn-outline-secondary" onclick="manualLocCorrect()">📍 현재위치 보정</button></div></div></div>';
         el.innerHTML = html;
         return;
     } else if (suggestData && suggestData.optimal_departure) {
@@ -308,7 +308,7 @@ function renderHome(data, loc) {
     html += '<div class="card border-0 shadow-sm mb-3" style="border-radius:16px;"><div class="card-body p-3">';
     html += '<div class="d-flex align-items-center gap-2 mb-2"><span class="badge bg-primary">📍 현재위치</span><small>'+dep+'</small></div>';
     html += '<div class="d-flex align-items-center gap-2 mb-3"><span class="badge bg-danger">🏠 기본주소</span><small>'+dest+'</small></div>';
-    html += '<div class="small text-muted mb-2">📍 직선거리 약 '+km+'km</div>';
+    html += '<div class="d-flex gap-2 align-items-center mb-2"><span class="small text-muted">📍 직선거리 약 '+km+'km</span><div class="d-flex gap-1 ms-auto"><input type="text" id="manualLoc" class="form-control form-control-sm" style="width:130px;" placeholder="현재위치 보정"><button class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="manualLocCorrect()">📍 보정</button></div></div>';
     if (data.last_transit&&data.last_transit.length>0){const lt=data.last_transit[0];const h=Math.floor(lt.total_min/60),m=lt.total_min%60;html+='<div class="p-2 bg-success bg-opacity-10 rounded mb-2"><strong>⏱ 소요시간</strong> 약 '+(h>0?h+'시간 ':'')+m+'분</div>';}
     else if(data.rough_estimate_min){const h=Math.floor(data.rough_estimate_min/60),m=data.rough_estimate_min%60;html+='<div class="alert alert-info py-2 mb-2"><strong>⏱ 예상 소요시간</strong> 약 '+(h>0?h+'시간 ':'')+m+'분 (직선거리 기반 추정)</div>';}
     html += '<hr><div class="mb-2"><label class="form-label small fw-bold">⏱ 희망 도착시간</label><div class="input-group input-group-sm"><input type="time" id="arrivalTime" class="form-control" value="21:00"><button class="btn btn-outline-secondary" onclick="calcDeparture()">계산</button></div></div><div id="departureResult" class="small mb-2"></div>';
