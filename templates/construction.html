@@ -150,7 +150,7 @@ function showInline(type) {
             if (!d.stores||d.stores.length===0) { el.innerHTML = '<div class="text-muted text-center py-2 small">등록된 가게가 없습니다.</div>'; return; }
             var html = '<div class="row g-2">';
             d.stores.forEach(function(s){
-                html += '<div class="col-4"><a href=\"/share/detail/'+s.id+'\" target=\"_blank\" class=\"text-decoration-none\"><div class=\"card\"><img src=\"'+(s.image_path||'')+'\" style=\"height:80px;object-fit:cover;\" onerror=\"this.src=\\\'https://placehold.co/200x100/e9ecef/6c757d?text=No\\'\"><div class=\"p-1 small text-dark text-center\">'+s.title+'</div></div></a></div>';
+                html += '<div class="col-4"><a href="/share/detail/'+s.id+'" target="_blank" class="text-decoration-none"><div class="card">'+(s.image_path?'<img src="'+s.image_path+'" style="height:80px;object-fit:cover;">':'<div style="height:80px;background:#eee;">')+'<div class="p-1 small text-dark text-center">'+s.title+'</div></div></a></div>';
             });
             html += '</div>';
             el.innerHTML = html;
