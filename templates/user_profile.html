@@ -75,13 +75,13 @@
                 <span class="fw-bold small">{{ profile_user.town }} {{ profile_user.village }}</span>
                 <small class="text-muted">|</small>
                 <span class="small">{{ curr_location or '-' }}</span>
-                <button class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="showAddressEdit()" title="주소편집">✏️</button>
-                <button class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="refreshLocation()" title="현재위치 갱신">🔄</button>
-                <button class="btn btn-sm btn-outline-success py-0 px-1" onclick="neighborVerify()" title="이웃인증">🏠</button>
-                <a href="/logout" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="return confirm('로그아웃 하시겠습니까?')" title="로그아웃">🚪</a>
-                <a href="/construction?tab=home" class="btn btn-sm btn-outline-secondary py-0 px-1" title="집으로">🏠</a>
-                <a href="/construction?tab=heritage" class="btn btn-sm btn-outline-secondary py-0 px-1" title="국가유산">🏛️</a>
-                <a href="/construction?tab=scenery" class="btn btn-sm btn-outline-secondary py-0 px-1" title="풍경">🌄</a>
+                <button class="btn btn-sm btn-outline-secondary py-0 px-1" data-bs-toggle="tooltip" data-bs-title="주소편집" onclick="showAddressEdit()">✏️</button>
+                <button class="btn btn-sm btn-outline-secondary py-0 px-1" data-bs-toggle="tooltip" data-bs-title="현재위치 갱신" onclick="refreshLocation()">🔄</button>
+                <button class="btn btn-sm btn-outline-success py-0 px-1" data-bs-toggle="tooltip" data-bs-title="이웃인증" onclick="neighborVerify()">🏠</button>
+                <a href="/logout" class="btn btn-sm btn-outline-danger py-0 px-1" data-bs-toggle="tooltip" data-bs-title="로그아웃" onclick="return confirm('로그아웃 하시겠습니까?')">🚪</a>
+                <a href="/construction?tab=home" class="btn btn-sm btn-outline-secondary py-0 px-1" data-bs-toggle="tooltip" data-bs-title="집으로">🏠</a>
+                <a href="/construction?tab=heritage" class="btn btn-sm btn-outline-secondary py-0 px-1" data-bs-toggle="tooltip" data-bs-title="국가유산">🏛️</a>
+                <a href="/construction?tab=scenery" class="btn btn-sm btn-outline-secondary py-0 px-1" data-bs-toggle="tooltip" data-bs-title="풍경">🌄</a>
                 <div class="ms-auto d-flex gap-1">
                     <div class="form-check form-switch mb-0 small"><input class="form-check-input" type="checkbox" id="locationShareToggle" {{ 'checked' if profile_user.location_share }} onchange="toggleLocationShare(this.checked)"><label class="form-check-label" for="locationShareToggle">위치</label></div>
                     <div class="form-check form-switch mb-0 small"><input class="form-check-input" type="checkbox" id="villageNotifyToggle" {{ 'checked' if profile_user.village_notify != False }} onchange="toggleVillageNotify(this.checked)"><label class="form-check-label" for="villageNotifyToggle">소식</label></div>
