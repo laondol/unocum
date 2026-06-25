@@ -387,8 +387,15 @@ fetch('/api/construction/unread').then(r=>r.json()).then(d=>{
 function manualLocCorrect() {
     var loc = document.getElementById('manualLoc').value.trim();
     if (!loc) return alert('위치를 입력하세요 (예: 양평읍 양근리)');
-    fetch('/api/user/location', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({manual_loc: loc})})
-    .then(r=>r.json()).then(d=>{ if(d.status==='success') location.reload(); else alert(d.msg||'실패'); });
+    if (!navigator.geolocation) { submitManualLoc(loc, 0, 0); return; }
+    navigator.geolocation.getCurrentPosition(function(p) {
+        submitManualLoc(loc, p.coords.latitude, p.coords.longitude);
+    }, function() { submitManualLoc(loc, 0, 0); }, {enableHighAccuracy:true, timeout:5000});
+}
+
+function submitManualLoc(loc, gps_lat, gps_lng) {
+    fetch('/user/location/correct', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({manual_loc: loc, gps_lat: gps_lat, gps_lng: gps_lng})})
+    .then(r=>r.json()).then(d=>{ alert(d.msg||'수정 완료'); if(d.status==='success') location.reload(); });
 }
 </script>
 {% endblock %}

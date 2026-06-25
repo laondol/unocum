@@ -1574,8 +1574,27 @@ def register_routes(app):
             return jsonify({"status":"error","msg":"로그인 필요"}), 401
         user = User.query.get(session['user_id'])
         data = request.get_json()
+        manual_loc = data.get('manual_loc','')
         gps_lat = data.get('gps_lat', type=float)
         gps_lng = data.get('gps_lng', type=float)
+        # 수동 위치 입력 처리
+        if manual_loc:
+            parts = manual_loc.strip().split()
+            if len(parts) >= 2:
+                user.curr_town = parts[0]
+                user.curr_village = parts[1]
+                user.location_updated_at = datetime.now()
+                from services.transit import lookup_village_coords
+                coords = lookup_village_coords(parts[0], parts[1])
+                if coords and gps_lat and gps_lng:
+                    user.curr_offset_lat = (user.curr_offset_lat or 0) + (coords[0] - gps_lat)
+                    user.curr_offset_lng = (user.curr_offset_lng or 0) + (coords[1] - gps_lng)
+                user.points = (user.points or 0) + 1
+                db.session.add(PointHistory(user_id=user.id, change_type='location_correct', amount=1, description=f'위치 수동 보정: {manual_loc}'))
+                db.session.commit()
+                return jsonify({"status":"success","msg":f"'{manual_loc}'(으)로 수정되었습니다. 1닢 지급!"})
+            return jsonify({"status":"error","msg":"읍면 리 형식으로 입력하세요"})
+        # GPS 좌표 보정 처리
         real_lat = data.get('real_lat', type=float)
         real_lng = data.get('real_lng', type=float)
         if not all([gps_lat, gps_lng, real_lat, real_lng]):
