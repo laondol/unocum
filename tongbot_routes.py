@@ -1,6 +1,6 @@
 import random, string
 from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template, current_app
-from models import db, User, TongBot, TongBotDraft, TongBotSchedule, ChatRoom, ChatMessage, Message, FriendCache
+from models import db, User, TongBot, TongBotDraft, TongBotSchedule, ChatRoom, ChatMessage, Message, FriendCache, BotKnowledge
 from datetime import datetime
 import os, uuid
 
@@ -265,27 +265,49 @@ def _ai_reply(bot, user, user_msg):
 [플랫폼 안내 - 플랫폼 기능 질문시에만 참고]
 {PLATFORM_GUIDE}
 
+[통벗 지식 공유]
+다른 통벗들이 공유한 아래 지식이 있다면 참고하세요:
+{_get_shared_knowledge(user_msg)}
+
 회원: {user_msg}"""
         r = requests.post("https://api.groq.com/openai/v1/chat/completions",
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
             json={"model": "llama-3.1-8b-instant", "messages": [{"role": "user", "content": prompt}], "max_tokens": 300},
             timeout=20)
         if r.status_code == 200:
-            return f"{_m['emoji']} {r.json()['choices'][0]['message']['content']}"
+            reply = r.json()['choices'][0]['message']['content']
+            _save_knowledge(bot, user_msg, reply)
+            return f"{_m['emoji']} {reply}"
     except:
         pass
     return f"{_m['emoji']} {user.username}님, 항상 응원하고 있어요. 무엇을 도와드릴까요?"
 
-TALENT_KEYWORDS = {
-    '글쓰기': ['글','쓰기','시','소설','일기','작문','이야기'],
-    '그림': ['그림','사진','디자인','색','풍경','스케치'],
-    '요리': ['요리','음식','레시피','맛집','베이킹','반찬'],
-    '음악': ['노래','악기','음악','연주','기타','피아노'],
-    '운동': ['운동','산책','달리기','등산','자전거','수영'],
-    '기술': ['코딩','프로그램','컴퓨터','앱','개발','IT'],
-    '상담': ['고민','상담','힘들','우울','조언','도움'],
-    '봉사': ['봉사','나눔','돕다','기부','이웃','마을'],
-}
+def _get_shared_knowledge(msg):
+    try:
+        words = msg.split()[:5]
+        knowledge = BotKnowledge.query.order_by(BotKnowledge.useful_count.desc()).limit(30).all()
+        matches = []
+        for k in knowledge:
+            if any(w in (k.topic or '') for w in words):
+                matches.append(f"- {k.topic}: {k.content[:100]}")
+        return '\n'.join(matches[:3]) if matches else '없음'
+    except:
+        return '없음'
+
+def _save_knowledge(bot, user_msg, reply):
+    try:
+        if len(reply) > 30 and len(user_msg) > 10:
+            words = user_msg.split()
+            topic = ' '.join(words[:2]) if len(words) >= 2 else words[0]
+            topic = topic[:50]
+            k = BotKnowledge.query.filter_by(topic=topic).first()
+            if k:
+                k.useful_count = (k.useful_count or 0) + 1
+            else:
+                db.session.add(BotKnowledge(topic=topic, content=reply[:200], source_bot=bot.bot_name))
+            db.session.commit()
+    except:
+        pass
 
 COUNSELOR_KEYWORDS = {
     'legal': ['법','소송','계약','임금','해고','변호사','노무'],
