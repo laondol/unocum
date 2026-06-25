@@ -250,14 +250,13 @@ function loadLocalStores() {
         }).catch(() => el.innerHTML = '<div class="alert alert-danger">불러오기 실패</div>');
     }).catch(() => el.innerHTML = '<div class="alert alert-danger">사용자 정보를 불러올 수 없습니다.</div>');
 }
-
 function loadHome() {
     const el = document.getElementById('homeContent');
     el.innerHTML = '<div class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm"></span> 위치 확인 중...</div>';
     if (!navigator.geolocation) { el.innerHTML = '<div class="alert alert-warning">이 브라우저는 위치 정보를 지원하지 않습니다.</div>'; return; }
     fetch('/api/user/location').then(r=>r.json()).then(loc => {
         if (loc.error) { el.innerHTML = '<div class="alert alert-warning">로그인이 필요합니다.</div>'; return; }
-        if (!loc.village) { el.innerHTML = '<div class="alert alert-warning">등록된 주소(리)가 없습니다. 마이페이지에서 설정해 주세요.</div>'; return; }
+        if (!loc.village && !loc.address) { el.innerHTML = '<div class="alert alert-warning">등록된 주소(리)가 없습니다. 마이페이지에서 설정해 주세요.</div>'; return; }
         navigator.geolocation.getCurrentPosition(pos => {
             const lat = pos.coords.latitude, lng = pos.coords.longitude;
             el.innerHTML = '<div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> 대중교통 경로 검색 중...</div>';
@@ -266,7 +265,9 @@ function loadHome() {
                 fetch('/construction/transit/suggest?from_lat='+lat+'&from_lng='+lng).then(r=>r.json())
             ]).then(([data,suggest]) => {
                 if (data.error) { el.innerHTML = '<div class="alert alert-warning">'+data.error+'</div>'; return; }
-                transitData = data; suggestData = suggest&&!suggest.error?suggest:null; renderHome(data, loc);
+                transitData = data; suggestData = suggest&&!suggest.error?suggest:null;
+                if (loc.address) data.departure.address = loc.address;
+                renderHome(data, loc);
             }).catch(() => el.innerHTML = '<div class="alert alert-danger">경로 검색에 실패했습니다.</div>');
         }, err => {
             let msg = '위치 정보를 가져올 수 없습니다.';
