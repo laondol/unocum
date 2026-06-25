@@ -128,11 +128,14 @@ function switchToHeritage() {
 
 function showInline(type) {
     var el = document.getElementById('inlineContent');
-    el.style.display = '';
+    var sc = document.getElementById('sceneryContent');
     if (type === 'scenery') {
-        el.innerHTML = document.getElementById('sceneryContent').innerHTML;
+        el.style.display = 'none';
+        sc.style.display = '';
         return;
     }
+    el.style.display = '';
+    sc.style.display = 'none';
     if (type === 'traffic') {
         el.innerHTML = '<div class="text-center py-2"><span class="spinner-border spinner-border-sm"></span> 교통정보 확인 중...</div>';
         fetch('/construction/traffic/gg').then(function(r){return r.json()}).then(function(d){
@@ -271,7 +274,11 @@ function loadHeritage() {
 }
 
 function loadScenery() {
-    const el = document.getElementById('sceneryContent');
+    const sc = document.getElementById('sceneryContent');
+    const ic = document.getElementById('inlineContent');
+    if (ic) ic.style.display = 'none';
+    sc.style.display = '';
+    const el = sc;
     el.innerHTML = '<div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> 풍경사진 불러오는 중...</div>';
     fetch('/construction/local-scenery').then(r=>r.json()).then(data => {
         if (data.error) { el.innerHTML = '<div class="alert alert-warning">'+data.error+'</div>'; return; }
