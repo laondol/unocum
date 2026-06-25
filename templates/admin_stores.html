@@ -1,0 +1,50 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container mt-4" style="max-width: 900px;">
+    <a href="/admin" class="btn btn-sm btn-outline-secondary mb-3">← 관리메뉴</a>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="fw-bold mb-0">🏪 동네가게 관리</h4>
+        <a href="/admin/stores/new" class="btn btn-sm btn-success">+ 가게 등록</a>
+    </div>
+
+    {% if stores %}
+    <div class="table-responsive">
+    <table class="table table-sm table-hover align-middle">
+        <thead class="table-light"><tr>
+            <th>이름</th><th>위치</th><th>링크</th><th>좌표</th><th></th>
+        </tr></thead>
+        <tbody>
+        {% for s in stores %}
+        <tr>
+            <td><strong>{{ s.name }}</strong></td>
+            <td class="small">{{ s.town or '' }} {{ s.village or '' }}</td>
+            <td class="small">
+                {% if s.our_link %}<span class="badge bg-success">자체</span>{% endif %}
+                {% if s.store_homepage %}<span class="badge bg-primary">홈피</span>{% endif %}
+                {% if s.smartplace %}<span class="badge bg-info">스마트</span>{% endif %}
+                {% if not s.our_link and not s.store_homepage and not s.smartplace %}-{% endif %}
+            </td>
+            <td class="small text-muted">{{ s.latitude|round(5) }}, {{ s.longitude|round(5) }}</td>
+            <td>
+                <a href="/admin/stores/edit/{{ s.id }}" class="btn btn-sm btn-outline-secondary">✏️</a>
+                <button class="btn btn-sm btn-outline-danger" onclick="delStore({{ s.id }},'{{ s.name }}')">🗑️</button>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% else %}
+    <div class="text-center py-5 text-muted">등록된 가게가 없습니다.</div>
+    {% endif %}
+</div>
+<script>
+function delStore(id, name) {
+    if (!confirm(name + ' 가게를 삭제할까요?')) return;
+    fetch('/admin/stores/delete/' + id, {method:'POST'}).then(function(r){return r.json()}).then(function(d){
+        if(d.status==='success') location.reload();
+        else alert('실패');
+    });
+}
+</script>
+{% endblock %}

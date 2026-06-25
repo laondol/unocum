@@ -79,7 +79,7 @@ function showInline(type) {
                     html += '<a href="'+detailUrl+'" target="_blank" class="text-decoration-none"><div class="store-img-placeholder">🏪</div></a>';
                 }
                 html += '<div class="p-2 text-center"><a href="'+detailUrl+'" target="_blank" class="text-decoration-none"><strong class="small text-dark">'+g.name+'</strong></a><br><small class="text-muted">글 '+g.posts.length+'개</small>';
-                if (g.smartplace_url) html += '<br><a href="'+g.smartplace_url+'" target="_blank" class="btn btn-xs btn-outline-success py-0 px-1 mt-1" style="font-size:0.65rem;">📍스마트플레이스</a>';
+                if (g.store_link) html += '<br><a href="'+g.store_link+'" target="_blank" class="btn btn-xs btn-outline-success py-0 px-1 mt-1" style="font-size:0.65rem;">'+(g.link_label||'🔗 링크')+'</a>';
                 html += '</div></div></div>';
             });
             html += '</div>';

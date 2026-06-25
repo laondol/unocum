@@ -1,0 +1,49 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container mt-4" style="max-width: 600px;">
+    <a href="/admin/stores" class="btn btn-sm btn-outline-secondary mb-3">← 가게 목록</a>
+    <h4 class="fw-bold mb-3">{% if store %}가게 수정{% else %}가게 등록{% endif %}</h4>
+
+    <form method="POST" class="card border-0 shadow-sm p-3" style="border-radius:16px;">
+        <div class="mb-3">
+            <label class="form-label small fw-bold">🏪 가게 이름</label>
+            <input type="text" name="name" class="form-control" value="{{ store.name if store else '' }}" required>
+        </div>
+        <div class="row g-2 mb-3">
+            <div class="col-6">
+                <label class="form-label small fw-bold">위도</label>
+                <input type="text" name="latitude" class="form-control" value="{{ store.latitude if store else '' }}" placeholder="37.12345">
+            </div>
+            <div class="col-6">
+                <label class="form-label small fw-bold">경도</label>
+                <input type="text" name="longitude" class="form-control" value="{{ store.longitude if store else '' }}" placeholder="127.12345">
+            </div>
+        </div>
+        <div class="row g-2 mb-3">
+            <div class="col-6">
+                <label class="form-label small fw-bold">읍/면</label>
+                <input type="text" name="town" class="form-control" value="{{ store.town if store else '' }}" placeholder="양서면">
+            </div>
+            <div class="col-6">
+                <label class="form-label small fw-bold">리</label>
+                <input type="text" name="village" class="form-control" value="{{ store.village if store else '' }}" placeholder="양수리">
+            </div>
+        </div>
+        <hr>
+        <p class="small text-muted mb-2">🔗 링크 (우선순위: 자체소개 > 가게홈피 > 스마트플레이스, 없는 칸은 비워두세요)</p>
+        <div class="mb-2">
+            <label class="form-label small fw-bold">1순위: 자체 사이트 가게소개 링크</label>
+            <input type="url" name="our_link" class="form-control form-control-sm" value="{{ store.our_link if store else '' }}" placeholder="https://함께사는양평.com/store/...">
+        </div>
+        <div class="mb-2">
+            <label class="form-label small fw-bold">2순위: 가게 자체 홈페이지</label>
+            <input type="url" name="store_homepage" class="form-control form-control-sm" value="{{ store.store_homepage if store else '' }}" placeholder="https://...">
+        </div>
+        <div class="mb-3">
+            <label class="form-label small fw-bold">3순위: 네이버 스마트플레이스</label>
+            <input type="url" name="smartplace" class="form-control form-control-sm" value="{{ store.smartplace if store else '' }}" placeholder="https://naver.me/...">
+        </div>
+        <button type="submit" class="btn btn-success w-100">저장</button>
+    </form>
+</div>
+{% endblock %}

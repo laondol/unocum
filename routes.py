@@ -6,7 +6,7 @@ from sqlalchemy import or_
 from urllib.parse import quote
 import json, base64, os, threading, requests
 
-from models import db, User, Post, Comment, NewsArticle, NewsComment, NewsRecommendation, NewsVote, PointHistory, ShareReport, Message, ShareComment, ConstructionNotice, VillageAlert, HeritageStamp, TongBot, TongBotDraft, TongBotSchedule, ChatRoom, ChatMessage, VillageCache, LegalPost, LegalAppointment, LawyerSchedule, GoogleCalendarConfig, PsychoPost, PsychoAppointment, PsychoDoctorSchedule, PsychoGoogleCalendarConfig, RampApplication, Friend, FriendGroup, PostVote
+from models import db, User, Post, Comment, NewsArticle, NewsComment, NewsRecommendation, NewsVote, PointHistory, ShareReport, Message, ShareComment, ConstructionNotice, VillageAlert, HeritageStamp, TongBot, TongBotDraft, TongBotSchedule, ChatRoom, ChatMessage, VillageCache, LegalPost, LegalAppointment, LawyerSchedule, GoogleCalendarConfig, PsychoPost, PsychoAppointment, PsychoDoctorSchedule, PsychoGoogleCalendarConfig, RampApplication, Friend, FriendGroup, PostVote, StoreInfo
 from services.oauth import oauth
 from services.security import save_village_file
 from services.ai_service import call_ai_judge, call_ai_debate, background_ai_judge, moderate_image, background_process_share
@@ -2560,17 +2560,10 @@ def register_routes(app):
                 })
                 if s.image_path and not g["image"]:
                     g["image"] = s.image_path
-                # canonical_name이 있으면 표시명 업데이트
-                if s.canonical_name and not g.get("_has_canonical"):
-                    g["name"] = s.canonical_name
-                    g["_has_canonical"] = True
-                if s.smartplace_url and not g.get("smartplace_url"):
-                    g["smartplace_url"] = s.smartplace_url
             else:
                 key = f"{round(slat,4)}|{round(slng,4)}"
-                display_name = s.canonical_name or s.title or "제목없음"
                 grouped[key] = {
-                    "name": display_name,
+                    "name": s.title or "제목없음",
                     "posts": [{
                         "id": s.id, "title": s.title, "desc": (s.description or "")[:100],
                         "user": s.author_name or "익명", "image": s.image_path,
@@ -2578,9 +2571,18 @@ def register_routes(app):
                     }],
                     "image": s.image_path,
                     "lat": s.latitude, "lng": s.longitude,
-                    "_has_canonical": bool(s.canonical_name),
-                    "smartplace_url": s.smartplace_url
                 }
+        # StoreInfo 매칭: 각 그룹 좌표와 가장 가까운 StoreInfo(100m 이내) 찾기
+        store_infos = StoreInfo.query.filter_by(town=town, village=village).all()
+        for gk, gv in grouped.items():
+            for si in store_infos:
+                if si.latitude and si.longitude and gv["lat"] and gv["lng"]:
+                    d = haversine_km(si.latitude, si.longitude, float(gv["lat"]), float(gv["lng"]))
+                    if d <= 0.1:
+                        gv["name"] = si.name
+                        gv["store_link"] = si.our_link or si.store_homepage or si.smartplace or None
+                        gv["link_label"] = "🏠 가게소개" if si.our_link else ("🌐 홈페이지" if si.store_homepage else ("📍 스마트플레이스" if si.smartplace else None))
+                        break
         result = {
             "town": town, "village": village,
             "stores": list(grouped.values())[:20],
@@ -2613,10 +2615,23 @@ def register_routes(app):
             grouped = [s for s in stores if _normalize_store_name(s.canonical_name or s.title) == name]
         if not grouped:
             return "가게를 찾을 수 없습니다.", 404
-        display_name = grouped[0].canonical_name or grouped[0].title or store_name
-        smartplace_url = next((s.smartplace_url for s in grouped if s.smartplace_url), None)
+
+        # StoreInfo 매칭
+        store_link = None
+        link_label = None
+        display_name = store_name
+        if target_lat_f and target_lng_f:
+            sis = StoreInfo.query.filter_by(town=town, village=village).all()
+            for si in sis:
+                if si.latitude and si.longitude:
+                    if haversine_km(si.latitude, si.longitude, target_lat_f, target_lng_f) <= 0.1:
+                        display_name = si.name
+                        store_link = si.our_link or si.store_homepage or si.smartplace or None
+                        link_label = "🏠 가게소개" if si.our_link else ("🌐 홈페이지" if si.store_homepage else ("📍 스마트플레이스" if si.smartplace else None))
+                        break
+
         naver_map = f'https://map.naver.com/p?c={target_lng},{target_lat},16,0,0,0,dh' if target_lat_f and target_lng_f else None
-        return render_template('store_detail.html', store_name=display_name, posts=grouped, town=town, village=village, smartplace_url=smartplace_url, naver_map=naver_map)
+        return render_template('store_detail.html', store_name=display_name, posts=grouped, town=town, village=village, store_link=store_link, link_label=link_label, naver_map=naver_map)
 
     @app.route('/construction/local-scenery')
     def construction_local_scenery():
@@ -2658,6 +2673,61 @@ def register_routes(app):
                 "created_at": s.created_at.strftime("%Y-%m-%d") if s.created_at else "",
             } for s in scenery[:30]],
         })
+
+    # ---- 동네가게 관리 (Admin) ----
+    @app.route('/admin/stores')
+    def admin_stores():
+        if session.get('role') not in ('admin','leader'):
+            return "권한 없음", 403
+        stores = StoreInfo.query.order_by(StoreInfo.town, StoreInfo.name).all()
+        return render_template('admin_stores.html', stores=stores)
+
+    @app.route('/admin/stores/new', methods=['GET','POST'])
+    def admin_stores_new():
+        if session.get('role') not in ('admin','leader'):
+            return "권한 없음", 403
+        if request.method == 'POST':
+            s = StoreInfo(
+                name=request.form.get('name','').strip(),
+                latitude=float(request.form.get('latitude',0) or 0),
+                longitude=float(request.form.get('longitude',0) or 0),
+                town=request.form.get('town','').strip(),
+                village=request.form.get('village','').strip(),
+                our_link=request.form.get('our_link','').strip(),
+                store_homepage=request.form.get('store_homepage','').strip(),
+                smartplace=request.form.get('smartplace','').strip(),
+            )
+            db.session.add(s)
+            db.session.commit()
+            return redirect('/admin/stores')
+        return render_template('admin_store_edit.html', store=None)
+
+    @app.route('/admin/stores/edit/<int:store_id>', methods=['GET','POST'])
+    def admin_stores_edit(store_id):
+        if session.get('role') not in ('admin','leader'):
+            return "권한 없음", 403
+        s = StoreInfo.query.get_or_404(store_id)
+        if request.method == 'POST':
+            s.name = request.form.get('name','').strip()
+            s.latitude = float(request.form.get('latitude',0) or 0)
+            s.longitude = float(request.form.get('longitude',0) or 0)
+            s.town = request.form.get('town','').strip()
+            s.village = request.form.get('village','').strip()
+            s.our_link = request.form.get('our_link','').strip()
+            s.store_homepage = request.form.get('store_homepage','').strip()
+            s.smartplace = request.form.get('smartplace','').strip()
+            db.session.commit()
+            return redirect('/admin/stores')
+        return render_template('admin_store_edit.html', store=s)
+
+    @app.route('/admin/stores/delete/<int:store_id>', methods=['POST'])
+    def admin_stores_delete(store_id):
+        if session.get('role') not in ('admin','leader'):
+            return jsonify({"status":"error"}), 403
+        s = StoreInfo.query.get_or_404(store_id)
+        db.session.delete(s)
+        db.session.commit()
+        return jsonify({"status":"success"})
 
     @app.route('/admin/alerts')
     def admin_alerts():

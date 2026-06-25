@@ -230,6 +230,20 @@ class ShareReport(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now)
 
+class StoreInfo(db.Model):
+    """관리자 등록 동네가게 정보"""
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    latitude = db.Column(db.Float)
+    longitude = db.Column(db.Float)
+    town = db.Column(db.String(50))
+    village = db.Column(db.String(50))
+    # 링크 3종 (우선순위: our_link > store_homepage > smartplace)
+    our_link = db.Column(db.String(500))     # 자체 사이트 내 가게소개 링크
+    store_homepage = db.Column(db.String(500))  # 가게 자체 홈페이지
+    smartplace = db.Column(db.String(500))      # 네이버 스마트플레이스
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
 class ConstructionNotice(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(300), nullable=False)
