@@ -2456,33 +2456,63 @@ def register_routes(app):
         return jsonify(utic_summary())
 
     def _resolve_canonical_store_name(report):
-        """카카오 키워드 검색으로 가게 정식명칭 조회"""
+        """카카오+네이버 API로 가게 정식명칭 조회"""
         if not report.latitude or not report.longitude:
             return
         try:
             import requests
+            from services.transit import haversine_km
+            best_name = None
+            best_source = None
+
+            # 1) 카카오 키워드 검색 (가게명 검색에 가장 적합)
             kakao_key = current_app.config.get('KAKAO_REST_API_KEY','')
-            if not kakao_key:
-                return
-            # 카카오 키워드 검색: query=가게명, 반경 1km
-            resp = requests.get('https://dapi.kakao.com/v2/local/search/keyword.json', params={
-                'query': (report.title or '').strip()[:30],
-                'x': str(report.longitude),
-                'y': str(report.latitude),
-                'radius': 1000,
-                'size': 1
-            }, headers={'Authorization': f'KakaoAK {kakao_key}'}, timeout=3)
-            if resp.status_code == 200:
-                data = resp.json()
-                docs = data.get('documents', [])
-                if docs:
-                    place = docs[0]
-                    # 같은 가게인지 확인: 거리 500m 이내
-                    from services.transit import haversine_km
-                    d = haversine_km(report.latitude, report.longitude, float(place.get('y',0)), float(place.get('x',0)))
-                    if d <= 1.0:
-                        report.canonical_name = place.get('place_name','')
-                        report.canonical_source = 'kakao'
+            if kakao_key:
+                resp = requests.get('https://dapi.kakao.com/v2/local/search/keyword.json', params={
+                    'query': (report.title or '').strip()[:30],
+                    'x': str(report.longitude),
+                    'y': str(report.latitude),
+                    'radius': 1000,
+                    'size': 1
+                }, headers={'Authorization': f'KakaoAK {kakao_key}'}, timeout=3)
+                if resp.status_code == 200:
+                    docs = resp.json().get('documents', [])
+                    if docs:
+                        p = docs[0]
+                        d = haversine_km(report.latitude, report.longitude, float(p.get('y',0)), float(p.get('x',0)))
+                        if d <= 1.0:
+                            best_name = p.get('place_name','')
+                            best_source = 'kakao'
+
+            # 2) 네이버 Geocoding (주소 기반 건물명)
+            if not best_name and report.address:
+                ncp_id = current_app.config.get('NAVER_SEARCH_CLIENT_ID','')
+                ncp_secret = current_app.config.get('NAVER_SEARCH_CLIENT_SECRET','')
+                if ncp_id and ncp_secret:
+                    resp = requests.get('https://maps.apigw.ntruss.com/map-geocode/v2/geocode', params={
+                        'query': report.address[:50],
+                        'coordinate': f'{report.longitude},{report.latitude}',
+                        'count': 1
+                    }, headers={
+                        'x-ncp-apigw-api-key-id': ncp_id,
+                        'x-ncp-apigw-api-key': ncp_secret,
+                        'Accept': 'application/json'
+                    }, timeout=3)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        addrs = data.get('addresses', [])
+                        if addrs:
+                            bldg = None
+                            for el in addrs[0].get('addressElements', []):
+                                if 'BUILDING_NAME' in el.get('types', []):
+                                    bldg = el.get('longName','')
+                            if bldg:
+                                best_name = bldg
+                                best_source = 'naver'
+
+            if best_name:
+                report.canonical_name = best_name
+                report.canonical_source = best_source
         except:
             pass
 
