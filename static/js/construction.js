@@ -72,14 +72,14 @@ function showInline(type) {
                 if (!imgs.length && g.image) imgs.push(g.image);
                 html += '<div class="col-6"><div class="store-card position-relative">';
                 if (imgs.length) {
-                    html += '<a href="'+detailUrl+'" target="_blank" class="text-decoration-none"><div class="store-img-scroll">';
+                    html += '<a href="'+detailUrl+'" class="text-decoration-none"><div class="store-img-scroll">';
                     imgs.forEach(function(img){ html += '<img src="'+img+'" class="store-img-item">'; });
                     html += '</div></a>';
                 } else {
-                    html += '<a href="'+detailUrl+'" target="_blank" class="text-decoration-none"><div class="store-img-placeholder">🏪</div></a>';
+                    html += '<a href="'+detailUrl+'" class="text-decoration-none"><div class="store-img-placeholder">🏪</div></a>';
                 }
-                html += '<div class="p-2 text-center"><a href="'+detailUrl+'" target="_blank" class="text-decoration-none"><strong class="small text-dark">'+g.name+'</strong></a><br><small class="text-muted">글 '+g.posts.length+'개</small>';
-                if (g.store_link) html += '<br><a href="'+g.store_link+'" target="_blank" class="btn btn-xs btn-outline-success py-0 px-1 mt-1" style="font-size:0.65rem;">'+(g.link_label||'🔗 링크')+'</a>';
+                html += '<div class="p-2 text-center"><a href="'+detailUrl+'" class="text-decoration-none"><strong class="small text-dark">'+g.name+'</strong></a><br><small class="text-muted">글 '+g.posts.length+'개</small>';
+                if (g.store_link) html += '<br><a href="'+g.store_link+'" class="btn btn-xs btn-outline-success py-0 px-1 mt-1" style="font-size:0.65rem;">'+(g.link_label||'🔗 링크')+'</a>';
                 html += '</div></div></div>';
             });
             html += '</div>';
