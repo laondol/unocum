@@ -2527,7 +2527,7 @@ def register_routes(app):
                     g["image"] = s.image_path
             else:
                 key = f"{name}|{round(slat,4)}|{round(slng,4)}"
-                grouped[key] = {"name": s.title or "제목없음", "posts": [{
+                grouped[key] = {"name": s.canonical_name or s.title or "제목없음", "posts": [{
                     "id": s.id, "title": s.title, "desc": (s.description or "")[:100],
                     "user": s.author_name or "익명", "image": s.image_path,
                     "date": s.created_at.strftime("%m/%d") if s.created_at else ""
