@@ -87,16 +87,6 @@
                     <div class="form-check form-switch mb-0 small"><input class="form-check-input" type="checkbox" id="villageNotifyToggle" {{ 'checked' if profile_user.village_notify != False }} onchange="toggleVillageNotify(this.checked)"><label class="form-check-label" for="villageNotifyToggle">소식</label></div>
                 </div>
             </div>
-            <div class="mt-2">
-                <form method="POST" action="/user/location/correct" onsubmit="this.querySelector('button').disabled=true">
-                    <input type="hidden" name="gps_lat" value="{{ profile_user.curr_latitude or 0 }}">
-                    <input type="hidden" name="gps_lng" value="{{ profile_user.curr_longitude or 0 }}">
-                    <div class="input-group input-group-sm">
-                        <input type="text" name="manual_loc" class="form-control" placeholder="상세주소 입력 (예: 양수리 935)" required>
-                        <button class="btn btn-outline-secondary" type="submit">📍 보정</button>
-                    </div>
-                </form>
-            </div>
             <div id="addressEditForm" class="mt-2 p-2 bg-light rounded" style="display:none;">
                 <form id="addressForm" onsubmit="updateAddress(event)" class="row g-1">
                     <div class="col-5"><select name="town" class="form-select form-select-sm" id="editTown" required onchange="updateVillageOptions(this.value)"><option value="">읍/면</option>{% for t in ['양평읍','강상면','강하면','양서면','옥천면','서종면','단월면','청운면','양동면','지평면','용문면','개군면','관외'] %}<option value="{{ t }}" {{ 'selected' if profile_user.town == t }}>{{ t }}</option>{% endfor %}</select></div>
