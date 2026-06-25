@@ -21,6 +21,7 @@
         .dropdown-header-custom { font-size: 0.7rem; font-weight: 700; color: var(--yp-green); text-transform: uppercase; letter-spacing: 1px; padding: 6px 16px 2px; }
         .nav-separator { width: 1px; height: 24px; background: #ddd; margin: 0 8px; }
     </style>
+    {% block head %}{% endblock %}
 </head>
 <body>
 
@@ -283,5 +284,6 @@
         [].slice.call(document.querySelectorAll('[data-bs-toggle=\"tooltip\"]')).forEach(function(e){new bootstrap.Tooltip(e)});
     });
     </script>
+    {% block scripts %}{% endblock %}
 </body>
 </html>
