@@ -187,7 +187,7 @@ def create_app():
             else:
                 # 기존 테이블에 누락 컬럼 추가
                 with db.engine.connect() as conn:
-                    for col in ['video_path', 'address', 'admin_score', 'leader_score', 'member_score', 'total_score', 'is_moderated', 'moderation_result', 'moderation_reason', 'moderation_at']:
+                    for col in ['video_path', 'address', 'admin_score', 'leader_score', 'member_score', 'total_score', 'is_moderated', 'moderation_result', 'moderation_reason', 'moderation_at', 'canonical_name', 'canonical_source']:
                         if col not in sr_cols:
                             if col in ('admin_score', 'leader_score', 'member_score', 'total_score'):
                                 conn.execute(db.text(f'ALTER TABLE share_report ADD COLUMN {col} INTEGER DEFAULT 0'))
@@ -201,6 +201,10 @@ def create_app():
                                 conn.execute(db.text(f'ALTER TABLE share_report ADD COLUMN {col} TEXT'))
                             elif col in ('moderation_at',):
                                 conn.execute(db.text(f'ALTER TABLE share_report ADD COLUMN {col} DATETIME'))
+                            elif col in ('canonical_name',):
+                                conn.execute(db.text(f'ALTER TABLE share_report ADD COLUMN {col} VARCHAR(200)'))
+                            elif col in ('canonical_source',):
+                                conn.execute(db.text(f'ALTER TABLE share_report ADD COLUMN {col} VARCHAR(50)'))
                             print(f'[OK] share_report.{col} column added')
                     # user_id nullable 변경 (기존 NOT NULL → NULL 허용)
                     # SQLite는 ALTER COLUMN을 지원하지 않으므로 스킵

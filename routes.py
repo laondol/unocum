@@ -1798,6 +1798,7 @@ def register_routes(app):
                 report.moderation_reason = '동영상은 승인 후 공개됩니다'
             else:
                 report.status = 'approved'
+                _resolve_canonical_store_name(report)
                 # 실시간 이미지 검사
                 if image_path:
                     try:
@@ -2033,6 +2034,7 @@ def register_routes(app):
         report = ShareReport.query.get_or_404(report_id)
         if action == 'approve':
             report.status = 'approved'
+            _resolve_canonical_store_name(report)
             report.updated_at = datetime.now()
         elif action == 'reject':
             report.status = 'rejected'
@@ -2090,6 +2092,7 @@ def register_routes(app):
             return "<script>alert('현재 상태에서 동의할 수 없습니다.'); location.href='/main';</script>"
         report.moderation_result = 'person_accepted'
         report.status = 'approved'
+        _resolve_canonical_store_name(report)
         report.moderation_reason = (report.moderation_reason or '') + ' | 회원 책임 동의함'
         db.session.commit()
         return "<script>alert('✅ 책임 동의가 완료되었습니다. 공유글이 게시되었습니다.'); location.href='/share/detail/"+str(report_id)+"';</script>"
@@ -2452,6 +2455,37 @@ def register_routes(app):
         from services.utic_traffic import traffic_summary as utic_summary
         return jsonify(utic_summary())
 
+    def _resolve_canonical_store_name(report):
+        """카카오 키워드 검색으로 가게 정식명칭 조회"""
+        if not report.latitude or not report.longitude:
+            return
+        try:
+            import requests
+            kakao_key = current_app.config.get('KAKAO_REST_API_KEY','')
+            if not kakao_key:
+                return
+            # 카카오 키워드 검색: query=가게명, 반경 1km
+            resp = requests.get('https://dapi.kakao.com/v2/local/search/keyword.json', params={
+                'query': (report.title or '').strip()[:30],
+                'x': str(report.longitude),
+                'y': str(report.latitude),
+                'radius': 1000,
+                'size': 1
+            }, headers={'Authorization': f'KakaoAK {kakao_key}'}, timeout=3)
+            if resp.status_code == 200:
+                data = resp.json()
+                docs = data.get('documents', [])
+                if docs:
+                    place = docs[0]
+                    # 같은 가게인지 확인: 거리 500m 이내
+                    from services.transit import haversine_km
+                    d = haversine_km(report.latitude, report.longitude, float(place.get('y',0)), float(place.get('x',0)))
+                    if d <= 1.0:
+                        report.canonical_name = place.get('place_name','')
+                        report.canonical_source = 'kakao'
+        except:
+            pass
+
     @app.route('/construction/local-stores')
     def construction_local_stores():
         uid = session.get('user_id')
@@ -2465,11 +2499,11 @@ def register_routes(app):
         stores = ShareReport.query.filter_by(
             town=town, village=village, status='approved'
         ).order_by(ShareReport.created_at.desc()).limit(50).all()
-        # 그룹화: 이름 같고 근거리(500m이내)면 하나로
+        # 그룹화: 이름 같고 1km 이내면 하나로
         from services.transit import haversine_km
         grouped = {}
         for s in stores:
-            name = (s.title or '제목없음').strip()[:20]
+            name = (s.canonical_name or s.title or '제목없음').strip()[:20]
             slat = s.latitude or 0
             slng = s.longitude or 0
             # 기존 그룹 중 이름 같고 500m 이내인 그룹 찾기
@@ -2479,7 +2513,7 @@ def register_routes(app):
                     continue
                 if slat and slng and gv["lat"] and gv["lng"]:
                     d = haversine_km(float(gv["lat"]), float(gv["lng"]), slat, slng)
-                    if d <= 0.5:
+                    if d <= 1.0:
                         matched_key = gk
                         break
             if matched_key:
@@ -2522,16 +2556,16 @@ def register_routes(app):
         target_lng_f = float(target_lng)
         grouped = []
         for s in stores:
-            if (s.title or '제목없음').strip()[:20] != name:
+            if (s.canonical_name or s.title or '제목없음').strip()[:20] != name:
                 continue
             if target_lat_f and target_lng_f and s.latitude and s.longitude:
                 d = haversine_km(target_lat_f, target_lng_f, s.latitude, s.longitude)
-                if d <= 0.5:
+                if d <= 1.0:
                     grouped.append(s)
             else:
                 grouped.append(s)
         if not grouped:
-            grouped = [s for s in stores if (s.title or '제목없음').strip()[:20] == store_name.strip()[:20]]
+            grouped = [s for s in stores if (s.canonical_name or s.title or '제목없음').strip()[:20] == store_name.strip()[:20]]
         if not grouped:
             return "가게를 찾을 수 없습니다.", 404
         return render_template('store_detail.html', store_name=store_name, posts=grouped, town=town, village=village)
