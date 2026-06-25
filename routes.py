@@ -1608,6 +1608,9 @@ def register_routes(app):
         db.session.commit()
         if request.is_json:
             return jsonify({"status":"success","msg":f"'{manual_loc}'(으)로 보정되었습니다. 1닢 지급!{learn_msg}"})
+        back = request.args.get('back','')
+        if back == 'construction':
+            return redirect('/construction?tab=home')
         return redirect('/user/' + str(user.id))
 
     @app.route('/message/inbox')
