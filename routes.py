@@ -2516,6 +2516,11 @@ def register_routes(app):
         except:
             pass
 
+    def _normalize_store_name(title):
+        """이름 정규화: 공백+특수문자 제거, 앞20자"""
+        import re
+        return re.sub(r'[\s\-_.,·]+', '', (title or '제목없음'))[:20]
+
     @app.route('/construction/local-stores')
     def construction_local_stores():
         uid = session.get('user_id')
@@ -2533,7 +2538,7 @@ def register_routes(app):
         from services.transit import haversine_km
         grouped = {}
         for s in stores:
-            name = (s.canonical_name or s.title or '제목없음').strip()[:20]
+            name = _normalize_store_name(s.canonical_name or s.title)
             slat = s.latitude or 0
             slng = s.longitude or 0
             # 기존 그룹 중 이름 같고 500m 이내인 그룹 찾기
@@ -2580,13 +2585,14 @@ def register_routes(app):
             town=town, village=village, status='approved'
         ).order_by(ShareReport.created_at.desc()).all()
         from services.transit import haversine_km
-        # 이름 같고 대상좌표 500m 이내 게시글만 모음
-        name = store_name.strip()[:20]
+        # 이름 정규화 후 비교 (공백 제거)
+        from urllib.parse import unquote
+        name = _normalize_store_name(unquote(store_name))
         target_lat_f = float(target_lat)
         target_lng_f = float(target_lng)
         grouped = []
         for s in stores:
-            if (s.canonical_name or s.title or '제목없음').strip()[:20] != name:
+            if _normalize_store_name(s.canonical_name or s.title) != name:
                 continue
             if target_lat_f and target_lng_f and s.latitude and s.longitude:
                 d = haversine_km(target_lat_f, target_lng_f, s.latitude, s.longitude)
@@ -2595,7 +2601,7 @@ def register_routes(app):
             else:
                 grouped.append(s)
         if not grouped:
-            grouped = [s for s in stores if (s.canonical_name or s.title or '제목없음').strip()[:20] == store_name.strip()[:20]]
+            grouped = [s for s in stores if _normalize_store_name(s.canonical_name or s.title) == name]
         if not grouped:
             return "가게를 찾을 수 없습니다.", 404
         return render_template('store_detail.html', store_name=store_name, posts=grouped, town=town, village=village)
