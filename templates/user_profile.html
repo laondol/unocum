@@ -75,10 +75,10 @@
                 <span class="fw-bold small">{{ profile_user.town }} {{ profile_user.village }}</span>
                 <small class="text-muted">|</small>
                 <span class="small">{{ curr_location or '-' }}</span>
-                <button class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="showAddressEdit()">✏️</button>
+                <button class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="showAddressEdit()" title="주소편집">✏️</button>
                 <button class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="refreshLocation()" title="현재위치 갱신">🔄</button>
-                <button class="btn btn-sm btn-outline-success py-0 px-1" onclick="neighborVerify()">🏠</button>
-                <a href="/logout" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="return confirm('로그아웃 하시겠습니까?')">🚪</a>
+                <button class="btn btn-sm btn-outline-success py-0 px-1" onclick="neighborVerify()" title="이웃인증">🏠</button>
+                <a href="/logout" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="return confirm('로그아웃 하시겠습니까?')" title="로그아웃">🚪</a>
                 <a href="/construction?tab=home" class="btn btn-sm btn-outline-secondary py-0 px-1" title="집으로">🏠</a>
                 <a href="/construction?tab=heritage" class="btn btn-sm btn-outline-secondary py-0 px-1" title="국가유산">🏛️</a>
                 <a href="/construction?tab=scenery" class="btn btn-sm btn-outline-secondary py-0 px-1" title="풍경">🌄</a>
