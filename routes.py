@@ -1527,6 +1527,9 @@ def register_routes(app):
         lon = float(data.get('lon', 0))
         if not lat or not lon:
             return jsonify({"status": "error", "msg": "GPS 위치가 필요합니다."}), 400
+        # GPS 보정 오프셋 적용
+        lat += (user.curr_offset_lat or 0)
+        lon += (user.curr_offset_lng or 0)
         town, village = gps_to_town_village(lat, lon)
         user.curr_latitude = lat
         user.curr_longitude = lon
@@ -1564,6 +1567,23 @@ def register_routes(app):
         user.village_notify = val
         db.session.commit()
         return jsonify({"status":"success"})
+
+    @app.route('/user/location/correct', methods=['POST'])
+    def user_location_correct():
+        if not session.get('username'):
+            return jsonify({"status":"error","msg":"로그인 필요"}), 401
+        user = User.query.get(session['user_id'])
+        data = request.get_json()
+        gps_lat = data.get('gps_lat', type=float)
+        gps_lng = data.get('gps_lng', type=float)
+        real_lat = data.get('real_lat', type=float)
+        real_lng = data.get('real_lng', type=float)
+        if not all([gps_lat, gps_lng, real_lat, real_lng]):
+            return jsonify({"status":"error","msg":"GPS와 실제위치가 필요합니다"})
+        user.curr_offset_lat = (user.curr_offset_lat or 0) + (real_lat - gps_lat)
+        user.curr_offset_lng = (user.curr_offset_lng or 0) + (real_lng - gps_lng)
+        db.session.commit()
+        return jsonify({"status":"success","msg":"위치 보정이 저장되었습니다"})
 
     @app.route('/message/inbox')
     def message_inbox():

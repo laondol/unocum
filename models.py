@@ -24,6 +24,8 @@ class User(db.Model):
     # 현재 위치 (갱신용)
     curr_latitude = db.Column(db.Float)                  # 현재 위도
     curr_longitude = db.Column(db.Float)                 # 현재 경도
+    curr_offset_lat = db.Column(db.Float, default=0)     # GPS 보정 오프셋
+    curr_offset_lng = db.Column(db.Float, default=0)     # GPS 보정 오프셋
     curr_town = db.Column(db.String(50))                 # 현재 읍/면
     curr_village = db.Column(db.String(50))              # 현재 리
     location_updated_at = db.Column(db.DateTime)         # 위치 갱신 일시
