@@ -1590,9 +1590,13 @@ def register_routes(app):
             if not town:
                 for t in YT:
                     if t in manual_loc: town = t; break
-            if town:
-                user.curr_town = town
-                user.curr_village = village or ''
+            if not town and not village:
+                town = user.curr_town or ''
+                village = user.curr_village or ''
+            if True:
+                if town:
+                    user.curr_town = town
+                    user.curr_village = village or ''
                 user.curr_address = manual_loc.strip()[:200]
                 user.location_updated_at = datetime.now()
                 from services.transit import lookup_village_coords, haversine_km
