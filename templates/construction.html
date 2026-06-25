@@ -286,7 +286,7 @@ function renderHome(data, loc) {
         var walkMin = Math.round(km * 15);
         var walkH = Math.floor(walkMin / 60), walkM = walkMin % 60;
         var walkTime = walkH > 0 ? walkH + '시간 ' + walkM + '분' : walkM + '분';
-        html += '<div class="card border-0 shadow-sm mb-3 border-start border-4 border-success" style="border-radius:16px;"><div class="card-body p-3 text-center"><h6 class="fw-bold text-success mb-2">🚶 같은 리에서 걸어가기</h6><p class="fw-bold text-success mb-0" style="font-size:1.2rem;">약 ' + walkTime + ' 소요</p><p class="small text-muted mt-1">직선거리 ' + km + 'km · 도보 15분/km 기준</p><p class="small mb-1">📍 현재위치: <strong>' + dep + '</strong></p><p class="small mb-2">🏠 기본주소: <strong>' + dest + '</strong></p><div class="d-flex gap-2 justify-content-center"><input type="text" id="manualLoc" class="form-control form-control-sm" style="width:150px;" placeholder="현재위치가 다르면 입력"><button class="btn btn-sm btn-outline-secondary" onclick="manualLocCorrect()">📍 보정</button></div></div></div>';
+        html += '<div class="card border-0 shadow-sm mb-3 border-start border-4 border-success" style="border-radius:16px;"><div class="card-body p-3 text-center"><h6 class="fw-bold text-success mb-2">🚶 같은 리에서 걸어가기</h6><p class="fw-bold text-success mb-0" style="font-size:1.2rem;">약 ' + walkTime + ' 소요</p><p class="small text-muted mt-1">직선거리 ' + km + 'km · 도보 15분/km 기준</p><p class="small mb-1">📍 현재위치: <strong>' + dep + '</strong></p><p class="small mb-2">🏠 기본주소: <strong>' + dest + '</strong></p><div class="d-flex gap-2 justify-content-center"><input type="text" id="manualLoc" class="form-control form-control-sm" style="width:150px;" placeholder="현재위치가 다르면 입력"><button class="btn btn-sm btn-outline-secondary loc-correct-btn">📍 보정</button></div></div></div>';
         el.innerHTML = html;
         return;
     } else if (suggestData && suggestData.optimal_departure) {
@@ -373,6 +373,13 @@ if (emptyE) emptyE.style.display = 'none';
 const al = document.getElementById('alertList');
 if (al) al.style.display = 'none';
 document.querySelectorAll('.notice-item').forEach(item => item.style.display = 'none');
+// 보정 버튼 이벤트 위임
+document.addEventListener('click', function(e) {
+    if (e.target.closest('.loc-correct-btn')) {
+        e.preventDefault();
+        manualLocCorrect();
+    }
+});
 var params = new URLSearchParams(window.location.search);
 var tab = params.get('tab');
 if (tab) {
