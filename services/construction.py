@@ -132,11 +132,18 @@ def sync_building_permits(app, api_key):
             if resp.status_code == 200:
                 data = resp.json()
                 items = data.get('Buildstrcontr', [])
-                if isinstance(items, dict):
-                    items = items.get('row', [])
-                if not isinstance(items, list):
-                    items = []
-                for row in items:
+                # items는 [{head:...}, {row:[...]}] 구조
+                rows = []
+                if isinstance(items, list):
+                    for part in items:
+                        if isinstance(part, dict) and 'row' in part:
+                            rows = part['row']
+                            break
+                elif isinstance(items, dict):
+                    rows = items.get('row', [])
+                if not isinstance(rows, list):
+                    rows = []
+                for row in rows:
                     sigun = row.get('SIGUN_NM', '')
                     if '양평' not in sigun:
                         continue
