@@ -2436,7 +2436,13 @@ def register_routes(app):
         gps_town = gps_result[0] if gps_result else ""
         gps_village = gps_result[1] if gps_result else ""
         same_village = bool(gps_town and gps_town == home_town and gps_village == home_village)
-        if same_village:
+        # 거리 기반: 500m 이내도 집으로 판정
+        near_home = False
+        if not same_village and user.curr_latitude and user.curr_longitude:
+            d = haversine_km(from_lat, from_lng, user.curr_latitude, user.curr_longitude)
+            near_home = d <= 0.5
+        if same_village or near_home:
+            msg = f"🏠 집입니다! 현재 위치가 등록된 주소({home_town} {home_village}) 근처입니다."
             return jsonify({
                 "already_home": True,
                 "message": f"현재 위치가 등록된 주소({home_town} {home_village})와 동일합니다. 막차 안내가 필요하지 않습니다.",
