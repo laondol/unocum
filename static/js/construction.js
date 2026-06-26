@@ -405,11 +405,12 @@ function submitManualLoc(loc, gps_lat, gps_lng) {
 // ---- 초기화 ----
 
 (function init(){
+    // notices 있으면 empty 메시지 숨김
+    var notices = document.querySelectorAll('.notice-item');
     var emptyE = document.getElementById('emptyNotices');
-    if (emptyE) emptyE.style.display = 'none';
+    if (emptyE && notices.length > 0) emptyE.style.display = 'none';
     var al = document.getElementById('alertList');
     if (al) al.style.display = 'none';
-    document.querySelectorAll('.notice-item').forEach(function(item){ item.style.display = 'none'; });
 
     var params = new URLSearchParams(window.location.search);
     var tab = params.get('tab');
