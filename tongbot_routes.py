@@ -152,6 +152,30 @@ def bot_chat():
 
     # 일정 의도 감지 → 일정 특화 AI로 처리
     schedule_info = None
+    shopping_info = None
+
+    # 쇼핑 의도 감지
+    if any(kw in msg for kw in SHOPPING_TRIGGERS):
+        keyword = msg
+        for kw in ['가격','얼마','사고','구매','쇼핑','파는','싼','비싼','최저','추천']:
+            keyword = keyword.replace(kw, '')
+        keyword = keyword.strip()[:30]
+        if len(keyword) >= 2:
+            shop = _search_shopping(keyword)
+            if shop:
+                local = _find_nearby_stores(keyword, 2)
+                parts = [f'🔍 "{keyword}" 검색 결과:\n']
+                parts.append(f'💰 최저가: {shop["min_price"]:,}원 | 최고가: {shop["max_price"]:,}원')
+                parts.append(f'🛒 온라인 쇼핑몰 {len(shop["items"])}건:')
+                for item in shop['items'][:3]:
+                    parts.append(f'  • {item["title"]} - {item["price"]:,}원 ({item["mall"]})\n    {item["link"]}')
+                if local:
+                    parts.append(f'\n🏪 근처 가게: {", ".join(local)}')
+                else:
+                    parts.append(f'\n🏪 근처 가게: 공유마당에서 확인하세요')
+                parts.append(f'\n🔗 네이버 쇼핑: https://search.shopping.naver.com/search/all?query={keyword}')
+                shopping_info = '\n'.join(parts)
+
     if _detect_schedule_intent(msg):
         try:
             import json as json_mod
@@ -167,7 +191,7 @@ def bot_chat():
         except:
             pass
 
-    return jsonify({"reply": reply, "bot_name": bot.bot_name, "talent": talent, "mood": bot.mood, "level": bot.level, "counselor": counselor_msg, "schedule": schedule_info})
+    return jsonify({"reply": reply, "bot_name": bot.bot_name, "talent": talent, "mood": bot.mood, "level": bot.level, "counselor": counselor_msg, "schedule": schedule_info, "shopping": shopping_info})
 
 @tongbot_bp.route('/api/bot/history')
 def bot_history():
@@ -724,6 +748,39 @@ def _find_nearby_stores(context, limit=3):
         return [r.title for r in reports if r.title]
     except:
         return []
+
+def _search_shopping(query):
+    """네이버 쇼핑 검색 + 최저/최고가"""
+    try:
+        ncid = current_app.config.get('NAVER_CLIENT_ID','') or os.getenv('NAVER_SEARCH_CLIENT_ID','')
+        ncsec = current_app.config.get('NAVER_CLIENT_SECRET','') or os.getenv('NAVER_SEARCH_CLIENT_SECRET','')
+        if not ncid:
+            return None
+        resp = requests.get('https://openapi.naver.com/v1/search/shop.json', params={
+            'query': query, 'display': 5, 'sort': 'sim'
+        }, headers={'X-Naver-Client-Id': ncid, 'X-Naver-Client-Secret': ncsec}, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            items = data.get('items', [])
+            if items:
+                prices = sorted([int(i.get('lprice',0)) for i in items if i.get('lprice')])
+                return {
+                    'items': [{
+                        'title': i.get('title','').replace('<b>','').replace('</b>',''),
+                        'price': int(i.get('lprice',0)),
+                        'link': i.get('link',''),
+                        'mall': i.get('mallName',''),
+                        'image': i.get('image','')
+                    } for i in items[:5]],
+                    'min_price': min(prices) if prices else 0,
+                    'max_price': max(prices) if prices else 0,
+                    'count': len(items)
+                }
+    except:
+        pass
+    return None
+
+SHOPPING_TRIGGERS = ['가격','얼마','사고','구매','쇼핑','파는','싼','비싼','최저가','최고가','가성비','추천','어디서','파나요','사나요']
 
 def bot_schedule_ai_internal(uid, msg, user, bot=None):
     now = datetime.now(KST)
