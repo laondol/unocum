@@ -2949,7 +2949,8 @@ def register_routes(app):
         from config import Config
         dg_key = getattr(Config, 'DATA_GO_KR_API_KEY', '')
         gg_key = getattr(Config, 'GG_TRAFFIC_API_KEY', '')
-        if not dg_key and not gg_key:
+        build_key = getattr(Config, 'GG_BUILDING_API_KEY', '')
+        if not dg_key and not gg_key and not build_key:
             return "<script>alert('API 키가 설정되지 않았습니다. config.py를 확인하세요.'); history.back();</script>"
         import threading
         if dg_key:
@@ -2957,6 +2958,9 @@ def register_routes(app):
         if gg_key:
             threading.Thread(target=sync_traffic_incidents, args=(current_app._get_current_object(), gg_key)).start()
             threading.Thread(target=sync_congestion_info, args=(current_app._get_current_object(), gg_key)).start()
+        if build_key:
+            from services.construction import sync_building_permits
+            threading.Thread(target=sync_building_permits, args=(current_app._get_current_object(), build_key)).start()
         return "<script>alert('정보 갱신이 시작되었습니다.'); location.href='/construction';</script>"
 
     # --- [상시 서비스 3종] ---

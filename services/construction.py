@@ -117,9 +117,6 @@ def sync_construction_notices(app, api_key):
         if count: db.session.commit()
         print(f"[CONSTRUCTION] Synced {count} new.")
 
-        # 건축착공 신고 동기화 (경기데이터드림)
-        sync_building_permits(app, api_key)
-
 def sync_building_permits(app, api_key):
     """경기데이터드림 건축착공 신고 현황 → ConstructionNotice"""
     if not api_key: print("[BUILDING] No API key. Skipping."); return
