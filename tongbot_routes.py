@@ -179,12 +179,12 @@ def bot_chat():
     if _detect_schedule_intent(msg):
         try:
             sched_resp = bot_schedule_ai_internal(uid, msg, user, bot)
-            reply = sched_resp.get('reply', reply)
+            if sched_resp.get('reply'):
+                reply = sched_resp['reply']
             if sched_resp.get('action') == 'create' and sched_resp.get('schedule'):
                 schedule_info = sched_resp['schedule']
-                schedule_info['loc_detail'] = ''
-        except:
-            pass
+        except Exception as e:
+            current_app.logger.error(f'일정AI 오류: {e}')
 
     # 통벗 추천: 문맥에 맞는 기능 제안
     if not schedule_info and not shopping_info and not counselor:
@@ -919,9 +919,30 @@ def bot_schedule_ai_internal(uid, msg, user, bot=None):
             db.session.add(s)
             db.session.commit()
             dt_str = evt.strftime('%m/%d %H:%M')
-            reply = f"📅 등록 완료!\n{s.title}\n🕐 {dt_str}"
+            # 피드백 구성
+            fb = [f"📅 일정이 등록되었습니다!"]
+            fb.append(f"제목: {s.title}")
             if s.location:
-                reply += f"\n📍 {s.location}"
+                fb.append(f"장소: {s.location}")
+            else:
+                fb.append(f"장소: (입력되지 않음)")
+            fb.append(f"시간: {dt_str}")
+            # 출발/귀가 계산
+            user_home = User.query.get(uid)
+            if s.location and user_home:
+                loc_lat, loc_lng = _geocode_location(s.location)
+                home_lat = user_home.curr_latitude or user_home.latitude
+                home_lng = user_home.curr_longitude or user_home.longitude
+                if loc_lat and home_lat:
+                    from services.transit import haversine_km
+                    d = haversine_km(home_lat, home_lng, loc_lat, loc_lng)
+                    travel_min = round(d * 15)
+                    dep_time = evt - timedelta(minutes=travel_min + 15)
+                    fb.append(f"출발시간: {dep_time.strftime('%H:%M')} (이동 약{travel_min}분)")
+                    fb.append(f"귀가예상: {(evt + timedelta(hours=1, minutes=travel_min)).strftime('%H:%M')}")
+                else:
+                    fb.append("💡 출발시간과 귀가시간을 알려면 장소의 상세주소가 필요합니다.")
+            reply = '\n'.join(fb)
             return {"reply": reply, "action": "create", "schedule": {"id": s.id, "title": s.title, "date": dt_str}}
         except Exception as e:
             return {"reply": f"일정 저장 실패: {e}", "action": "chat"}
