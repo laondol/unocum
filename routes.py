@@ -180,7 +180,7 @@ def register_routes(app):
 
     @app.route('/login', methods=['GET', 'POST'])
     def login():
-        default_next = request.referrer if request.referrer and request.referrer.startswith(request.host_url) and request.referrer != url_for('login', _external=True) else url_for('world_news')
+        default_next = request.referrer if request.referrer and request.referrer.startswith(request.host_url) and request.referrer != url_for('login', _external=True) else None
         next_url = request.args.get('next') or request.form.get('next') or default_next
         if next_url and not next_url.startswith('/'):
             next_url = url_for('intro')
@@ -214,7 +214,7 @@ def register_routes(app):
                 else:
                     u.last_payout = now
                     db.session.commit()
-                return redirect(next_url)
+                return redirect(next_url or url_for('user_profile', user_id=u.id))
             return "<script>alert('로그인 정보 오류'); history.back();</script>"
         return render_template('login.html', next=next_url)
 
