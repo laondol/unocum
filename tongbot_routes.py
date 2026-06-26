@@ -1,4 +1,4 @@
-import random, string, re, requests
+import random, string, re, requests, json
 from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template, current_app
 from models import db, User, TongBot, TongBotDraft, TongBotSchedule, ChatRoom, ChatMessage, Message, FriendCache, BotKnowledge
 from datetime import datetime, timedelta, timezone
@@ -150,69 +150,22 @@ def bot_chat():
     elif counselor == 'psycho':
         counselor_msg = {'type':'psycho','msg':'마음이 힘드신가요? 심리상담사와 대화를 연결해 드릴까요? (30닢 소요)','url':'/psycho/list'}
 
-    # 일정 생성 의도 감지
+    # 일정 의도 감지 → 일정 특화 AI로 처리
     schedule_info = None
     if _detect_schedule_intent(msg):
-        parsed = _parse_schedule_from_text(msg, uid)
-        if parsed.get('event_date'):
-            loc_info = _resolve_location(parsed.get('location',''), uid)
-            try:
-                # 출발/귀가 시간 계산
-                departure_str = ''
-                return_str = ''
-                travel_min = loc_info.get('travel_min') if loc_info else None
-                if travel_min:
-                    evt = parsed['event_date']
-                    dep = evt - timedelta(minutes=travel_min + 15)
-                    departure_str = dep.strftime('%H:%M')
-                    end_dt = evt + timedelta(hours=1)
-                    ret = end_dt + timedelta(minutes=travel_min)
-                    return_str = ret.strftime('%H:%M')
-
-                memo_parts = ['통벗 대화로 생성']
-                if departure_str:
-                    memo_parts.append(f'출발: {departure_str}')
-                if return_str:
-                    memo_parts.append(f'귀가: {return_str}')
-                if loc_info and loc_info.get('address'):
-                    memo_parts.append(f'주소: {loc_info["address"]}')
-
-                s = TongBotSchedule(
-                    user_id=uid,
-                    title=parsed['title'],
-                    description=parsed.get('memo','')[:200],
-                    event_date=parsed['event_date'],
-                    location=loc_info['address'] if loc_info else parsed.get('location',''),
-                    memo=' | '.join(memo_parts)
-                )
-                db.session.add(s)
-                db.session.commit()
-
-                kst = parsed['event_date'].astimezone(KST)
-                date_str = kst.strftime('%m월 %d일 %H:%M')
-                loc_str = ''
-                if loc_info:
-                    loc_str = f"\n📍 {loc_info['name']} ({loc_info['address']})"
-                    if loc_info.get('distance_km'):
-                        loc_str += f"\n🚶 약 {travel_min}분 ({loc_info['distance_km']}km)"
-                elif parsed.get('location'):
-                    loc_str = f"\n📍 {parsed['location']}"
-
-                depart_info = ''
-                if departure_str:
-                    depart_info += f"\n🚶 출발: {departure_str}"
-                if return_str:
-                    depart_info += f"\n🏠 귀가: {return_str}"
-
-                schedule_info = {
-                    'id': s.id,
-                    'title': parsed['title'],
-                    'date': date_str,
-                    'location': parsed.get('location',''),
-                    'loc_detail': loc_str + depart_info
-                }
-            except Exception as e:
-                current_app.logger.error(f"일정 저장 실패: {e}")
+        try:
+            import json as json_mod
+            fake_req = type('obj', (object,), {'json': {'message': msg}})()
+            sched_resp = bot_schedule_ai_internal(uid, msg, user, bot)
+            if sched_resp.get('json'):
+                sched_data = sched_resp['json']
+                if sched_data.get('action') == 'create' and sched_data.get('schedule'):
+                    schedule_info = sched_data['schedule']
+                    schedule_info['loc_detail'] = ''
+                reply = sched_data.get('reply', reply)
+                # AI 응답으로 대체
+        except:
+            pass
 
     return jsonify({"reply": reply, "bot_name": bot.bot_name, "talent": talent, "mood": bot.mood, "level": bot.level, "counselor": counselor_msg, "schedule": schedule_info})
 
@@ -712,6 +665,208 @@ def bot_review(draft_id):
         return jsonify({"success": True, "review": review, "suggestion": suggestion})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@tongbot_bp.route('/api/bot/schedule/ai', methods=['POST'])
+def bot_schedule_ai():
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({"error": "로그인이 필요합니다."}), 401
+    msg = request.json.get('message', '').strip()
+    if not msg:
+        return jsonify({"error": "메시지를 입력하세요."})
+    user = User.query.get(uid)
+    bot = _get_bot(uid)
+    return jsonify(bot_schedule_ai_internal(uid, msg, user, bot))
+
+def bot_schedule_ai_internal(uid, msg, user, bot=None):
+    now = datetime.now(KST)
+    today_str = now.strftime('%Y-%m-%d %H:%M')
+    weekday = ['월','화','수','목','금','토','일'][now.weekday()]
+
+    # 기존 일정 목록
+    scheds = TongBotSchedule.query.filter_by(user_id=uid).order_by(TongBotSchedule.event_date.asc()).limit(20).all()
+    sched_list = []
+    for s in scheds:
+        evt = s.event_date
+        if evt:
+            s_str = f"#{s.id} {evt.strftime('%m/%d %H:%M')}"
+            if s.end_date:
+                s_str += f"~{s.end_date.strftime('%H:%M')}"
+            s_str += f" {s.title}"
+            if s.location:
+                s_str += f" @{s.location}"
+            sched_list.append(s_str)
+
+    home_addr = f"{user.town or ''} {user.village or ''}".strip()
+    if user.address:
+        home_addr = user.address
+
+    system_prompt = f"""당신은 일정관리 AI입니다. 사용자의 메시지를 분석하여 아래 JSON 형식 중 하나로만 응답하세요. 다른 말은 절대 하지 마세요.
+
+현재: {today_str} ({week요일})
+사용자 기본주소: {home_addr}
+기존 일정:
+{chr(10).join(sched_list) if sched_list else '(없음)'}
+
+[응답 형식 - 하나만 선택]
+1. 일정 생성: {{"action":"create","title":"짧은제목","event_date":"2026-06-27T15:00","location":"장소명","description":"설명"}}
+2. 일정 조회: {{"action":"query","period":"today|tomorrow|week|all"}}
+3. 일정 삭제: {{"action":"delete","id":일정번호}}
+4. 일정 변경: {{"action":"update","id":일정번호,"changes":{{"title":"새제목","event_date":"2026-06-27T16:00"}}}}
+5. 빈시간 찾기: {{"action":"find_free","date":"2026-06-27","duration_min":60}}
+6. 일반 대화: {{"action":"chat","reply":"친절한답변"}}
+
+[규칙]
+- event_date는 반드시 ISO형식(YYYY-MM-DDTHH:MM)으로
+- title은 30자 이내로 간결하게
+- 날짜가 언급되지 않으면 오늘 기준으로
+- "내일"은 {now.date() + timedelta(days=1)} 기준
+- 시간이 언급되지 않으면 오전 9시로
+- id는 기존 일정의 #번호를 참고
+- find_free 시 duration_min 기본값 60"""
+
+    try:
+        groq_key = current_app.config.get('GROQ_API_KEY', os.getenv('GROQ_API_KEY', ''))
+        if not groq_key:
+            return {"reply": "AI 서비스가 현재 이용 불가능합니다.", "action": "chat"}
+
+        resp = requests.post('https://api.groq.com/openai/v1/chat/completions',
+            headers={'Authorization': f'Bearer {groq_key}', 'Content-Type': 'application/json'},
+            json={
+                'model': 'llama-3.1-8b-instant',
+                'messages': [
+                    {'role': 'system', 'content': system_prompt},
+                    {'role': 'user', 'content': msg}
+                ],
+                'temperature': 0.1,
+                'max_tokens': 300
+            }, timeout=10)
+        ai_text = resp.json()['choices'][0]['message']['content'].strip()
+        # JSON 응답만 추출
+        json_match = re.search(r'\{[^{}]*"action"[^{}]*\}', ai_text, re.DOTALL)
+        if not json_match:
+            json_match = re.search(r'\{.*\}', ai_text, re.DOTALL)
+        if not json_match:
+            return {"reply": ai_text[:200], "action": "chat"}
+
+        action_data = json.loads(json_match.group())
+    except:
+        return {"reply": "죄송합니다. 일정을 이해하지 못했어요. 다시 말씀해 주세요.", "action": "chat"}
+
+    action = action_data.get('action', 'chat')
+
+    if action == 'create':
+        try:
+            evt_str = action_data.get('event_date', '')
+            evt = datetime.fromisoformat(evt_str) if evt_str else None
+            if not evt:
+                return {"reply": "날짜/시간을 알 수 없습니다.", "action": "chat"}
+            s = TongBotSchedule(
+                user_id=uid,
+                title=action_data.get('title', '일정'),
+                description=action_data.get('description', ''),
+                event_date=evt,
+                location=action_data.get('location', ''),
+                memo='AI 일정 생성'
+            )
+            db.session.add(s)
+            db.session.commit()
+            dt_str = evt.strftime('%m/%d %H:%M')
+            reply = f"📅 등록 완료!\n{s.title}\n🕐 {dt_str}"
+            if s.location:
+                reply += f"\n📍 {s.location}"
+            return {"reply": reply, "action": "create", "schedule": {"id": s.id, "title": s.title, "date": dt_str}}
+        except Exception as e:
+            return {"reply": f"일정 저장 실패: {e}", "action": "chat"}
+
+    elif action == 'query':
+        period = action_data.get('period', 'all')
+        scheds = TongBotSchedule.query.filter_by(user_id=uid).order_by(TongBotSchedule.event_date.asc())
+        if period == 'today':
+            scheds = scheds.filter(TongBotSchedule.event_date >= now.strftime('%Y-%m-%d')).filter(TongBotSchedule.event_date < (now + timedelta(days=1)).strftime('%Y-%m-%d'))
+        elif period == 'tomorrow':
+            tm = now + timedelta(days=1)
+            scheds = scheds.filter(TongBotSchedule.event_date >= tm.strftime('%Y-%m-%d')).filter(TongBotSchedule.event_date < (tm + timedelta(days=1)).strftime('%Y-%m-%d'))
+        elif period == 'week':
+            scheds = scheds.filter(TongBotSchedule.event_date >= now.strftime('%Y-%m-%d')).filter(TongBotSchedule.event_date < (now + timedelta(days=7)).strftime('%Y-%m-%d'))
+        result = scheds.limit(15).all()
+        if not result:
+            return {"reply": "해당 기간에 등록된 일정이 없습니다.", "action": "query"}
+        lines = [f"📅 {period} 일정 ({len(result)}건):"]
+        for s in result:
+            evt = s.event_date
+            line = f"  {evt.strftime('%m/%d %H:%M')} {s.title}"
+            if s.location:
+                line += f" @{s.location}"
+            lines.append(line)
+        return {"reply": '\n'.join(lines), "action": "query"}
+
+    elif action == 'delete':
+        sid = action_data.get('id')
+        s = TongBotSchedule.query.filter_by(id=sid, user_id=uid).first()
+        if not s:
+            return {"reply": f"#{sid} 일정을 찾을 수 없습니다.", "action": "chat"}
+        title = s.title
+        db.session.delete(s)
+        db.session.commit()
+        return {"reply": f"🗑️ '{title}' 일정을 삭제했습니다.", "action": "delete"}
+
+    elif action == 'update':
+        sid = action_data.get('id')
+        s = TongBotSchedule.query.filter_by(id=sid, user_id=uid).first()
+        if not s:
+            return {"reply": f"#{sid} 일정을 찾을 수 없습니다.", "action": "chat"}
+        changes = action_data.get('changes', {})
+        updated = []
+        if 'title' in changes:
+            s.title = changes['title']; updated.append('제목')
+        if 'event_date' in changes:
+            s.event_date = datetime.fromisoformat(changes['event_date']); updated.append('시간')
+        if 'location' in changes:
+            s.location = changes['location']; updated.append('장소')
+        if 'description' in changes:
+            s.description = changes['description']; updated.append('설명')
+        db.session.commit()
+        return {"reply": f"✏️ {s.title} 일정이 수정됨 ({', '.join(updated)})", "action": "update"}
+
+    elif action == 'find_free':
+        date_str = action_data.get('date', now.strftime('%Y-%m-%d'))
+        duration = int(action_data.get('duration_min', 60))
+        # 해당 날짜의 기존 일정 가져오기
+        day_scheds = TongBotSchedule.query.filter_by(user_id=uid).filter(
+            TongBotSchedule.event_date >= f'{date_str} 00:00',
+            TongBotSchedule.event_date <= f'{date_str} 23:59'
+        ).order_by(TongBotSchedule.event_date.asc()).all()
+        # 9시~21시 사이 빈 시간대 찾기
+        busy = [(9, 0)]
+        for s in day_scheds:
+            evt = s.event_date
+            if evt:
+                start_min = evt.hour * 60 + evt.minute
+                end_min = start_min + 60
+                if s.end_date:
+                    end_min = s.end_date.hour * 60 + s.end_date.minute
+                busy.append((start_min, end_min))
+        busy.append((21 * 60, 21 * 60))
+        busy.sort()
+
+        free_slots = []
+        for i in range(len(busy) - 1):
+            gap = busy[i+1][0] - busy[i][1]
+            if gap >= duration:
+                start_h = busy[i][1] // 60
+                start_m = busy[i][1] % 60
+                end_h = busy[i+1][0] // 60
+                end_m = busy[i+1][0] % 60
+                free_slots.append(f"{start_h:02d}:{start_m:02d}~{end_h:02d}:{end_m:02d}")
+
+        if free_slots:
+            return {"reply": f"🕐 {date_str} 빈 시간 ({duration}분 이상):\n" + '\n'.join(f"  {s}" for s in free_slots[:5]), "action": "find_free"}
+        else:
+            return {"reply": f"😔 {date_str}에 {duration}분 이상 빈 시간이 없습니다.", "action": "find_free"}
+
+    else:
+        return {"reply": action_data.get('reply', '무엇을 도와드릴까요?'), "action": "chat"}
 
 @tongbot_bp.route('/api/bot/schedule', methods=['GET', 'POST'])
 def bot_schedule():
