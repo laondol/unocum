@@ -835,18 +835,6 @@ def bot_schedule_ai_internal(uid, msg, user, bot=None):
                 s_str += f" @{s.location}"
             sched_list.append(s_str)
 
-    # 벗 목록 (간단히)
-    friends = Friend.query.filter(
-        ((Friend.requester_id == uid) | (Friend.receiver_id == uid)),
-        Friend.status == 'accepted'
-    ).all()
-    friend_ids_set = set()
-    for f in friends:
-        if f.requester_id == uid: friend_ids_set.add(f.receiver_id)
-        else: friend_ids_set.add(f.requester_id)
-    friend_users = User.query.filter(User.id.in_(friend_ids_set)).all() if friend_ids_set else []
-    friend_names = [f.username for f in friend_users[:10]]
-
     home_addr = f"{user.town or ''} {user.village or ''}".strip()
     if user.address:
         home_addr = user.address
@@ -855,7 +843,7 @@ def bot_schedule_ai_internal(uid, msg, user, bot=None):
 
 현재: {today_str} ({weekday}요일)
 사용자 기본주소: {home_addr}
-내 벗: {', '.join(friend_names) if friend_names else '없음'}
+내 벗: (기능 준비 중)
 기존 일정:
 {chr(10).join(sched_list) if sched_list else '(없음)'}
 
