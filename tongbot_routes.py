@@ -179,7 +179,7 @@ def bot_chat():
                     'loc_detail': loc_str + travel_str
                 }
             except Exception as e:
-                pass
+                current_app.logger.error(f"일정 저장 실패: {e}")
 
     return jsonify({"reply": reply, "bot_name": bot.bot_name, "talent": talent, "mood": bot.mood, "level": bot.level, "counselor": counselor_msg, "schedule": schedule_info})
 
@@ -203,16 +203,19 @@ MOODS = ['neutral','happy','excited','thoughtful','caring','playful']
 MOOD_EMOJI = {'neutral':'😊','happy':'😄','excited':'🤩','thoughtful':'🤔','caring':'🥰','playful':'😜'}
 LEVEL_NAMES = {1:'🥚 알',2:'🐣 새싹',3:'🌱 묘목',4:'🪴 나무',5:'🌸 꽃',6:'🌟 별',7:'👑 수호자'}
 
-SCHEDULE_KEYWORDS = ['일정', '약속', '캘린더', '예약', '스케줄', '추가해', '등록해', '만들어줘', '생성해', '넣어줘', '기록해', '잡아줘']
+SCHEDULE_KEYWORDS = ['일정', '약속', '캘린더', '예약', '스케줄', '추가해', '등록해', '만들어줘', '생성해', '넣어줘', '기록해', '잡아줘', '저장해', '등록', '추가', '일정추가', '일정등록', '만나자', '보자', '가자', '갈까', '만날까']
 
 def _detect_schedule_intent(msg):
-    """일정 생성 의도 감지: 키워드 + 미래 시간 표현"""
+    """일정 생성 의도 감지"""
     msg_lower = msg.lower()
     keyword_hit = any(kw in msg_lower for kw in SCHEDULE_KEYWORDS)
+    # 시간 표현이 있으면 추가로 감지
     if not keyword_hit:
-        return False
-    has_time = bool(re.search(r'(\d{1,2}시|오전|오후|내일|모레|다음주|주말|월요일|화요일|수요일|목요일|금요일|토요일|일요일|\d{1,2}월\s*\d{1,2}일|\d{1,2}/\d{1,2}|오늘)', msg))
-    return keyword_hit and has_time
+        has_time = bool(re.search(r'(\d{1,2}시|오전|오후|내일|모레|다음주|이번주|주말|오늘)', msg))
+        has_action = bool(re.search(r'(만나|갈|볼|가자|보자|만날|약속|일정|예약)', msg))
+        if has_time and has_action:
+            return True
+    return keyword_hit
 
 def _parse_schedule_from_text(msg, uid):
     """자연어에서 일정 정보 추출: title, event_date, location"""
@@ -224,7 +227,7 @@ def _parse_schedule_from_text(msg, uid):
     try:
         import dateparser
         settings = {'PREFER_DATES_FROM': 'future', 'RELATIVE_BASE': now.replace(tzinfo=None)}
-        dt = dateparser.parse(msg, settings=settings)
+        dt = dateparser.parse(msg, settings=settings, languages=['ko'])
         if dt:
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=KST)
@@ -232,29 +235,29 @@ def _parse_schedule_from_text(msg, uid):
     except:
         pass
 
-    # 2) 장소 추출: "~에서", "장소는 ~", "~로 가는"
-    loc_match = re.search(r'(?:에서|에\s*가는|장소[는은]\s*|위치[는은]\s*|곳[은는]\s*|에\s+있는)\s*[\w가-힣\s]+?(?=[,.~]|$|\s*(?:일정|약속|추가|등록|$))', msg)
-    if not loc_match:
-        loc_match = re.search(r'(?:에\s+갈|을\s+갈|를\s+갈)', msg)
-        if not loc_match:
-            loc_match = re.search(r'(?<=\s)[\w가-힣]+(?:에|에서|으로|로)\s*(?=일정|약속|추가|등록|예약|\d|$)', msg)
-    if loc_match:
-        loc_raw = loc_match.group().strip()
-        loc_raw = re.sub(r'(에서|에\s*가는|장소[는은]|위치[는은]|곳[은은])\s*', '', loc_raw).strip()
-        if len(loc_raw) >= 2:
-            result['location'] = loc_raw
+    # 2) 장소 추출: "~에서", "장소는 ~", "~로"
+    loc = ''
+    for pat in [r'(?:에서|에\s*가는|장소[는은]?\s*|위치[는은]?\s*|곳[은는]?\s*)\s*([\w가-힣\s]+?)(?=\s*(?:일정|약속|추가|등록|예약|\d{1,2}시|오전|오후|$))',
+                r'([\w가-힣]+(?:에|에서|으로|로))\s*(?:일정|약속|추가|등록|예약|\d{1,2}시|오전|오후|$)']:
+        m = re.search(pat, msg)
+        if m:
+            loc = m.group(1).strip()
+            loc = re.sub(r'(에서|에|으로|로|장소[는은]?|위치[는은]?|곳[은는]?)\s*$', '', loc).strip()
+            if len(loc) >= 2:
+                break
+    result['location'] = loc
 
-    # 3) 제목 추출: 시간/장소 제외한 나머지
+    # 3) 제목 추출
     title = msg
-    if result['event_date']:
-        kst_date = result['event_date'].astimezone(KST)
-        for pat in [r'\d{1,2}시(\d{1,2}분)?', r'오전\s*\d{1,2}시', r'오후\s*\d{1,2}시', r'\d{4}년\s*\d{1,2}월\s*\d{1,2}일', r'\d{1,2}월\s*\d{1,2}일', r'\d{1,2}/\d{1,2}']:
-            title = re.sub(pat, '', title)
-    if result['location']:
-        title = title.replace(result['location'], '')
     for kw in SCHEDULE_KEYWORDS:
-        title = re.sub(rf'{kw}\S*', '', title)
-    title = re.sub(r'\s+', ' ', title).strip(' ,.~')
+        title = re.sub(rf'{kw}\S*', '', title, flags=re.IGNORECASE)
+    for pat in [r'\d{1,2}시(\d{1,2}분)?', r'오전\s*\d{1,2}시', r'오후\s*\d{1,2}시',
+                r'\d{4}년\s*\d{1,2}월\s*\d{1,2}일', r'\d{1,2}월\s*\d{1,2}일', r'\d{1,2}/\d{1,2}',
+                r'내일|모레|오늘|다음주|이번주|주말|월요일|화요일|수요일|목요일|금요일|토요일|일요일']:
+        title = re.sub(pat, '', title)
+    if loc:
+        title = title.replace(loc, '')
+    title = re.sub(r'\s+', ' ', title).strip(' ,.~-')
     if not title or len(title) < 2:
         title = '일정'
     result['title'] = title[:100]
