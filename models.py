@@ -241,7 +241,8 @@ class StoreInfo(db.Model):
     # 링크 3종 (우선순위: our_link > store_homepage > smartplace)
     our_link = db.Column(db.String(500))     # 자체 사이트 내 가게소개 링크
     store_homepage = db.Column(db.String(500))  # 가게 자체 홈페이지
-    smartplace = db.Column(db.String(500))      # 네이버 스마트플레이스
+    smartplace = db.Column(db.String(500))
+    phone = db.Column(db.String(30))
     created_at = db.Column(db.DateTime, default=datetime.now)
 
 class ConstructionNotice(db.Model):

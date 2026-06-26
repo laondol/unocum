@@ -2,27 +2,74 @@
 {% block content %}
 <div class="container mt-4" style="max-width: 700px;">
     <a href="/construction" class="btn btn-sm btn-outline-secondary mb-3">← 위치기반안내로</a>
-    <h2 class="fw-bold mb-3">{{ store_name }}</h2>
 
+    <h2 class="fw-bold mb-2">{{ store_name }}</h2>
+
+    <!-- 링크 -->
+    {% if store_link or naver_map %}
+    <div class="d-flex gap-2 mb-3">
+        {% if store_link %}<a href="{{ store_link }}" class="btn btn-sm btn-success">{{ link_label or '🔗' }}</a>{% endif %}
+        {% if naver_map %}<a href="{{ naver_map }}" class="btn btn-sm btn-outline-success">🗺️ 지도</a>{% endif %}
+    </div>
+    {% endif %}
+
+    <!-- 사진 그리드 (전체 가게사진) -->
+    {% if gallery %}
+    <div class="photo-grid mb-3">
+        {% for img in gallery %}
+        <img src="{{ img }}" class="photo-grid-item" loading="lazy">
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- 주소 -->
+    {% if store_address %}
+    <div class="mb-1 small">📍 {{ store_address }}</div>
+    {% endif %}
+
+    <!-- 전화번호 (StoreInfo에 있으면) -->
+    {% if phone %}
+    <div class="mb-3 small">📞 {{ phone }}</div>
+    {% endif %}
+
+    <hr class="my-3">
+
+    <!-- 회원 글 -->
     {% if posts %}
-        {% for p in posts %}
-        <div class="card border-0 shadow-sm mb-3" style="border-radius:16px;">
-            {% if p.image_path %}
-            <img src="{{ p.image_path }}" class="card-img-top" style="max-height:400px;object-fit:cover;border-radius:16px 16px 0 0;">
-            {% endif %}
-            <div class="card-body">
-                <h6><a href="/share/detail/{{ p.id }}" target="_blank">{{ p.title or '제목없음' }}</a></h6>
-                <div class="d-flex justify-content-between small text-muted">
-                    <span>
+    {% for p in posts %}
+    <div class="card border-0 shadow-sm mb-2" style="border-radius:12px;">
+        <div class="card-body p-2">
+            <div class="d-flex gap-2">
+                {% if p.image_path %}
+                <img src="{{ p.image_path }}" style="width:60px;height:60px;object-fit:cover;border-radius:8px;flex-shrink:0;">
+                {% endif %}
+                <div class="flex-grow-1 min-w-0">
+                    <a href="/share/detail/{{ p.id }}" class="text-decoration-none small fw-bold">{{ p.title or '제목없음' }}</a>
+                    <div class="small text-muted">
                         {% if p.user_id %}<a href="/user/{{ p.user_id }}">{{ p.author_name or '익명' }}</a>{% else %}{{ p.author_name or '익명' }}{% endif %}
-                    </span>
-                    <span>{{ p.created_at.strftime('%Y-%m-%d') if p.created_at else '' }}</span>
+                    </div>
                 </div>
             </div>
         </div>
-        {% endfor %}
-    {% else %}
-    <div class="text-center py-5 text-muted">등록된 게시글이 없습니다.</div>
+    </div>
+    {% endfor %}
     {% endif %}
 </div>
+
+<style>
+.photo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 3px;
+}
+.photo-grid-item {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+.photo-grid-item:hover { opacity: 0.8; }
+</style>
 {% endblock %}
