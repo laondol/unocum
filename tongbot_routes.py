@@ -846,7 +846,7 @@ def bot_schedule_ai_internal(uid, msg, user, bot=None):
 
     system_prompt = f"""당신은 일정관리 AI입니다. 사용자의 메시지를 분석하여 아래 JSON 형식 중 하나로만 응답하세요. 다른 말은 절대 하지 마세요.
 
-현재: {today_str} ({week요일})
+현재: {today_str} ({weekday}요일)
 사용자 기본주소: {home_addr}
 내 벗: {', '.join(friend_names) if friend_names else '없음'}
 기존 일정:

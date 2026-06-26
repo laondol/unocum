@@ -23,6 +23,7 @@ class Config:
     DATA_GO_KR_API_KEY = os.getenv('DATA_GO_KR_API_KEY', '')
     GG_TRAFFIC_API_KEY = os.getenv('GG_TRAFFIC_API_KEY', '')
     GG_BUILDING_API_KEY = os.getenv('GG_BUILDING_API_KEY', '')
+    EX_CONSTRUCTION_API_KEY = os.getenv('EX_CONSTRUCTION_API_KEY', '8485113604')
     GROQ_API_KEY = os.getenv('GROQ_API_KEY', '')
     SMTP_HOST = os.getenv('SMTP_HOST', 'email-smtp.ap-northeast-2.amazonaws.com')
     SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
