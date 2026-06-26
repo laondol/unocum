@@ -178,16 +178,11 @@ def bot_chat():
 
     if _detect_schedule_intent(msg):
         try:
-            import json as json_mod
-            fake_req = type('obj', (object,), {'json': {'message': msg}})()
             sched_resp = bot_schedule_ai_internal(uid, msg, user, bot)
-            if sched_resp.get('json'):
-                sched_data = sched_resp['json']
-                if sched_data.get('action') == 'create' and sched_data.get('schedule'):
-                    schedule_info = sched_data['schedule']
-                    schedule_info['loc_detail'] = ''
-                reply = sched_data.get('reply', reply)
-                # AI 응답으로 대체
+            reply = sched_resp.get('reply', reply)
+            if sched_resp.get('action') == 'create' and sched_resp.get('schedule'):
+                schedule_info = sched_resp['schedule']
+                schedule_info['loc_detail'] = ''
         except:
             pass
 
