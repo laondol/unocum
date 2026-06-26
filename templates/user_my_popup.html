@@ -223,7 +223,10 @@ function sendChat() {
         msgs.lastElementChild.outerHTML = '<div class="text-start mb-2"><span class="badge bg-success">'+d.bot_name+'</span> '+d.reply+'</div>';
         if(d.talent){msgs.innerHTML+='<div class="text-center mb-2"><span class="badge bg-warning text-dark">🌟 발견된 재능: '+d.talent+'</span></div>';}
         if(d.counselor){const c=d.counselor;msgs.innerHTML+='<div class="text-center mb-2"><div class="alert alert-info py-1 small">'+c.msg+'<br><a href="'+c.url+'" class="btn btn-sm btn-info mt-1">상담받기</a></div></div>';}
-        if(d.schedule){const s=d.schedule;msgs.innerHTML+='<div class="text-center mb-2"><div class="card border-success" style="border-radius:12px;"><div class="card-body p-2 small"><span class="badge bg-success">📅 일정 등록됨</span><br><strong>'+s.title+'</strong><br>🕐 '+s.date+s.loc_detail+'</div></div></div>';}
+        if(d.schedule){const s=d.schedule;msgs.innerHTML+='<div class="text-center mb-2"><div class="card border-success" style="border-radius:12px;"><div class="card-body p-2 small"><span class="badge bg-success">📅 일정 등록됨</span><br><strong>'+s.title+'</strong><br>🕐 '+s.date+s.loc_detail+'</div></div></div>';
+        var sl = document.getElementById('scheduleList');
+        if(sl) sl.innerHTML = '<div class="text-muted text-center small py-2">🔄 페이지 새로고침 후 일정탭에서 확인하세요</div>';
+        }
         msgs.scrollTop = msgs.scrollHeight;
     })
     .catch(()=>{ msgs.lastElementChild.outerHTML = '<div class="text-start mb-2 text-danger small">응답 실패</div>'; });

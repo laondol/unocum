@@ -319,15 +319,19 @@ def _parse_schedule_from_text(msg, uid):
 
     # 3) 제목 추출
     title = msg
-    for kw in SCHEDULE_KEYWORDS:
-        title = re.sub(rf'{kw}\S*', '', title, flags=re.IGNORECASE)
-    for pat in [r'\d{1,2}시(\d{1,2}분)?', r'오전\s*\d{1,2}시', r'오후\s*\d{1,2}시',
-                r'\d{4}년\s*\d{1,2}월\s*\d{1,2}일', r'\d{1,2}월\s*\d{1,2}일', r'\d{1,2}/\d{1,2}',
-                r'내일|모레|오늘|다음주|이번주|주말|월요일|화요일|수요일|목요일|금요일|토요일|일요일']:
-        title = re.sub(pat, '', title)
-    if loc:
-        title = title.replace(loc, '')
-    title = re.sub(r'\s+', ' ', title).strip(' ,.~-')
+    # 키워드/시간표현을 공백 기준 단어 단위로 제거
+    words = title.split()
+    cleaned = []
+    for w in words:
+        w_clean = re.sub(r'[~.!,?]+$', '', w)
+        is_kw = any(kw in w_clean for kw in SCHEDULE_KEYWORDS)
+        is_time = bool(re.match(r'^(오전|오후|아침|저녁|밤|내일|모레|오늘|글피|다음주|이번주|다다음주|월요일|화요일|수요일|목요일|금요일|토요일|일요일|월|화|수|목|금|토|일)$', w_clean)) or bool(re.match(r'^\d{1,2}시(\d{1,2}분)?$', w_clean)) or bool(re.match(r'^\d{1,2}:\d{2}$', w_clean)) or bool(re.match(r'^\d{1,2}월$|^\d{1,2}일$|^\d{4}년$', w_clean)) or bool(re.match(r'^\d{1,2}/\d{1,2}$', w_clean))
+        if is_kw or is_time:
+            continue
+        if w_clean == loc or w_clean in loc.split():
+            continue
+        cleaned.append(w)
+    title = ' '.join(cleaned).strip()
     if not title or len(title) < 2:
         title = '일정'
     result['title'] = title[:100]
