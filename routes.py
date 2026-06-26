@@ -17,9 +17,19 @@ from services.geocode import haversine, gps_to_town_village, get_nearby_reports,
 
 # --- [공개 경로] 인트로 및 대시보드 ---
 def register_routes(app):
-    
+    # React SPA 폴백
+    import os as _os
+    spa_dir = _os.path.join(app.root_path, 'static', 'spa')
+
+    @app.route('/spa')
+    @app.route('/spa/<path:path>')
+    def spa_fallback(path=''):
+        spa_index = _os.path.join(spa_dir, 'index.html')
+        if _os.path.exists(spa_index):
+            return app.send_static_file('spa/index.html')
+        return render_template('intro.html')
+
     @app.route('/')
-    @app.route('/intro')
     def intro():
         selected_news = NewsArticle.query.filter(NewsArticle.is_selected == True, NewsArticle.world_admin_approved == True, NewsArticle.category.in_(['세계뉴스', '환경뉴스', '건강정보', '복지정보', '농업정보', '관광소식'])).order_by(NewsArticle.updated_at.desc()).limit(6).all()
         return render_template('intro.html', selected_news=selected_news)
