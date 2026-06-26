@@ -2683,7 +2683,21 @@ def register_routes(app):
                         break
 
         naver_map = f'https://map.naver.com/p?c={target_lng},{target_lat},16,0,0,0,dh' if target_lat_f and target_lng_f else None
-        return render_template('store_detail.html', store_name=display_name, posts=grouped, town=town, village=village, store_link=store_link, link_label=link_label, naver_map=naver_map)
+        # 갤러리 이미지 수집
+        gallery = []
+        for p in grouped:
+            if p.image_path and p.image_path not in gallery:
+                gallery.append(p.image_path)
+        # 주소: StoreInfo의 address 또는 첫 게시글의 location
+        store_address = ''
+        for si in sis:
+            if si.latitude and si.longitude:
+                if haversine_km(si.latitude, si.longitude, target_lat_f, target_lng_f) <= 0.1:
+                    store_address = getattr(si, 'address', '') or ''
+                    break
+        if not store_address and grouped:
+            store_address = grouped[0].address or grouped[0].location or ''
+        return render_template('store_detail.html', store_name=display_name, posts=grouped, town=town, village=village, store_link=store_link, link_label=link_label, naver_map=naver_map, gallery=gallery, store_address=store_address)
 
     @app.route('/construction/local-scenery')
     def construction_local_scenery():
