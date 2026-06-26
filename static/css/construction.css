@@ -3,9 +3,21 @@
     border-radius: 12px;
     overflow: hidden;
     border: 1px solid #eee;
+    background: #fff;
     transition: box-shadow 0.2s;
 }
 .store-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+.card-img-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+}
+.card-grid-img {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: 3px;
+}
 .store-img-scroll {
     display: flex;
     overflow-x: auto;

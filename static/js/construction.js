@@ -62,25 +62,31 @@ function showInline(type) {
         el.innerHTML = '<div class="text-center py-2"><span class="spinner-border spinner-border-sm"></span> 동네가게 불러오는 중...</div>';
         fetch('/construction/local-stores').then(function(r){return r.json()}).then(function(d){
             if (!d.stores||d.stores.length===0) { el.innerHTML = '<div class="text-muted text-center py-2 small">등록된 가게가 없습니다.</div>'; return; }
-            var html = '<div class="row g-2">';
+            var html = '<div class="row g-3">';
             d.stores.forEach(function(g){
                 var lat = g.lat ? parseFloat(g.lat).toFixed(4) : '0';
                 var lng = g.lng ? parseFloat(g.lng).toFixed(4) : '0';
                 var detailUrl = '/construction/store/' + encodeURIComponent(g.name) + '?town=' + encodeURIComponent(d.town) + '&village=' + encodeURIComponent(d.village) + '&lat=' + lat + '&lng=' + lng;
-                var imgs = [];
-                g.posts.forEach(function(p){ if (p.image) imgs.push(p.image); });
-                if (!imgs.length && g.image) imgs.push(g.image);
-                html += '<div class="col-6"><div class="store-card position-relative">';
+                html += '<div class="col-6"><div class="store-card">';
+                html += '<a href="'+detailUrl+'" class="text-decoration-none"><strong class="d-block p-2 pb-0 text-dark" style="font-size:0.9rem;">'+g.name+'</strong></a>';
+                if (g.store_link) html += '<div class="px-2 pb-1"><a href="'+g.store_link+'" class="btn btn-xs btn-outline-success py-0 px-1" style="font-size:0.6rem;">'+(g.link_label||'🔗')+'</a></div>';
+                // 사진 그리드
+                var imgs = g.gallery || [];
+                if (!imgs.length && g.image) imgs = [g.image];
                 if (imgs.length) {
-                    html += '<a href="'+detailUrl+'" class="text-decoration-none"><div class="store-img-scroll">';
-                    imgs.forEach(function(img){ html += '<img src="'+img+'" class="store-img-item">'; });
+                    html += '<a href="'+detailUrl+'" class="text-decoration-none"><div class="card-img-grid px-1 pb-1">';
+                    imgs.slice(0,6).forEach(function(img,i){
+                        html += '<img src="'+img+'" class="card-grid-img">';
+                    });
                     html += '</div></a>';
-                } else {
-                    html += '<a href="'+detailUrl+'" class="text-decoration-none"><div class="store-img-placeholder">🏪</div></a>';
                 }
-                html += '<div class="p-2 text-center"><a href="'+detailUrl+'" class="text-decoration-none"><strong class="small text-dark">'+g.name+'</strong></a><br><small class="text-muted">글 '+g.posts.length+'개</small>';
-                if (g.store_link) html += '<br><a href="'+g.store_link+'" class="btn btn-xs btn-outline-success py-0 px-1 mt-1" style="font-size:0.65rem;">'+(g.link_label||'🔗 링크')+'</a>';
-                html += '</div></div></div>';
+                if (g.address) html += '<small class="d-block px-2 text-muted" style="font-size:0.65rem;">📍 '+g.address+'</small>';
+                html += '<small class="d-block px-2 pb-2 text-muted" style="font-size:0.65rem;">📝 글 '+g.posts.length+'개</small>';
+                html += '</div></div>';
+            });
+            html += '</div>';
+            el.innerHTML = html;
+        });
             });
             html += '</div>';
             el.innerHTML = html;

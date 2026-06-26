@@ -2,85 +2,27 @@
 {% block content %}
 <div class="container mt-4" style="max-width: 700px;">
     <a href="/construction" class="btn btn-sm btn-outline-secondary mb-3">← 위치기반안내로</a>
-
-    <h2 class="fw-bold mb-1">{{ store_name }}</h2>
-    <p class="text-muted small mb-2">{{ town }} {{ village }}</p>
-
-    {% if store_link or naver_map %}
-    <div class="d-flex gap-2 mb-3">
-        {% if store_link %}<a href="{{ store_link }}" target="_blank" class="btn btn-sm btn-success">{{ link_label or '🔗 링크' }}</a>{% endif %}
-        {% if naver_map %}<a href="{{ naver_map }}" target="_blank" class="btn btn-sm btn-outline-success">🗺️ 네이버 지도</a>{% endif %}
-    </div>
-    {% endif %}
-
-    <!-- 모자이크 갤러리 -->
-    {% if posts %}
-    <h6 class="fw-bold mb-2">📸 가게 사진</h6>
-    <div class="mosaic-grid mb-3">
-        {% for p in posts %}
-        {% if p.image_path %}
-        <a href="/share/detail/{{ p.id }}" target="_blank" class="mosaic-item">
-            <img src="{{ p.image_path }}" alt="{{ p.title }}">
-            <span class="mosaic-label">{{ p.title or '제목없음' }}</span>
-        </a>
-        {% endif %}
-        {% endfor %}
-    </div>
-    {% endif %}
-
-    {% if store_address %}
-    <div class="mb-3">
-        <div class="small text-muted">📍 {{ store_address }}</div>
-    </div>
-    {% endif %}
+    <h2 class="fw-bold mb-3">{{ store_name }}</h2>
 
     {% if posts %}
-    <h6 class="fw-bold mb-2">📝 회원 글</h6>
-    <div class="list-group list-group-flush mb-3">
         {% for p in posts %}
-        <a href="/share/detail/{{ p.id }}" target="_blank" class="list-group-item list-group-item-action small">
-            <div class="d-flex justify-content-between">
-                <span>{{ p.title or '제목없음' }}</span>
-                <small class="text-muted">{{ p.author_name or '익명' }}</small>
+        <div class="card border-0 shadow-sm mb-3" style="border-radius:16px;">
+            {% if p.image_path %}
+            <img src="{{ p.image_path }}" class="card-img-top" style="max-height:400px;object-fit:cover;border-radius:16px 16px 0 0;">
+            {% endif %}
+            <div class="card-body">
+                <h6><a href="/share/detail/{{ p.id }}" target="_blank">{{ p.title or '제목없음' }}</a></h6>
+                <div class="d-flex justify-content-between small text-muted">
+                    <span>
+                        {% if p.user_id %}<a href="/user/{{ p.user_id }}">{{ p.author_name or '익명' }}</a>{% else %}{{ p.author_name or '익명' }}{% endif %}
+                    </span>
+                    <span>{{ p.created_at.strftime('%Y-%m-%d') if p.created_at else '' }}</span>
+                </div>
             </div>
-        </a>
+        </div>
         {% endfor %}
-    </div>
     {% else %}
-    <div class="text-center py-4 text-muted">등록된 게시글이 없습니다.</div>
+    <div class="text-center py-5 text-muted">등록된 게시글이 없습니다.</div>
     {% endif %}
 </div>
-
-<style>
-.mosaic-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-    gap: 4px;
-}
-.mosaic-item {
-    position: relative;
-    display: block;
-    overflow: hidden;
-    border-radius: 6px;
-    aspect-ratio: 1;
-}
-.mosaic-item img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: 0.2s;
-}
-.mosaic-item:hover img { transform: scale(1.1); }
-.mosaic-label {
-    position: absolute;
-    bottom: 0; left: 0; right: 0;
-    background: rgba(0,0,0,0.6);
-    color: #fff;
-    font-size: 0.65rem;
-    padding: 2px 4px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-</style>
 {% endblock %}
