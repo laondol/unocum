@@ -1425,6 +1425,8 @@ def register_routes(app):
                 ),
                 Message.created_at.desc()
             ).all()
+        elif session.get('role') in ('admin','leader'):
+            messages = []
         else:
             messages = Message.query.filter(
                 ((Message.sender_id==uid) & (Message.receiver_id==user.id)) |
@@ -1533,6 +1535,7 @@ def register_routes(app):
             point_history=point_history, 
             messages=messages,
             is_own=is_own,
+            is_admin=is_admin,
             is_friend=is_friend,
             bot_name=bot_name,
             posts=posts,

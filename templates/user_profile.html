@@ -121,7 +121,7 @@
     <div class="card border-0 shadow-sm mb-3" style="border-radius: 18px;">
         <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center" style="border-radius: 18px 18px 0 0;">
             <span>{% if is_own %}👥 벗 · 쪽지{% else %}💬 주고받은 쪽지{% endif %}</span>
-            {% if not is_own %}<a href="/message/send/{{ profile_user.id }}" class="btn btn-success btn-sm">쪽지 보내기</a>{% endif %}
+            {% if not is_own and not is_admin %}<a href="/message/send/{{ profile_user.id }}" class="btn btn-success btn-sm">쪽지 보내기</a>{% endif %}
         </div>
         <div class="card-body p-0">
             {% if is_own and recent_friends %}
