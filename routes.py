@@ -2688,10 +2688,19 @@ def register_routes(app):
         for p in grouped:
             if p.image_path and p.image_path not in gallery:
                 gallery.append(p.image_path)
-        # 주소: 첫 게시글의 address 또는 location
+        # 주소: 공유글 address → location → GPS 역지오코딩
         store_address = ''
         if grouped:
             store_address = grouped[0].address or grouped[0].location or ''
+        if not store_address and target_lat_f and target_lng_f:
+            from services.transit import reverse_geocode
+            from config import Config
+            geo = reverse_geocode(target_lat_f, target_lng_f,
+                kakao_key=Config.KAKAO_REST_API_KEY,
+                naver_id=Config.NAVER_CLIENT_ID or Config.NAVER_SEARCH_CLIENT_ID,
+                naver_secret=Config.NAVER_CLIENT_SECRET or Config.NAVER_SEARCH_CLIENT_SECRET)
+            if geo and geo.get('address'):
+                store_address = geo['address']
         if not store_address:
             store_address = f'{town} {village}'
         return render_template('store_detail.html', store_name=display_name, posts=grouped, town=town, village=village, store_link=store_link, link_label=link_label, naver_map=naver_map, gallery=gallery, store_address=store_address)
