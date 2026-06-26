@@ -24,9 +24,22 @@ def reverse_geocode(lat, lng, kakao_key=None, naver_id=None, naver_secret=None):
         url = "https://naveropenapi.apigw.ntruss.com/map-reversegeocode/v2/gc"
         headers = {"X-NCP-APIGW-API-KEY-ID": naver_id, "X-NCP-APIGW-API-KEY": naver_secret}
         try:
-            r = requests.get(url, headers=headers, params={"coords": f"{lng},{lat}", "output": "json", "orders": "addr"}, timeout=10)
+            r = requests.get(url, headers=headers, params={"coords": f"{lng},{lat}", "output": "json", "orders": "roadaddr,addr"}, timeout=10)
             if r.status_code == 200:
                 data = r.json()
+                for result in data.get("results", []):
+                    if result.get("name") == "roadaddr":
+                        land = result.get("land", {})
+                        road_name = land.get("name", "")
+                        road_num = land.get("number1", "")
+                        region = result.get("region", {})
+                        area1 = region.get("area1", {}).get("name", "")
+                        area2 = region.get("area2", {}).get("name", "")
+                        area3 = region.get("area3", {}).get("name", "")
+                        addr = f"{area1} {area2} {area3} {road_name} {road_num}".strip()
+                        if addr:
+                            return {"lat": lat, "lng": lng, "address": addr}
+                # fallback: 행정주소
                 results = data.get("results", [])
                 if results:
                     region = results[0].get("region", {})

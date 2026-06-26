@@ -2379,8 +2379,6 @@ def register_routes(app):
         kakao_key = Config.KAKAO_REST_API_KEY
         naver_id = Config.NAVER_SEARCH_CLIENT_ID or Config.NAVER_CLIENT_ID
         naver_secret = Config.NAVER_SEARCH_CLIENT_SECRET or Config.NAVER_CLIENT_SECRET
-        dep = None
-        dest = None
         from services.transit import reverse_geocode, geocode_address, estimate_transit_time_rough, haversine_km, lookup_village_coords
         dep = reverse_geocode(from_lat, from_lng, kakao_key, naver_id, naver_secret)
         if not dest:
