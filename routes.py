@@ -30,6 +30,7 @@ def register_routes(app):
         return render_template('intro.html')
 
     @app.route('/')
+    @app.route('/intro')
     def intro():
         selected_news = NewsArticle.query.filter(NewsArticle.is_selected == True, NewsArticle.world_admin_approved == True, NewsArticle.category.in_(['세계뉴스', '환경뉴스', '건강정보', '복지정보', '농업정보', '관광소식'])).order_by(NewsArticle.updated_at.desc()).limit(6).all()
         return render_template('intro.html', selected_news=selected_news)
