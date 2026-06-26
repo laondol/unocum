@@ -157,27 +157,59 @@ def bot_chat():
         if parsed.get('event_date'):
             loc_info = _resolve_location(parsed.get('location',''), uid)
             try:
-                loc_info = _resolve_location(parsed.get('location',''), uid)
+                # 출발/귀가 시간 계산
+                departure_str = ''
+                return_str = ''
+                travel_min = loc_info.get('travel_min') if loc_info else None
+                if travel_min:
+                    evt = parsed['event_date']
+                    dep = evt - timedelta(minutes=travel_min + 15)
+                    departure_str = dep.strftime('%H:%M')
+                    end_dt = evt + timedelta(hours=1)
+                    ret = end_dt + timedelta(minutes=travel_min)
+                    return_str = ret.strftime('%H:%M')
+
+                memo_parts = ['통벗 대화로 생성']
+                if departure_str:
+                    memo_parts.append(f'출발: {departure_str}')
+                if return_str:
+                    memo_parts.append(f'귀가: {return_str}')
+                if loc_info and loc_info.get('address'):
+                    memo_parts.append(f'주소: {loc_info["address"]}')
+
                 s = TongBotSchedule(
                     user_id=uid,
                     title=parsed['title'],
                     description=parsed.get('memo','')[:200],
                     event_date=parsed['event_date'],
                     location=loc_info['address'] if loc_info else parsed.get('location',''),
-                    memo=f"통벗 대화로 생성"
+                    memo=' | '.join(memo_parts)
                 )
                 db.session.add(s)
                 db.session.commit()
-                kst = parsed['event_date'].astimezone(timezone(timedelta(hours=9)))
+
+                kst = parsed['event_date'].astimezone(KST)
                 date_str = kst.strftime('%m월 %d일 %H:%M')
-                loc_str = f"\n📍 {loc_info['name']} ({loc_info['address']})" if loc_info else (f"\n📍 {parsed['location']}" if parsed['location'] else '')
-                travel_str = f"\n🚶 예상 소요시간: 약 {loc_info['travel_min']}분 ({loc_info['distance_km']}km)" if loc_info and loc_info.get('travel_min') else ''
+                loc_str = ''
+                if loc_info:
+                    loc_str = f"\n📍 {loc_info['name']} ({loc_info['address']})"
+                    if loc_info.get('distance_km'):
+                        loc_str += f"\n🚶 약 {travel_min}분 ({loc_info['distance_km']}km)"
+                elif parsed.get('location'):
+                    loc_str = f"\n📍 {parsed['location']}"
+
+                depart_info = ''
+                if departure_str:
+                    depart_info += f"\n🚶 출발: {departure_str}"
+                if return_str:
+                    depart_info += f"\n🏠 귀가: {return_str}"
+
                 schedule_info = {
                     'id': s.id,
                     'title': parsed['title'],
                     'date': date_str,
                     'location': parsed.get('location',''),
-                    'loc_detail': loc_str + travel_str
+                    'loc_detail': loc_str + depart_info
                 }
             except Exception as e:
                 current_app.logger.error(f"일정 저장 실패: {e}")
@@ -388,15 +420,16 @@ def _resolve_location(location_name, uid):
 
                 # 소요시간: 사용자 집 → 장소 (transit.py 사용)
                 time_min = None
+                dist_km = None
                 if user and (user.curr_latitude or user.latitude):
                     from services.transit import haversine_km
                     home_lat = user.curr_latitude or user.latitude or 0
                     home_lng = user.curr_longitude or user.longitude or 0
                     if home_lat and home_lng:
-                        dist = haversine_km(home_lat, home_lng, lat, lng)
-                        time_min = round(dist * 15)  # 15min/km walking
+                        dist_km = haversine_km(home_lat, home_lng, lat, lng)
+                        time_min = round(dist_km * 15)
 
-                return {'name': place_name, 'address': addr, 'latitude': lat, 'longitude': lng, 'travel_min': time_min, 'distance_km': round(dist, 1) if home_lat else None}
+                return {'name': place_name, 'address': addr, 'latitude': lat, 'longitude': lng, 'travel_min': time_min, 'distance_km': round(dist_km, 1) if dist_km else None}
     except:
         pass
     return None
