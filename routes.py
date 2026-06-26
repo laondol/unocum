@@ -1440,20 +1440,22 @@ def register_routes(app):
             is_friend = bool(f)
         
         is_own = (session.get('user_id') == user.id)
+        is_admin = session.get('role') in ('admin','leader')
         bot_name = ''
         posts = []
         curr_location = ''
-        if user.curr_address:
-            curr_location = user.curr_address
-        if not curr_location and user.curr_latitude and user.curr_longitude:
-            from services.transit import reverse_geocode
-            from config import Config
-            geo = reverse_geocode(user.curr_latitude, user.curr_longitude,
-                kakao_key=Config.KAKAO_REST_API_KEY,
-                naver_id=Config.NAVER_CLIENT_ID or Config.NAVER_SEARCH_CLIENT_ID,
-                naver_secret=Config.NAVER_CLIENT_SECRET or Config.NAVER_SEARCH_CLIENT_SECRET)
-            if geo and geo.get('address'):
-                curr_location = geo['address']
+        if is_own or is_admin:
+            if user.curr_address:
+                curr_location = user.curr_address
+            if not curr_location and user.curr_latitude and user.curr_longitude:
+                from services.transit import reverse_geocode
+                from config import Config
+                geo = reverse_geocode(user.curr_latitude, user.curr_longitude,
+                    kakao_key=Config.KAKAO_REST_API_KEY,
+                    naver_id=Config.NAVER_CLIENT_ID or Config.NAVER_SEARCH_CLIENT_ID,
+                    naver_secret=Config.NAVER_CLIENT_SECRET or Config.NAVER_SEARCH_CLIENT_SECRET)
+                if geo and geo.get('address'):
+                    curr_location = geo['address']
         if not curr_location:
             curr_location = f"{user.curr_town or ''} {user.curr_village or ''}".strip() or '위치 없음'
         if is_own:
