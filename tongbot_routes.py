@@ -191,7 +191,11 @@ def bot_chat():
         except:
             pass
 
-    return jsonify({"reply": reply, "bot_name": bot.bot_name, "talent": talent, "mood": bot.mood, "level": bot.level, "counselor": counselor_msg, "schedule": schedule_info, "shopping": shopping_info})
+    # 통벗 추천: 문맥에 맞는 기능 제안
+    if not schedule_info and not shopping_info and not counselor:
+        suggestions = _get_proactive_suggestions(user, msg)
+
+    return jsonify({"reply": reply, "bot_name": bot.bot_name, "talent": talent, "mood": bot.mood, "level": bot.level, "counselor": counselor_msg, "schedule": schedule_info, "shopping": shopping_info, "suggestion": suggestions})
 
 @tongbot_bp.route('/api/bot/history')
 def bot_history():
@@ -782,6 +786,40 @@ def _search_shopping(query):
     return None
 
 SHOPPING_TRIGGERS = ['가격','얼마','사고','구매','쇼핑','파는','싼','비싼','최저가','최고가','가성비','추천','어디서','파나요','사나요']
+
+def _get_proactive_suggestions(user, msg):
+    """문맥 기반 추천 제안"""
+    suggestions = []
+    now = datetime.now(KST)
+    h = now.hour
+    has_home = bool(user.curr_latitude or user.latitude)
+
+    # 시간대별 추천
+    if 7 <= h <= 9:
+        suggestions.append({'text': '오늘 일정 확인해 보세요', 'action': 'schedule'})
+    if 17 <= h <= 20 and has_home:
+        suggestions.append({'text': '귀가길 안내 받으실래요?', 'action': 'home'})
+    if h >= 21:
+        suggestions.append({'text': '내일 일정 미리 등록해 두세요', 'action': 'schedule'})
+
+    # 대화 기반 추천
+    if any(kw in msg for kw in ['뭐','어디','뭐하지','심심','할일']):
+        suggestions.append({'text': '위치기반안내에서 주변 명소 확인', 'action': 'construction'})
+    if any(kw in msg for kw in ['심심','할말','얘기','대화','외로']):
+        suggestions.append({'text': '벗 채팅으로 이웃과 대화해 보세요', 'action': 'chat'})
+
+    # 체크 안한 기능 추천 (랜덤 1개)
+    all_tips = [
+        {'text': '프로필에서 벗 신청하고 이웃과 소통하세요', 'action': 'friend'},
+        {'text': '공유마당에 동네 소식 올려보세요', 'action': 'share'},
+        {'text': '위치 보정하면 1닢 드려요!', 'action': 'location'},
+        {'text': '통벗 말투를 바꿔보세요 (친근/존중/엄격)', 'action': 'tone'},
+        {'text': '꿈꾸기에 마을 제안 올려보세요', 'action': 'dream'},
+    ]
+    import random
+    suggestions.append(random.choice(all_tips))
+
+    return suggestions[:3] if suggestions else None
 
 def bot_schedule_ai_internal(uid, msg, user, bot=None):
     now = datetime.now(KST)

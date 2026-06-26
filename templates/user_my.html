@@ -255,9 +255,22 @@ function sendChat() {
         if(sl) sl.innerHTML = '<div class="text-muted text-center small py-2">🔄 페이지 새로고침 후 일정탭에서 확인하세요</div>';
         }
         if(d.shopping){msgs.innerHTML+='<div class="text-center mb-2"><div class="card border-warning" style="border-radius:12px;"><div class="card-body p-2 small" style="white-space:pre-line;">'+d.shopping+'</div></div></div>';}
+        if(d.suggestion){var tips=d.suggestion.map(function(t){return '<button class="btn btn-sm btn-outline-secondary me-1 mb-1" onclick="handleSuggestion(\''+t.action+'\')">💡 '+t.text+'</button>';}).join('');msgs.innerHTML+='<div class="text-center mb-2">'+tips+'</div>';}
         msgs.scrollTop = msgs.scrollHeight;
     })
     .catch(()=>{ msgs.lastElementChild.outerHTML = '<div class="text-start mb-2 text-danger small">응답 실패</div>'; });
+}
+
+function handleSuggestion(action) {
+    if(action==='schedule'){ document.querySelector('#botTabs .nav-link[data-tab=schedule]').click(); }
+    else if(action==='home'){ location.href='/construction?tab=home'; }
+    else if(action==='construction'){ location.href='/construction'; }
+    else if(action==='chat'){ window.open('/chat','chatPopup','width=500,height=600'); }
+    else if(action==='share'){ location.href='/share-report'; }
+    else if(action==='friend'){ location.href='/user'; }
+    else if(action==='dream'){ location.href='/main'; }
+    else if(action==='tone'){ document.querySelector('#botTabs .nav-link[data-tab=chat]').click(); }
+    else if(action==='location'){ location.href='/construction?tab=home'; }
 }
 
 function showHistory() {
