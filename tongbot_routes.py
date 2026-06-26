@@ -835,10 +835,17 @@ def bot_schedule_ai_internal(uid, msg, user, bot=None):
                 s_str += f" @{s.location}"
             sched_list.append(s_str)
 
-    # 벗 목록
-    from models import Friend
-    friends = User.query.join(Friend, Friend.friend_id == User.id).filter(Friend.user_id == uid, Friend.status == 'accepted').all()
-    friend_names = [f.username for f in friends[:10]]
+    # 벗 목록 (간단히)
+    friends = Friend.query.filter(
+        ((Friend.requester_id == uid) | (Friend.receiver_id == uid)),
+        Friend.status == 'accepted'
+    ).all()
+    friend_ids_set = set()
+    for f in friends:
+        if f.requester_id == uid: friend_ids_set.add(f.receiver_id)
+        else: friend_ids_set.add(f.requester_id)
+    friend_users = User.query.filter(User.id.in_(friend_ids_set)).all() if friend_ids_set else []
+    friend_names = [f.username for f in friend_users[:10]]
 
     home_addr = f"{user.town or ''} {user.village or ''}".strip()
     if user.address:
