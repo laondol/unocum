@@ -752,8 +752,9 @@ def _find_nearby_stores(context, limit=3):
 def _search_shopping(query):
     """네이버 쇼핑 검색 + 최저/최고가"""
     try:
-        ncid = current_app.config.get('NAVER_CLIENT_ID','') or os.getenv('NAVER_SEARCH_CLIENT_ID','')
-        ncsec = current_app.config.get('NAVER_CLIENT_SECRET','') or os.getenv('NAVER_SEARCH_CLIENT_SECRET','')
+        # 검색API 전용키 우선, 없으면 config 기본값
+        ncid = os.getenv('NAVER_SEARCH_CLIENT_ID','') or 'Vi403Ckfdg8NGRPDfBin'
+        ncsec = os.getenv('NAVER_SEARCH_CLIENT_SECRET','') or 'bepKiJZvWx'
         if not ncid:
             return None
         resp = requests.get('https://openapi.naver.com/v1/search/shop.json', params={
