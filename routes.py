@@ -2453,7 +2453,7 @@ def register_routes(app):
         is_home = False
         if user_home_lat and user_home_lng:
             d = haversine_km(corrected_lat, corrected_lng, user_home_lat, user_home_lng)
-            is_home = d <= 1.0
+            is_home = d <= 0.2
         if not is_home:
             same_village = bool(gps_town and gps_town == home_town and gps_village == home_village)
             is_home = same_village
