@@ -282,7 +282,7 @@
     </script>
     <script>
     document.addEventListener('DOMContentLoaded',function(){
-        document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function(e){new bootstrap.Tooltip(e)});
+        [].slice.call(document.querySelectorAll('[data-bs-toggle=\"tooltip\"]')).forEach(function(e){new bootstrap.Tooltip(e)});
     });
     </script>
     {% block scripts %}{% endblock %}
