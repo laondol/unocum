@@ -27,7 +27,7 @@
                         <small class="text-muted">{{ nip() }}</small>
                     </a>
                     {% if is_own %}
-                    <div class="mt-1"><small class="text-muted">📍 {{ curr_location or '위치 없음' }}</small></div>
+                    <div class="mt-1"><small class="text-muted">📍 <span data-bs-toggle="tooltip" data-bs-title="{{ curr_location or '위치 없음' }}">{{ profile_user.town }} {{ profile_user.village }}</span></small></div>
                     {% endif %}
                     {% if is_own %}
                     <div class="mt-2 d-flex gap-1">
@@ -72,7 +72,7 @@
         <div class="card-body p-2">
             <div class="d-flex align-items-center gap-2 flex-wrap">
                 <small class="text-muted">📍</small>
-                <span class="fw-bold small">{{ curr_location or (profile_user.town + ' ' + profile_user.village) }}</span>
+                <span class="fw-bold small" {% if is_own %}data-bs-toggle="tooltip" data-bs-title="{{ curr_location }}"{% endif %}>{{ profile_user.town }} {{ profile_user.village }}</span>
                 <button class="btn btn-sm btn-outline-secondary py-0 px-1" data-bs-toggle="tooltip" data-bs-title="주소편집" onclick="showAddressEdit()">✏️</button>
                 <button class="btn btn-sm btn-outline-secondary py-0 px-1" data-bs-toggle="tooltip" data-bs-title="현재위치 갱신" onclick="refreshLocation()">🔄</button>
                 <button class="btn btn-sm btn-outline-success py-0 px-1" data-bs-toggle="tooltip" data-bs-title="이웃인증" onclick="neighborVerify()">🏠</button>
