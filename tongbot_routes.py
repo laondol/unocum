@@ -836,8 +836,8 @@ def bot_schedule_ai_internal(uid, msg, user, bot=None):
             sched_list.append(s_str)
 
     home_addr = f"{user.town or ''} {user.village or ''}".strip()
-    if user.address:
-        home_addr = user.address
+    if hasattr(user, 'curr_address') and user.curr_address:
+        home_addr = user.curr_address
 
     system_prompt = f"""당신은 일정관리 AI입니다. 사용자의 메시지를 분석하여 아래 JSON 형식 중 하나로만 응답하세요. 다른 말은 절대 하지 마세요.
 
