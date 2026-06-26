@@ -66,13 +66,13 @@
         </div>
     </div>
 
-    <!-- 위치 관리 (본인만) - 2번째 블록 -->
-    {% if is_own %}
+    <!-- 위치 관리 - 2번째 블록 -->
     <div class="card border-0 shadow-sm mb-3" style="border-radius: 18px;">
         <div class="card-body p-2">
             <div class="d-flex align-items-center gap-2 flex-wrap">
                 <small class="text-muted">📍</small>
                 <span class="fw-bold small">{{ curr_location or (profile_user.town + ' ' + profile_user.village) }}</span>
+                {% if is_own %}
                 <button class="btn btn-sm btn-outline-secondary py-0 px-1" data-bs-toggle="tooltip" data-bs-title="주소편집" onclick="showAddressEdit()">✏️</button>
                 <button class="btn btn-sm btn-outline-secondary py-0 px-1" data-bs-toggle="tooltip" data-bs-title="현재위치 갱신" onclick="refreshLocation()">🔄</button>
                 <button class="btn btn-sm btn-outline-success py-0 px-1" data-bs-toggle="tooltip" data-bs-title="이웃인증" onclick="neighborVerify()">🏠</button>
@@ -84,7 +84,9 @@
                     <div class="form-check form-switch mb-0 small"><input class="form-check-input" type="checkbox" id="locationShareToggle" {{ 'checked' if profile_user.location_share }} onchange="toggleLocationShare(this.checked)"><label class="form-check-label" for="locationShareToggle">위치</label></div>
                     <div class="form-check form-switch mb-0 small"><input class="form-check-input" type="checkbox" id="villageNotifyToggle" {{ 'checked' if profile_user.village_notify != False }} onchange="toggleVillageNotify(this.checked)"><label class="form-check-label" for="villageNotifyToggle">소식</label></div>
                 </div>
+                {% endif %}
             </div>
+            {% if is_own %}
             <div id="addressEditForm" class="mt-2 p-2 bg-light rounded" style="display:none;">
                 <form id="addressForm" onsubmit="updateAddress(event)" class="row g-1">
                     <div class="col-5"><select name="town" class="form-select form-select-sm" id="editTown" required onchange="updateVillageOptions(this.value)"><option value="">읍/면</option>{% for t in ['양평읍','강상면','강하면','양서면','옥천면','서종면','단월면','청운면','양동면','지평면','용문면','개군면','관외'] %}<option value="{{ t }}" {{ 'selected' if profile_user.town == t }}>{{ t }}</option>{% endfor %}</select></div>
@@ -92,9 +94,9 @@
                     <div class="col-2"><button type="submit" class="btn btn-sm btn-success w-100">저장</button></div>
                 </form>
             </div>
+            {% endif %}
         </div>
     </div>
-    {% endif %}
 
     <!-- 닢 내역 (숨김) -->
     <div id="nipSection" class="card border-0 shadow-sm mb-3 d-none" style="border-radius: 18px;">
