@@ -38,6 +38,7 @@ function showInline(type) {
     if (type === 'scenery') {
         el.style.display = 'none';
         sc.style.display = '';
+        loadScenery();
         return;
     }
     el.style.display = '';
