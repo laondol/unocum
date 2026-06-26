@@ -1443,22 +1443,19 @@ def register_routes(app):
         bot_name = ''
         posts = []
         curr_location = ''
-        yp_towns = {'양평읍','강상면','강하면','양서면','옥천면','서종면','단월면','청운면','양동면','지평면','용문면','개군면'}
         if user.curr_address:
             curr_location = user.curr_address
-        elif user.curr_town and user.curr_town in yp_towns:
-            curr_location = f"{user.curr_town} {user.curr_village or ''}"
-        elif user.curr_latitude and user.curr_longitude:
+        if not curr_location and user.curr_latitude and user.curr_longitude:
             from services.transit import reverse_geocode
             from config import Config
             geo = reverse_geocode(user.curr_latitude, user.curr_longitude,
                 kakao_key=Config.KAKAO_REST_API_KEY,
-                naver_id=Config.NAVER_SEARCH_CLIENT_ID,
-                naver_secret=Config.NAVER_SEARCH_CLIENT_SECRET)
+                naver_id=Config.NAVER_CLIENT_ID or Config.NAVER_SEARCH_CLIENT_ID,
+                naver_secret=Config.NAVER_CLIENT_SECRET or Config.NAVER_SEARCH_CLIENT_SECRET)
             if geo and geo.get('address'):
                 curr_location = geo['address']
-            else:
-                curr_location = f"{user.curr_latitude:.4f}, {user.curr_longitude:.4f}"
+        if not curr_location:
+            curr_location = f"{user.curr_town or ''} {user.curr_village or ''}".strip() or '위치 없음'
         if is_own:
             bot = TongBot.query.filter_by(user_id=uid).first()
             if not bot:
