@@ -2447,22 +2447,22 @@ def register_routes(app):
         gps_town = gps_result[0] if gps_result else ""
         gps_village = gps_result[1] if gps_result else ""
         same_village = bool(gps_town and gps_town == home_town and gps_village == home_village)
-        # 거리 기반: 보정된 위치와 등록 집주소 비교
-        near_home = False
-        user_home_lat = user.curr_latitude or user.latitude
-        user_home_lng = user.curr_longitude or user.longitude
-        if not same_village and user_home_lat and user_home_lng:
+        # 집 판정: 보정좌표와 등록좌표 거리 1km 이내면 집
+        user_home_lat = user.curr_latitude or user.latitude or 0
+        user_home_lng = user.curr_longitude or user.longitude or 0
+        is_home = False
+        if user_home_lat and user_home_lng:
             d = haversine_km(corrected_lat, corrected_lng, user_home_lat, user_home_lng)
-            near_home = d <= 0.5
-        if same_village or near_home:
-            msg = f"🏠 집입니다! 현재 위치가 등록된 주소({home_town} {home_village}) 근처입니다."
+            is_home = d <= 1.0
+        if not is_home:
+            same_village = bool(gps_town and gps_town == home_town and gps_village == home_village)
+            is_home = same_village
+        if is_home:
+            home_addr = user.curr_address or f"{home_town} {home_village}"
             return jsonify({
                 "already_home": True,
-                "message": f"현재 위치가 등록된 주소({home_town} {home_village})와 동일합니다. 막차 안내가 필요하지 않습니다.",
-                "current_town": gps_town,
-                "current_village": gps_village,
-                "home_town": home_town,
-                "home_village": home_village,
+                "message": f"🏠 집입니다! 현재 위치가 {home_addr} 근처입니다.",
+                "home_address": home_addr,
             })
         suggestion = suggest_optimal_departure(from_lat, from_lng, home_town, home_village)
         if not suggestion:

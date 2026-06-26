@@ -293,10 +293,11 @@ function renderHome(data, loc) {
     var dep = data.departure.address, dest = data.destination.address, km = data.distance_km;
     var html = '';
     if (suggestData && suggestData.already_home) {
-        var walkMin = Math.round(km * 15);
-        var walkH = Math.floor(walkMin / 60), walkM = walkMin % 60;
-        var walkTime = walkH > 0 ? walkH + '시간 ' + walkM + '분' : walkM + '분';
-        html += '<div class="card border-0 shadow-sm mb-3 home-walk-card"><div class="card-body p-3 text-center"><h6 class="fw-bold text-success mb-2">🚶 같은 리에서 걸어가기</h6><p class="fw-bold text-success mb-0 font-size-1-2">약 ' + walkTime + ' 소요</p><p class="small text-muted mt-1">직선거리 ' + km + 'km · 도보 15분/km 기준</p><p class="small mb-1">📍 현재위치: <strong>' + dep + '</strong></p><p class="small mb-2">🏠 기본주소: <strong>' + dest + '</strong></p></div></div>';
+        var homeAddr = suggestData.home_address || (loc.town+' '+loc.village);
+        html += '<div class="card border-0 shadow-sm mb-3 text-center" style="border-radius:16px;border:2px solid #198754;">';
+        html += '<div class="card-body p-4"><div class="fs-1 mb-2">🏠</div>';
+        html += '<h4 class="fw-bold text-success mb-2">현재 집입니다</h4>';
+        html += '<p class="text-muted small mb-0">📍 '+homeAddr+'</p></div></div>';
         el.innerHTML = html;
         return;
     } else if (suggestData && suggestData.optimal_departure) {
