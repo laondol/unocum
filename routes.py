@@ -1625,6 +1625,7 @@ def register_routes(app):
             user.curr_latitude = geo['lat']
             user.curr_longitude = geo['lng']
         user.curr_address = manual_loc[:200]
+        user.address = manual_loc[:200]  # 기본주소도 함께 갱신
         user.location_updated_at = datetime.now()
         user.points = (user.points or 0) + 1
         db.session.add(PointHistory(user_id=user.id, change_type='location_correct', amount=1, description=f'위치 보정: {manual_loc}'))
@@ -2367,7 +2368,13 @@ def register_routes(app):
             return jsonify({"error": "등록된 주소가 없습니다. 마이페이지에서 설정해 주세요."}), 400
         home_town = user.town or user.curr_town or ''
         home_village = user.village or user.curr_village or ''
-        to_address = f"경기 양평군 {home_town} {home_village}".strip()
+        # 보정된 위치가 있으면 그걸 집 주소로
+        if user.curr_address and user.curr_latitude and user.curr_longitude:
+            to_address = user.curr_address
+            dest = {"lat": user.curr_latitude, "lng": user.curr_longitude, "address": to_address}
+        else:
+            to_address = f"경기 양평군 {home_town} {home_village}".strip()
+            dest = None
         from config import Config
         kakao_key = Config.KAKAO_REST_API_KEY
         naver_id = Config.NAVER_SEARCH_CLIENT_ID or Config.NAVER_CLIENT_ID
@@ -2376,7 +2383,8 @@ def register_routes(app):
         dest = None
         from services.transit import reverse_geocode, geocode_address, estimate_transit_time_rough, haversine_km, lookup_village_coords
         dep = reverse_geocode(from_lat, from_lng, kakao_key, naver_id, naver_secret)
-        dest = geocode_address(to_address, kakao_key, naver_id, naver_secret)
+        if not dest:
+            dest = geocode_address(to_address, kakao_key, naver_id, naver_secret)
         if not dest or not dest.get("lat"):
             lc = lookup_village_coords(user.curr_town, user.curr_village)
             if lc:
@@ -2430,16 +2438,21 @@ def register_routes(app):
             return jsonify({"error": "등록된 주소가 없습니다."}), 400
         home_town = user.town or user.curr_town or ''
         home_village = user.village or user.curr_village or ''
+        # 보정 오프셋 적용: 학습된 GPS 오차 보정
+        corrected_lat = from_lat + (user.curr_offset_lat or 0)
+        corrected_lng = from_lng + (user.curr_offset_lng or 0)
         from services.transit import suggest_optimal_departure, lookup_village_coords, haversine_km
         from services.geocode import gps_to_town_village
-        gps_result = gps_to_town_village(from_lat, from_lng)
+        gps_result = gps_to_town_village(corrected_lat, corrected_lng)
         gps_town = gps_result[0] if gps_result else ""
         gps_village = gps_result[1] if gps_result else ""
         same_village = bool(gps_town and gps_town == home_town and gps_village == home_village)
-        # 거리 기반: 500m 이내도 집으로 판정
+        # 거리 기반: 보정된 위치와 등록 집주소 비교
         near_home = False
-        if not same_village and user.curr_latitude and user.curr_longitude:
-            d = haversine_km(from_lat, from_lng, user.curr_latitude, user.curr_longitude)
+        user_home_lat = user.curr_latitude or user.latitude
+        user_home_lng = user.curr_longitude or user.longitude
+        if not same_village and user_home_lat and user_home_lng:
+            d = haversine_km(corrected_lat, corrected_lng, user_home_lat, user_home_lng)
             near_home = d <= 0.5
         if same_village or near_home:
             msg = f"🏠 집입니다! 현재 위치가 등록된 주소({home_town} {home_village}) 근처입니다."
@@ -2454,16 +2467,26 @@ def register_routes(app):
         suggestion = suggest_optimal_departure(from_lat, from_lng, home_town, home_village)
         if not suggestion:
             return jsonify({"error": "경로를 찾을 수 없습니다."}), 404
-        home_coords = lookup_village_coords(home_town, home_village)
+        # 보정된 위치가 있으면 그걸로 집 좌표+주소 사용
+        if user.curr_latitude and user.curr_longitude:
+            home_coords = {"lat": user.curr_latitude, "lng": user.curr_longitude}
+        else:
+            home_coords = lookup_village_coords(home_town, home_village)
+            if home_coords:
+                home_coords = {"lat": home_coords[0], "lng": home_coords[1]}
         if home_coords:
-            suggestion["home_coords"] = {"lat": home_coords[0], "lng": home_coords[1]}
+            suggestion["home_coords"] = home_coords
             suggestion["home_distance_km"] = round(haversine_km(
                 suggestion["station_coords"]["lat"], suggestion["station_coords"]["lng"],
-                home_coords[0], home_coords[1]
+                home_coords["lat"], home_coords["lng"]
             ), 1)
         suggestion["home_town"] = user.curr_town
         suggestion["home_village"] = user.curr_village
+        suggestion["home_address"] = user.curr_address or user.address or ''
         suggestion["already_home"] = False
+        suggestion["corrected"] = bool(user.curr_offset_lat or user.curr_offset_lng)
+        suggestion["corrected_lat"] = corrected_lat
+        suggestion["corrected_lng"] = corrected_lng
         from urllib.parse import quote
         sc = suggestion["station_coords"]
         sname = quote(suggestion["transfer_station"])
