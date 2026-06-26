@@ -3,73 +3,84 @@
 <div class="container mt-4" style="max-width: 700px;">
     <a href="/construction" class="btn btn-sm btn-outline-secondary mb-3">← 위치기반안내로</a>
 
-    <h2 class="fw-bold mb-2">{{ store_name }}</h2>
+    <h2 class="fw-bold mb-1">{{ store_name }}</h2>
+    <p class="text-muted small mb-2">{{ town }} {{ village }}</p>
 
-    <!-- 링크 -->
     {% if store_link or naver_map %}
     <div class="d-flex gap-2 mb-3">
-        {% if store_link %}<a href="{{ store_link }}" class="btn btn-sm btn-success">{{ link_label or '🔗' }}</a>{% endif %}
-        {% if naver_map %}<a href="{{ naver_map }}" class="btn btn-sm btn-outline-success">🗺️ 지도</a>{% endif %}
+        {% if store_link %}<a href="{{ store_link }}" target="_blank" class="btn btn-sm btn-success">{{ link_label or '🔗 링크' }}</a>{% endif %}
+        {% if naver_map %}<a href="{{ naver_map }}" target="_blank" class="btn btn-sm btn-outline-success">🗺️ 네이버 지도</a>{% endif %}
     </div>
     {% endif %}
 
-    <!-- 사진 그리드 (전체 가게사진) -->
-    {% if gallery %}
-    <div class="photo-grid mb-3">
-        {% for img in gallery %}
-        <img src="{{ img }}" class="photo-grid-item" loading="lazy">
+    <!-- 모자이크 갤러리 -->
+    {% if posts %}
+    <h6 class="fw-bold mb-2">📸 가게 사진</h6>
+    <div class="mosaic-grid mb-3">
+        {% for p in posts %}
+        {% if p.image_path %}
+        <a href="/share/detail/{{ p.id }}" target="_blank" class="mosaic-item">
+            <img src="{{ p.image_path }}" alt="{{ p.title }}">
+            <span class="mosaic-label">{{ p.title or '제목없음' }}</span>
+        </a>
+        {% endif %}
         {% endfor %}
     </div>
     {% endif %}
 
-    <!-- 주소 -->
     {% if store_address %}
-    <div class="mb-1 small">📍 {{ store_address }}</div>
-    {% endif %}
-
-    <!-- 전화번호 (StoreInfo에 있으면) -->
-    {% if phone %}
-    <div class="mb-3 small">📞 {{ phone }}</div>
-    {% endif %}
-
-    <hr class="my-3">
-
-    <!-- 회원 글 -->
-    {% if posts %}
-    {% for p in posts %}
-    <div class="card border-0 shadow-sm mb-2" style="border-radius:12px;">
-        <div class="card-body p-2">
-            <div class="d-flex gap-2">
-                {% if p.image_path %}
-                <img src="{{ p.image_path }}" style="width:60px;height:60px;object-fit:cover;border-radius:8px;flex-shrink:0;">
-                {% endif %}
-                <div class="flex-grow-1 min-w-0">
-                    <a href="/share/detail/{{ p.id }}" class="text-decoration-none small fw-bold">{{ p.title or '제목없음' }}</a>
-                    <div class="small text-muted">
-                        {% if p.user_id %}<a href="/user/{{ p.user_id }}">{{ p.author_name or '익명' }}</a>{% else %}{{ p.author_name or '익명' }}{% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div class="mb-3">
+        <div class="small text-muted">📍 {{ store_address }}</div>
     </div>
-    {% endfor %}
+    {% endif %}
+
+    {% if posts %}
+    <h6 class="fw-bold mb-2">📝 회원 글</h6>
+    <div class="list-group list-group-flush mb-3">
+        {% for p in posts %}
+        <a href="/share/detail/{{ p.id }}" target="_blank" class="list-group-item list-group-item-action small">
+            <div class="d-flex justify-content-between">
+                <span>{{ p.title or '제목없음' }}</span>
+                <small class="text-muted">{{ p.author_name or '익명' }}</small>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-4 text-muted">등록된 게시글이 없습니다.</div>
     {% endif %}
 </div>
 
 <style>
-.photo-grid {
+.mosaic-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-    gap: 3px;
+    gap: 4px;
 }
-.photo-grid-item {
-    width: 100%;
-    aspect-ratio: 1;
-    object-fit: cover;
+.mosaic-item {
+    position: relative;
+    display: block;
+    overflow: hidden;
     border-radius: 6px;
-    cursor: pointer;
+    aspect-ratio: 1;
+}
+.mosaic-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
     transition: 0.2s;
 }
-.photo-grid-item:hover { opacity: 0.8; }
+.mosaic-item:hover img { transform: scale(1.1); }
+.mosaic-label {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(0,0,0,0.6);
+    color: #fff;
+    font-size: 0.65rem;
+    padding: 2px 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 </style>
 {% endblock %}

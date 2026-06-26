@@ -2610,12 +2610,8 @@ def register_routes(app):
                     "user": s.author_name or "익명", "image": s.image_path,
                     "date": s.created_at.strftime("%m/%d") if s.created_at else ""
                 })
-                if s.image_path and s.image_path not in g.get("gallery", []):
-                    g.setdefault("gallery", []).append(s.image_path)
-                if not g.get("image"):
+                if s.image_path and not g["image"]:
                     g["image"] = s.image_path
-                if not g.get("address") and (s.address or s.location):
-                    g["address"] = s.address or s.location
             else:
                 key = f"{round(slat,4)}|{round(slng,4)}"
                 grouped[key] = {
@@ -2627,26 +2623,11 @@ def register_routes(app):
                     }],
                     "image": s.image_path,
                     "lat": s.latitude, "lng": s.longitude,
-                    "address": s.address or s.location or '',
-                    "gallery": [s.image_path] if s.image_path else [],
                 }
-        # StoreInfo 매칭 + 갤러리/주소 수집
+        # StoreInfo 매칭: 각 그룹 좌표와 가장 가까운 StoreInfo(100m 이내) 찾기
         store_infos = StoreInfo.query.filter_by(town=town, village=village).all()
         for gk, gv in grouped.items():
-            # 갤러리: 모든 포스트의 이미지 수집
-            imgs = []
-            for p in gv["posts"]:
-                if p["image"] and p["image"] not in imgs:
-                    imgs.append(p["image"])
-            gv["gallery"] = imgs
-            if not gv.get("address"):
-                for p in gv["posts"]:
-                    # ShareReport에서 주소 찾기
-                    sr = ShareReport.query.get(p["id"])
-                    if sr and (sr.address or sr.location):
-                        gv["address"] = sr.address or sr.location
-                        break
-            # StoreInfo 매칭
+            for si in store_infos:
                 if si.latitude and si.longitude and gv["lat"] and gv["lng"]:
                     d = haversine_km(si.latitude, si.longitude, float(gv["lat"]), float(gv["lng"]))
                     if d <= 0.1:
