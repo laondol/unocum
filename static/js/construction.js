@@ -115,6 +115,12 @@ function switchTab(type) {
         if (document.getElementById('alertList')) document.getElementById('alertList').style.display='';
         if (document.getElementById('emptyNotices')) document.getElementById('emptyNotices').style.display='';
     }
+    else if (type === 'building') {
+        document.querySelectorAll('.notice-item').forEach(function(item){
+            var dt = item.dataset.type;
+            if (dt==='building_permit') item.style.display='';
+        });
+    }
 }
 
 // ---- 탭 클릭 이벤트 ----
@@ -145,6 +151,13 @@ document.querySelectorAll('#infoTabs .nav-link').forEach(function(tab){
             case 'alert':
                 if (alertList) alertList.style.display='';
                 if (emptyEl) emptyEl.style.display='';
+                break;
+            case 'building':
+                document.querySelectorAll('.notice-item').forEach(function(item){
+                    var dt = item.dataset.type;
+                    if (dt==='building_permit') item.style.display='';
+                });
+                if (emptyEl && !document.querySelector('.notice-item:not([style*="display:none"])')) emptyEl.style.display='';
                 break;
         }
     });
