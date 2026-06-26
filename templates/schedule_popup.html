@@ -135,13 +135,14 @@ function renderEventList() {
         var end = s.end_date ? ' ~ ' + s.end_date.split(' ')[1].substring(0,5) : '';
         var loc = s.location ? '<br><small>📍 '+s.location+'</small>' : '';
         var memo = s.description ? '<br><small>📝 '+s.description+'</small>' : '';
+        var content = s.content ? '<br><small class="text-muted">'+s.content.replace(/\n/g,'<br>')+'</small>' : '';
         var color = s.color || 'gray';
         var badge = {'red':'🔴','blue':'🔵','green':'🟢','gray':'⚪'}[color] || '⚪';
         var extra = '';
         if (s.departure_time) extra += '<br><small>🚶 출발: '+s.departure_time+' ('+s.travel_min+'분)</small>';
         if (s.return_time) extra += '<br><small>🏠 귀가: '+s.return_time+'</small>';
         var datePart = s.event_date ? s.event_date.split(' ')[0] : '';
-        return '<div class="d-flex justify-content-between border-bottom py-1"><span><strong>'+badge+' '+s.title+'</strong><br><small>🕐 '+datePart+' '+(s.event_date.split(' ')[1]||'').substring(0,5)+end+'</small>'+loc+memo+extra+'</span><button class="btn btn-sm btn-outline-danger" onclick="deleteEvent('+s.id+')">✕</button></div>';
+        return '<div class="d-flex justify-content-between border-bottom py-1"><span><strong>'+badge+' '+s.title+'</strong><br><small>🕐 '+datePart+' '+(s.event_date.split(' ')[1]||'').substring(0,5)+end+'</small>'+loc+memo+extra+content+'</span><button class="btn btn-sm btn-outline-danger" onclick="deleteEvent('+s.id+')">✕</button></div>';
     }).join('');
 }
 
@@ -186,7 +187,8 @@ function showDay(date) {
         var extra = '';
         if (s.departure_time) extra += '<br><small>🚶 출발: '+s.departure_time+' (약 '+s.travel_min+'분)</small>';
         if (s.return_time) extra += '<br><small>🏠 귀가: '+s.return_time+'</small>';
-        h += '<div class="border-bottom py-1 mb-1 small"><strong>'+badge+' '+s.title+'</strong><br>🕐 '+time+extra+(s.location?'<br>📍 '+s.location:'')+'</div>';
+        var content = s.content ? '<br><small class="text-muted">'+s.content.replace(/\n/g,'<br>')+'</small>' : '';
+        h += '<div class="border-bottom py-1 mb-1 small"><strong>'+badge+' '+s.title+'</strong><br>🕐 '+time+extra+(s.location?'<br>📍 '+s.location:'')+content+'</div>';
     });
     el.innerHTML = h;
 }

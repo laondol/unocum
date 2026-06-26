@@ -678,6 +678,36 @@ def bot_schedule_ai():
     bot = _get_bot(uid)
     return jsonify(bot_schedule_ai_internal(uid, msg, user, bot))
 
+def _format_schedule_content(raw_text, bot_name, sched_context):
+    """통벗이 일정 내용을 보기좋게 편집 + 필요시 코멘트 추가"""
+    lines = []
+    # 핵심 내용 정리
+    key_points = []
+    for part in raw_text.replace(',',' ').replace('.',' ').split():
+        part = part.strip()
+        if len(part) >= 2:
+            key_points.append(part)
+
+    # 깔끔한 내용으로 정리
+    content = raw_text.strip()
+    if len(content) > 10:
+        content = '📋 ' + content
+
+    # 관련 정보가 있으면 코멘트 추가
+    comment = None
+    lower = raw_text.lower()
+    if any(kw in lower for kw in ['보험','계약','약관','청약']):
+        comment = f'{{[{bot_name} 생각]}} 보험 관련 건은 꼼꼼히 비교하시고, 필요시 법률상담을 이용하세요.'
+    elif any(kw in lower for kw in ['모임','약속','만남','식사']):
+        comment = f'{{[{bot_name} 생각]}} 약속 전에 교통편 확인하시고, 늦으면 미리 연락하세요.'
+    elif any(kw in lower for kw in ['병원','진료','건강','수술']):
+        comment = f'{{[{bot_name} 생각]}} 진료 전 준비물(신분증, 보험증) 챙기세요.'
+
+    result = content
+    if comment:
+        result += '\n\n' + comment
+    return result
+
 def bot_schedule_ai_internal(uid, msg, user, bot=None):
     now = datetime.now(KST)
     today_str = now.strftime('%Y-%m-%d %H:%M')
@@ -773,9 +803,10 @@ def bot_schedule_ai_internal(uid, msg, user, bot=None):
                 user_id=uid,
                 title=action_data.get('title', '일정'),
                 description=action_data.get('description', ''),
+                content=action_data.get('content', ''),
                 event_date=evt,
                 location=action_data.get('location', ''),
-                memo='AI 일정 생성'
+                memo='AI 생성'
             )
             db.session.add(s)
             db.session.commit()
@@ -850,7 +881,14 @@ def bot_schedule_ai_internal(uid, msg, user, bot=None):
         if 'location' in changes:
             s.location = changes['location']; updated.append('장소')
         if 'description' in changes:
-            s.description = changes['description']; updated.append('설명')
+            raw = changes['description']
+            bot_name = bot.bot_name if bot else '통벗'
+            s.description = raw
+            s.content = _format_schedule_content(raw, bot_name, s.title)
+            updated.append('내용')
+        if 'content' in changes:
+            s.content = changes['content']
+            if '내용' not in updated: updated.append('내용')
         db.session.commit()
         return {"reply": f"✏️ {s.title} 일정이 수정됨 ({', '.join(updated)})", "action": "update"}
 
@@ -940,6 +978,7 @@ def bot_schedule():
         for s in schedules:
             item = {
                 "id": s.id, "title": s.title, "description": s.description,
+                "content": s.content or s.description or '',
                 "memo": s.memo, "location": s.location,
                 "event_date": s.event_date.strftime("%Y-%m-%d %H:%M") if s.event_date else "",
                 "end_date": s.end_date.strftime("%Y-%m-%d %H:%M") if s.end_date else "",
