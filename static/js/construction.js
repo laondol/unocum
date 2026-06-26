@@ -59,7 +59,7 @@ function showInline(type) {
             el.innerHTML = html;
         });
     } else if (type === 'localstore') {
-        el.innerHTML = '<div class="text-center py-2"><span class="spinner-border spinner-border-sm"></span> 동네가게 불러오는 중...</div>';
+        el.innerHTML = '<div class="text-center py-2"><span class="spinner-border spinner-border-sm"></span> 가게 불러오는 중...</div>';
         fetch('/construction/local-stores').then(function(r){return r.json()}).then(function(d){
             if (!d.stores||d.stores.length===0) { el.innerHTML = '<div class="text-muted text-center py-2 small">등록된 가게가 없습니다.</div>'; return; }
             var html = '<div class="row g-2">';
@@ -231,11 +231,11 @@ function loadScenery() {
     }).catch(function(){ sc.innerHTML = '<div class="alert alert-danger">불러오기 실패</div>'; });
 }
 
-// ---- 동네가게 (레거시, switchTab 전용) ----
+// ---- 가게 (레거시, switchTab 전용) ----
 
 function loadLocalStores() {
     var el = document.getElementById('localStoresContent');
-    el.innerHTML = '<div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> 동네가게 불러오는 중...</div>';
+    el.innerHTML = '<div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> 가게 불러오는 중...</div>';
     fetch('/api/user/location').then(function(r){return r.json()}).then(function(loc){
         if (loc.error||!loc.village) { el.innerHTML = '<div class="alert alert-warning">등록된 주소(리)가 없습니다. 마이페이지에서 설정해 주세요.</div>'; return; }
         fetch('/construction/local-stores').then(function(r){return r.json()}).then(function(data){
