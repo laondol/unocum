@@ -718,7 +718,8 @@ def bot_schedule_ai_internal(uid, msg, user, bot=None):
 1. 일정 생성: {{"action":"create","title":"짧은제목","event_date":"2026-06-27T15:00","location":"장소명","description":"설명"}}
 2. 일정 조회: {{"action":"query","period":"today|tomorrow|week|all"}}
 3. 일정 삭제: {{"action":"delete","id":일정번호}}
-4. 일정 변경: {{"action":"update","id":일정번호,"changes":{{"title":"새제목","event_date":"2026-06-27T16:00"}}}}
+4. 일정 변경: {{"action":"update","id":일정번호,"changes":{{"title":"새제목","description":"메모내용"}}}}
+     ※ id 대신 keyword로 제목 검색 가능: {{"action":"update","keyword":"양지애","changes":{{"description":"메모내용"}}}}
 5. 빈시간 찾기: {{"action":"find_free","date":"2026-06-27","duration_min":60}}
 6. 공통 빈시간: {{"action":"find_common","date":"2026-06-27","friend_names":["벗이름1","벗이름2"],"duration_min":60}}
 7. 일반 대화: {{"action":"chat","reply":"친절한답변"}}
@@ -820,9 +821,26 @@ def bot_schedule_ai_internal(uid, msg, user, bot=None):
 
     elif action == 'update':
         sid = action_data.get('id')
-        s = TongBotSchedule.query.filter_by(id=sid, user_id=uid).first()
+        s = None
+        if sid:
+            s = TongBotSchedule.query.filter_by(id=sid, user_id=uid).first()
+        # id 없으면 제목 키워드로 검색
         if not s:
-            return {"reply": f"#{sid} 일정을 찾을 수 없습니다.", "action": "chat"}
+            keyword = action_data.get('keyword', '')
+            if not keyword:
+                # changes의 title에서 키워드 추출 시도
+                ch_title = action_data.get('changes', {}).get('title', '')
+                for word in (msg + ' ' + ch_title).split():
+                    if len(word) >= 2:
+                        found = TongBotSchedule.query.filter(
+                            TongBotSchedule.user_id == uid,
+                            TongBotSchedule.title.ilike(f'%{word}%')
+                        ).order_by(TongBotSchedule.event_date.desc()).first()
+                        if found:
+                            s = found
+                            break
+        if not s:
+            return {"reply": f"관련 일정을 찾을 수 없습니다.", "action": "chat"}
         changes = action_data.get('changes', {})
         updated = []
         if 'title' in changes:
