@@ -5,7 +5,8 @@ from models import db, ConstructionNotice
 
 CALS_BASE = "http://openapi.calspia.go.kr/openapi/service"
 GG_INCIDENT_URL = "https://openapigits.gg.go.kr/api/rest/getIncidentInfo"
-GG_CONGEST_URL = "https://openapigits.gg.go.kr/api/rest/getRoadLinkCongestInfo"
+GG_CONGEST_URL  = "https://openapigits.gg.go.kr/api/rest/getRoadLinkCongestInfo"
+GG_BUILDING_URL = "https://openapi.gg.go.kr/Buildstrcontr"
 
 def fetch_cals_road_construction(api_key):
     url = f"{CALS_BASE}/roadCstrncInfoService/getRoadCstrncList"
@@ -115,3 +116,61 @@ def sync_construction_notices(app, api_key):
             count += 1
         if count: db.session.commit()
         print(f"[CONSTRUCTION] Synced {count} new.")
+
+        # 건축착공 신고 동기화 (경기데이터드림)
+        sync_building_permits(app, api_key)
+
+def sync_building_permits(app, api_key):
+    """경기데이터드림 건축착공 신고 현황 → ConstructionNotice"""
+    if not api_key: print("[BUILDING] No API key. Skipping."); return
+    with app.app_context():
+        from models import ConstructionNotice
+        import requests
+        count = 0
+        try:
+            resp = requests.get(GG_BUILDING_URL, params={
+                'Key': api_key, 'Type': 'json', 'pIndex': 1, 'pSize': 100,
+                'SIGUN_NM': '양평군'
+            }, timeout=15)
+            if resp.status_code == 200:
+                data = resp.json()
+                items = data.get('Buildstrcontr', [])
+                if isinstance(items, dict):
+                    items = items.get('row', [])
+                if not isinstance(items, list):
+                    items = []
+                for row in items:
+                    sigun = row.get('SIGUN_NM', '')
+                    if '양평' not in sigun:
+                        continue
+                    lat = row.get('REFINE_WGS84_LAT')
+                    lng = row.get('REFINE_WGS84_LOGT')
+                    title = row.get('BIZ_REGION_INFO', '') or '건축공사'
+                    stmt_date = row.get('STATMNT_DE', '')
+                    builder = row.get('CNSTRCT_BIZNES_INFO', '')
+                    office = row.get('ETC_SERVC_INFO', '')
+                    key_str = f"{title}|{stmt_date}|{builder}"
+                    if ConstructionNotice.query.filter_by(title=title, source="gg_building").first():
+                        continue
+                    desc_parts = []
+                    if builder: desc_parts.append(f'시공사: {builder}')
+                    if office: desc_parts.append(f'설계사무소: {office}')
+                    if stmt_date: desc_parts.append(f'신고일: {stmt_date}')
+                    db.session.add(ConstructionNotice(
+                        title=title,
+                        description=' | '.join(desc_parts),
+                        location=sigun,
+                        latitude=float(lat) if lat else None,
+                        longitude=float(lng) if lng else None,
+                        source='gg_building', source_url='',
+                        notice_type='building_permit',
+                        start_date=datetime.strptime(stmt_date, "%Y%m%d") if stmt_date and len(stmt_date)==8 else None,
+                        is_active=True
+                    ))
+                    count += 1
+            else:
+                print(f"[BUILDING] API error: {resp.status_code}")
+        except Exception as e:
+            print(f"[BUILDING] Error: {e}")
+        if count: db.session.commit()
+        print(f"[BUILDING] Synced {count} new.")
