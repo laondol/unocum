@@ -416,6 +416,29 @@ def register_routes(app):
         user.curr_longitude = lon
         user.curr_town = town
         user.curr_village = village or ''
+        # Kakao 역지오코딩으로 상세주소 조회 → 기본주소로 저장
+        try:
+            import requests as req_lib
+            kakao_key = current_app.config.get('KAKAO_REST_API_KEY','')
+            if kakao_key:
+                r = req_lib.get('https://dapi.kakao.com/v2/local/geo/coord2address.json', params={
+                    'x': lon, 'y': lat
+                }, headers={'Authorization': f'KakaoAK {kakao_key}'}, timeout=3)
+                if r.status_code == 200:
+                    data = r.json()
+                    docs = data.get('documents', [])
+                    if docs:
+                        road = docs[0].get('road_address') or {}
+                        addr = docs[0].get('address') or {}
+                        full_addr = road.get('address_name','') or addr.get('address_name','')
+                        building = road.get('building_name','')
+                        if building:
+                            full_addr += f' ({building})'
+                        if full_addr:
+                            user.address = full_addr[:200]
+                            user.curr_address = full_addr[:200]
+        except:
+            pass
         user.location_updated_at = datetime.now()
         db.session.commit()
         return jsonify({'status':'success','msg':'이웃주민 인증 완료!', 'town': town, 'village': village or ''})
