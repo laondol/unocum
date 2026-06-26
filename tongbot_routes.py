@@ -1,6 +1,6 @@
 import random, string, re, requests, json
 from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template, current_app
-from models import db, User, TongBot, TongBotDraft, TongBotSchedule, ChatRoom, ChatMessage, Message, FriendCache, BotKnowledge
+from models import db, User, TongBot, TongBotDraft, TongBotSchedule, ChatRoom, ChatMessage, Message, FriendCache, BotKnowledge, StoreInfo, ShareReport
 from datetime import datetime, timedelta, timezone
 import os, uuid
 
@@ -702,11 +702,28 @@ def _format_schedule_content(raw_text, bot_name, sched_context):
         comment = f'{{[{bot_name} 생각]}} 약속 전에 교통편 확인하시고, 늦으면 미리 연락하세요.'
     elif any(kw in lower for kw in ['병원','진료','건강','수술']):
         comment = f'{{[{bot_name} 생각]}} 진료 전 준비물(신분증, 보험증) 챙기세요.'
+    elif any(kw in lower for kw in ['쇼핑','구매','장보기','마트','시장','옷','신발','가전','가구','선물']):
+        stores = _find_nearby_stores(sched_context, 3)
+        if stores:
+            comment = f'{{[{bot_name} 생각]}} 근처 추천 가게: {", ".join(stores)}'
+        else:
+            comment = f'{{[{bot_name} 생각]}} 공유마당에 등록된 동네가게를 확인해 보세요.'
 
     result = content
     if comment:
         result += '\n\n' + comment
     return result
+
+def _find_nearby_stores(context, limit=3):
+    """근처 동네가게 찾기"""
+    try:
+        stores = StoreInfo.query.limit(limit).all()
+        if stores:
+            return [s.name for s in stores]
+        reports = ShareReport.query.filter_by(status='approved').filter(ShareReport.title.isnot(None)).limit(limit).all()
+        return [r.title for r in reports if r.title]
+    except:
+        return []
 
 def bot_schedule_ai_internal(uid, msg, user, bot=None):
     now = datetime.now(KST)
