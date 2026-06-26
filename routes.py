@@ -2301,7 +2301,24 @@ def register_routes(app):
     @app.route('/construction')
     @app.route('/construction')
     def construction():
-        notices = ConstructionNotice.query.filter_by(is_active=True).order_by(ConstructionNotice.created_at.desc()).all()
+        notices = ConstructionNotice.query.filter_by(is_active=True).all()
+        # 사용자 집 기준 거리순 정렬
+        uid = session.get('user_id')
+        if uid:
+            user = User.query.get(uid)
+            if user and (user.curr_latitude or user.latitude):
+                from services.transit import haversine_km
+                home_lat = user.curr_latitude or user.latitude
+                home_lng = user.curr_longitude or user.longitude
+                def dist_key(n):
+                    if n.latitude and n.longitude:
+                        return haversine_km(home_lat, home_lng, n.latitude, n.longitude)
+                    return 999
+                notices = sorted(notices, key=dist_key)
+            else:
+                notices = sorted(notices, key=lambda n: n.created_at or datetime.min, reverse=True)
+        else:
+            notices = sorted(notices, key=lambda n: n.created_at or datetime.min, reverse=True)
         alerts = VillageAlert.query.filter_by(is_active=True).order_by(VillageAlert.created_at.desc()).limit(20).all()
         from config import Config
         dg_key = getattr(Config, 'DATA_GO_KR_API_KEY', '')
