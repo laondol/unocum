@@ -122,7 +122,9 @@ document.querySelectorAll('#schedTabs .nav-link').forEach(t => {
 function loadEvents() {
     fetch('/api/bot/schedule').then(r=>r.json()).then(d => {
         schedules = d.schedules || [];
+        console.log('Schedules loaded:', schedules.length, schedules.map(s=>s.color));
         renderEventList();
+        renderCal();
     });
 }
 
@@ -138,7 +140,8 @@ function renderEventList() {
         var extra = '';
         if (s.departure_time) extra += '<br><small>🚶 출발: '+s.departure_time+' ('+s.travel_min+'분)</small>';
         if (s.return_time) extra += '<br><small>🏠 귀가: '+s.return_time+'</small>';
-        return '<div class="d-flex justify-content-between border-bottom py-1"><span><strong>'+badge+' '+s.title+'</strong><br><small>🕐 '+s.event_date.split(' ')[1].substring(0,5)+end+'</small>'+loc+memo+extra+'</span><button class="btn btn-sm btn-outline-danger" onclick="deleteEvent('+s.id+')">✕</button></div>';
+        var datePart = s.event_date ? s.event_date.split(' ')[0] : '';
+        return '<div class="d-flex justify-content-between border-bottom py-1"><span><strong>'+badge+' '+s.title+'</strong><br><small>🕐 '+datePart+' '+(s.event_date.split(' ')[1]||'').substring(0,5)+end+'</small>'+loc+memo+extra+'</span><button class="btn btn-sm btn-outline-danger" onclick="deleteEvent('+s.id+')">✕</button></div>';
     }).join('');
 }
 
