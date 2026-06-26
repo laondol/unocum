@@ -185,7 +185,22 @@
         </div>
         <div id="scheduleList">
             {% for s in schedules %}
-            <div class="card mb-2"><div class="card-body p-2 small"><strong>{{ s.title }}</strong><span class="text-muted ms-2">{{ s.event_date.strftime('%Y-%m-%d %H:%M') if s.event_date else '' }}</span>{% if s.description %}<br>{{ s.description }}{% endif %}</div></div>
+            {% set sev = s.event_date %}
+            {% set sh = sev.hour if sev else 0 %}
+            {% set sm = sev.minute if sev else 0 %}
+            {% set is_allday = (sh == 0 and sm == 0) and (not s.end_date or (s.end_date.hour == 23 and s.end_date.minute == 59)) %}
+            {% set scolor = 'gray' %}
+            {% if is_allday %}{% set scolor = 'red' %}
+            {% elif s.location %}{% set scolor = 'blue' %}
+            {% endif %}
+            <div class="card mb-2 border-start border-3 {% if scolor == 'red' %}border-danger{% elif scolor == 'blue' %}border-primary{% elif scolor == 'green' %}border-success{% else %}border-secondary{% endif %}">
+                <div class="card-body p-2 small">
+                    <strong>{% if scolor == 'red' %}🔴{% elif scolor == 'blue' %}🔵{% elif scolor == 'green' %}🟢{% else %}⚪{% endif %} {{ s.title }}</strong>
+                    <span class="text-muted ms-2">{{ sev.strftime('%Y-%m-%d') if sev else '' }}{% if not is_allday %} {{ sev.strftime('%H:%M') if sev else '' }}{% endif %}</span>
+                    {% if s.location %}<br>📍 {{ s.location }}{% endif %}
+                    {% if s.description %}<br>{{ s.description[:80] }}{% endif %}
+                </div>
+            </div>
             {% endfor %}
             {% if not schedules %}<div class="text-muted text-center py-3">등록된 일정이 없습니다.</div>{% endif %}
         </div>

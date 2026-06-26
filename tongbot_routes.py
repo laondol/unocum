@@ -157,13 +157,14 @@ def bot_chat():
         if parsed.get('event_date'):
             loc_info = _resolve_location(parsed.get('location',''), uid)
             try:
+                loc_info = _resolve_location(parsed.get('location',''), uid)
                 s = TongBotSchedule(
                     user_id=uid,
                     title=parsed['title'],
-                    description=msg,
+                    description=parsed.get('memo','')[:200],
                     event_date=parsed['event_date'],
                     location=loc_info['address'] if loc_info else parsed.get('location',''),
-                    memo=f"통벗 대화로 생성됨"
+                    memo=f"통벗 대화로 생성"
                 )
                 db.session.add(s)
                 db.session.commit()
@@ -295,31 +296,29 @@ def _parse_korean_datetime(msg, now):
     return datetime(target_date.year, target_date.month, target_date.day, hour, minute, tzinfo=KST)
 
 def _parse_schedule_from_text(msg, uid):
-    """자연어에서 일정 정보 추출: title, event_date, location"""
-    result = {'title': '', 'event_date': None, 'location': '', 'description': ''}
-    KST = timezone(timedelta(hours=9))
+    """자연어에서 일정 정보 추출: title, event_date, location, memo"""
+    result = {'title': '', 'event_date': None, 'location': '', 'memo': ''}
     now = datetime.now(KST)
 
-    # 1) 한글 날짜/시간 파싱 (dateparser는 한글 미지원)
+    # 1) 한글 날짜/시간 파싱
     dt = _parse_korean_datetime(msg, now)
     if dt:
         result['event_date'] = dt
 
-    # 2) 장소 추출: "~에서", "장소는 ~", "~로"
+    # 2) 장소 추출
     loc = ''
-    for pat in [r'(?:에서|에\s*가는|장소[는은]?\s*|위치[는은]?\s*|곳[은는]?\s*)\s*([\w가-힣\s]+?)(?=\s*(?:일정|약속|추가|등록|예약|\d{1,2}시|오전|오후|$))',
+    for pat in [r'(?:에서|에\s*가는|장소[는은]?\s*|위치[는은]?\s*|곳[은은]?\s*)\s*([\w가-힣\s]+?)(?=\s*(?:일정|약속|추가|등록|예약|\d{1,2}시|오전|오후|$))',
                 r'([\w가-힣]+(?:에|에서|으로|로))\s*(?:일정|약속|추가|등록|예약|\d{1,2}시|오전|오후|$)']:
         m = re.search(pat, msg)
         if m:
             loc = m.group(1).strip()
-            loc = re.sub(r'(에서|에|으로|로|장소[는은]?|위치[는은]?|곳[은는]?)\s*$', '', loc).strip()
+            loc = re.sub(r'(에서|에|으로|로|장소[는은]?|위치[는은]?|곳[은은]?)\s*$', '', loc).strip()
             if len(loc) >= 2:
                 break
     result['location'] = loc
 
-    # 3) 제목 추출
+    # 3) 제목 추출 (대상 + 내용을 짧게)
     title = msg
-    # 키워드/시간표현을 공백 기준 단어 단위로 제거
     words = title.split()
     cleaned = []
     for w in words:
@@ -328,14 +327,38 @@ def _parse_schedule_from_text(msg, uid):
         is_time = bool(re.match(r'^(오전|오후|아침|저녁|밤|내일|모레|오늘|글피|다음주|이번주|다다음주|월요일|화요일|수요일|목요일|금요일|토요일|일요일|월|화|수|목|금|토|일)$', w_clean)) or bool(re.match(r'^\d{1,2}시(\d{1,2}분)?$', w_clean)) or bool(re.match(r'^\d{1,2}:\d{2}$', w_clean)) or bool(re.match(r'^\d{1,2}월$|^\d{1,2}일$|^\d{4}년$', w_clean)) or bool(re.match(r'^\d{1,2}/\d{1,2}$', w_clean))
         if is_kw or is_time:
             continue
-        if w_clean == loc or w_clean in loc.split():
+        if w_clean == loc or (loc and w_clean in loc.split()):
             continue
-        cleaned.append(w)
+        # 조사 제거
+        w_clean = re.sub(r'(을|를|이|가|은|는|의|과|와|으로|로|에서|에|께|한테)$', '', w_clean)
+        if w_clean:
+            cleaned.append(w_clean)
     title = ' '.join(cleaned).strip()
     if not title or len(title) < 2:
         title = '일정'
-    result['title'] = title[:100]
+    result['title'] = title[:60]
+    # 메모: 원본 메시지 저장 (출발/귀가시간은 저장 시 계산)
+    result['memo'] = msg[:200]
     return result
+
+def _geocode_location(loc_name):
+    """장소명 → (lat,lng) 좌표"""
+    if not loc_name:
+        return None, None
+    try:
+        kakao_key = current_app.config.get('KAKAO_REST_API_KEY','')
+        if not kakao_key:
+            return None, None
+        resp = requests.get('https://dapi.kakao.com/v2/local/search/keyword.json', params={
+            'query': loc_name, 'size': 1
+        }, headers={'Authorization': f'KakaoAK {kakao_key}'}, timeout=2)
+        if resp.status_code == 200:
+            docs = resp.json().get('documents', [])
+            if docs:
+                return float(docs[0].get('y',0)), float(docs[0].get('x',0))
+    except:
+        pass
+    return None, None
 
 def _resolve_location(location_name, uid):
     """카카오 키워드 검색으로 장소→좌표,주소,소요시간"""
@@ -663,8 +686,56 @@ def bot_schedule():
     if not uid:
         return jsonify({"error": "로그인이 필요합니다."}), 401
     if request.method == 'GET':
+        user = User.query.get(uid)
+        home_lat = user.curr_latitude or user.latitude
+        home_lng = user.curr_longitude or user.longitude
         schedules = TongBotSchedule.query.filter_by(user_id=uid).order_by(TongBotSchedule.event_date.asc()).limit(30).all()
-        return jsonify({"schedules": [{"id": s.id, "title": s.title, "description": s.description, "memo": s.memo, "location": s.location, "event_date": s.event_date.strftime("%Y-%m-%d %H:%M") if s.event_date else "", "end_date": s.end_date.strftime("%Y-%m-%d %H:%M") if s.end_date else "", "invited": s.invited_user_ids} for s in schedules]})
+        result_list = []
+        for s in schedules:
+            item = {
+                "id": s.id, "title": s.title, "description": s.description,
+                "memo": s.memo, "location": s.location,
+                "event_date": s.event_date.strftime("%Y-%m-%d %H:%M") if s.event_date else "",
+                "end_date": s.end_date.strftime("%Y-%m-%d %H:%M") if s.end_date else "",
+                "invited": s.invited_user_ids, "color": "gray"
+            }
+            # 컬러 판정
+            evt = s.event_date
+            if evt:
+                has_time = evt.hour != 0 or evt.minute != 0
+                # 종일 일정: 시작시간이 00:00이고 종료가 없거나 23:59
+                is_allday = not has_time and (not s.end_date or (s.end_date.hour == 23 and s.end_date.minute == 59))
+                if is_allday:
+                    item["color"] = "red"
+                elif s.location:
+                    # 위치 기반 판정: Kakao 좌표 검색해서 집과 비교
+                    loc_lat, loc_lng = _geocode_location(s.location)
+                    if loc_lat and loc_lng and home_lat and home_lng:
+                        from services.transit import haversine_km
+                        d = haversine_km(home_lat, home_lng, loc_lat, loc_lng)
+                        if d <= 1.0:
+                            item["color"] = "green"
+                        else:
+                            item["color"] = "blue"
+                            # 출발시간 계산
+                            travel_min = round(d * 15)
+                            departure = evt - timedelta(minutes=travel_min + 15)  # 15분 여유
+                            item["departure_time"] = departure.strftime("%H:%M")
+                            item["travel_min"] = travel_min
+                            # 귀가시간: 종료시간 + 이동시간
+                            end = s.end_date or (evt + timedelta(hours=1))
+                            return_time = end + timedelta(minutes=travel_min)
+                            item["return_time"] = return_time.strftime("%H:%M")
+                            if d > 10:
+                                item["color"] = "blue"  # 10km 이상이면 출장
+                            else:
+                                item["color"] = "blue"  # 근거리도 출장으로
+                    else:
+                        item["color"] = "green"  # 좌표 못찾으면 기본 초록
+                else:
+                    item["color"] = "gray"  # 장소 없음
+            result_list.append(item)
+        return jsonify({"schedules": result_list})
     data = request.json
     end_date = None
     if data.get('end_date'):

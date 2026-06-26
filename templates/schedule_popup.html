@@ -8,12 +8,16 @@
 <style>body{background:#f8f9fa;}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
 .cal-header{text-align:center;font-size:0.75rem;font-weight:bold;color:#6c757d;padding:4px;}
-.cal-day{text-align:center;padding:8px 4px;border-radius:8px;cursor:pointer;font-size:0.85rem;}
+.cal-day{text-align:center;padding:8px 4px;border-radius:8px;cursor:pointer;font-size:0.85rem;position:relative;}
 .cal-day:hover{background:#e9ecef;}
 .cal-day.today{background:#0d6efd;color:#fff;font-weight:bold;}
 .cal-day.other{color:#ccc;}
-.cal-day.has-event::after{content:'';display:block;width:5px;height:5px;background:#198754;border-radius:50%;margin:2px auto 0;}
-.cal-day.today.has-event::after{background:#fff;}
+.cal-day::after{content:'';display:none;width:6px;height:6px;border-radius:50%;margin:3px auto 0;}
+.cal-day.event-red::after{display:block;background:#dc3545;}
+.cal-day.event-blue::after{display:block;background:#0d6efd;}
+.cal-day.event-green::after{display:block;background:#198754;}
+.cal-day.event-gray::after{display:block;background:#adb5bd;}
+.cal-day.today.event-red::after,.cal-day.today.event-blue::after,.cal-day.today.event-green::after,.cal-day.today.event-gray::after{background:#fff;}
 </style>
 </head>
 <body>
@@ -129,7 +133,12 @@ function renderEventList() {
         var end = s.end_date ? ' ~ ' + s.end_date.split(' ')[1].substring(0,5) : '';
         var loc = s.location ? '<br><small>📍 '+s.location+'</small>' : '';
         var memo = s.description ? '<br><small>📝 '+s.description+'</small>' : '';
-        return '<div class="d-flex justify-content-between border-bottom py-1"><span><strong>'+s.title+'</strong><br><small>🕐 '+s.event_date.split(' ')[1].substring(0,5)+end+'</small>'+loc+memo+'</span><button class="btn btn-sm btn-outline-danger" onclick="deleteEvent('+s.id+')">✕</button></div>';
+        var color = s.color || 'gray';
+        var badge = {'red':'🔴','blue':'🔵','green':'🟢','gray':'⚪'}[color] || '⚪';
+        var extra = '';
+        if (s.departure_time) extra += '<br><small>🚶 출발: '+s.departure_time+' ('+s.travel_min+'분)</small>';
+        if (s.return_time) extra += '<br><small>🏠 귀가: '+s.return_time+'</small>';
+        return '<div class="d-flex justify-content-between border-bottom py-1"><span><strong>'+badge+' '+s.title+'</strong><br><small>🕐 '+s.event_date.split(' ')[1].substring(0,5)+end+'</small>'+loc+memo+extra+'</span><button class="btn btn-sm btn-outline-danger" onclick="deleteEvent('+s.id+')">✕</button></div>';
     }).join('');
 }
 
@@ -145,7 +154,16 @@ function renderCal() {
         const dateStr = calYear+'-'+String(calMonth).padStart(2,'0')+'-'+String(d).padStart(2,'0');
         const today = now.getFullYear()===calYear && now.getMonth()+1===calMonth && now.getDate()===d;
         const hasEvent = schedules.some(s => s.event_date && s.event_date.startsWith(dateStr));
-        html += '<div class="cal-day '+(today?'today':'')+' '+(hasEvent?'has-event':'')+'" onclick="showDay(\''+dateStr+'\')">'+d+'</div>';
+        var evtColor = '';
+        if (hasEvent) {
+            var evts = schedules.filter(s => s.event_date && s.event_date.startsWith(dateStr));
+            var colors = evts.map(s => s.color || 'gray');
+            if (colors.includes('red')) evtColor = 'event-red';
+            else if (colors.includes('blue')) evtColor = 'event-blue';
+            else if (colors.includes('green')) evtColor = 'event-green';
+            else evtColor = 'event-gray';
+        }
+        html += '<div class="cal-day '+(today?'today':'')+' '+evtColor+'" onclick="showDay(\''+dateStr+'\')">'+d+'</div>';
     }
     // 빈칸 채우기
     const remaining = (7 - ((firstDay + lastDate) % 7)) % 7;
@@ -156,8 +174,18 @@ function renderCal() {
 function showDay(date) {
     const dayScheds = schedules.filter(s => s.event_date && s.event_date.startsWith(date));
     const el = document.getElementById('dayEvents');
-    if (dayScheds.length === 0) { el.innerHTML = '<div class="text-muted small">'+date+' - 일정 없음</div>'; return; }
-    el.innerHTML = '<strong class="small">'+date+'</strong>'+dayScheds.map(s => '<div class="small border-bottom py-1">🕐 '+s.event_date.split(' ')[1]+' - '+s.title+'</div>').join('');
+    if (dayScheds.length === 0) { el.innerHTML = '<div class="text-muted small py-2">일정 없음</div>'; return; }
+    var h = '<div class="small fw-bold mb-2">'+date+'</div>';
+    dayScheds.forEach(function(s){
+        var color = s.color || 'gray';
+        var badge = {'red':'🔴','blue':'🔵','green':'🟢','gray':'⚪'}[color] || '⚪';
+        var time = s.event_date ? s.event_date.split(' ')[1].substring(0,5) : '';
+        var extra = '';
+        if (s.departure_time) extra += '<br><small>🚶 출발: '+s.departure_time+' (약 '+s.travel_min+'분)</small>';
+        if (s.return_time) extra += '<br><small>🏠 귀가: '+s.return_time+'</small>';
+        h += '<div class="border-bottom py-1 mb-1 small"><strong>'+badge+' '+s.title+'</strong><br>🕐 '+time+extra+(s.location?'<br>📍 '+s.location:'')+'</div>';
+    });
+    el.innerHTML = h;
 }
 
 function changeMonth(d) {
