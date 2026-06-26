@@ -118,10 +118,10 @@
     </div>
 
     <!-- ========== 그룹2: 벗리스트 + 쪽지 ========== -->
+    {% if is_own or messages %}
     <div class="card border-0 shadow-sm mb-3" style="border-radius: 18px;">
         <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center" style="border-radius: 18px 18px 0 0;">
-            <span>{% if is_own %}👥 벗 · 쪽지{% else %}💬 주고받은 쪽지{% endif %}</span>
-            {% if not is_own and not is_admin %}<a href="/message/send/{{ profile_user.id }}" class="btn btn-success btn-sm">쪽지 보내기</a>{% endif %}
+            <span>{% if is_own %}👥 벗 · 쪽지{% else %}💬 쪽지{% endif %}</span>
         </div>
         <div class="card-body p-0">
             {% if is_own and recent_friends %}
@@ -136,7 +136,7 @@
     {% endif %}
             <div class="list-group list-group-flush" style="max-height:250px;overflow-y:auto;">
                 {% for m in messages %}
-                <a href="/message/read/{{ m.id }}" class="list-group-item list-group-item-action {% if not m.is_read and is_own %}fw-bold bg-light{% endif %} small">
+                {% if is_own %}<a href="/message/read/{{ m.id }}" class="list-group-item list-group-item-action {% if not m.is_read and is_own %}fw-bold bg-light{% endif %} small">{% else %}<div class="list-group-item small">{% endif %}
                     <div class="d-flex justify-content-between">
                         <span class="text-muted">{{ m.created_at.strftime('%m/%d %H:%M') }}</span>
                         {% if is_own %}<span class="badge {% if m.sender_role=='admin' %}bg-danger{% elif m.sender_role=='leader' %}bg-primary{% else %}bg-secondary{% endif %}">{{ m.sender_role }}</span>
@@ -144,13 +144,14 @@
                     </div>
                     <strong>{{ m.subject }}</strong>
                     <small class="text-muted d-block">{% if m.content.startswith('<div') %}{{ m.content|safe }}{% else %}{{ m.content[:80] }}{% if m.content|length > 80 %}...{% endif %}{% endif %}</small>
-                </a>
+                {% if is_own %}</a>{% else %}</div>{% endif %}
                 {% else %}
                 <div class="list-group-item text-center text-muted py-4">쪽지가 없습니다.</div>
                 {% endfor %}
             </div>
         </div>
     </div>
+    {% endif %}
 
     <!-- ========== 그룹3: 내 게시글 ========== -->
     {% if posts %}
