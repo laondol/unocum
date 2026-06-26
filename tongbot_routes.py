@@ -217,23 +217,93 @@ def _detect_schedule_intent(msg):
             return True
     return keyword_hit
 
+KST = timezone(timedelta(hours=9))
+
+def _parse_korean_datetime(msg, now):
+    """한글 자연어 → datetime (KST)"""
+    WEEKDAYS = {'월요일':0,'화요일':1,'수요일':2,'목요일':3,'금요일':4,'토요일':5,'일요일':6,
+                '월':0,'화':1,'수':2,'목':3,'금':4,'토':5,'일':6}
+    msg_clean = msg.replace(' ','')
+    hour = None
+    minute = 0
+    ampm = None
+
+    # 시간 추출
+    tm = re.search(r'(오전|오후|아침|점심|저녁|밤)?\s*(\d{1,2})\s*시(\s*(\d{1,2})\s*분)?', msg)
+    if tm:
+        label = tm.group(1) or ''
+        hour = int(tm.group(2))
+        if tm.group(4):
+            minute = int(tm.group(4))
+        if '오후' in label or '저녁' in label or '밤' in label:
+            if hour < 12:
+                hour += 12
+        elif '아침' in label or '점심' in label:
+            ampm = 'pm' if '점심' in label else 'am'
+            if ampm == 'pm' and hour < 12:
+                hour += 12
+        # "오전"은 그대로
+    if hour is None:
+        tm2 = re.search(r'(\d{1,2}):(\d{2})', msg)
+        if tm2:
+            hour = int(tm2.group(1))
+            minute = int(tm2.group(2))
+
+    # 날짜 계산
+    target_date = now.date()
+    if '오늘' in msg_clean:
+        pass  # already now.date()
+    elif '모레' in msg_clean:
+        target_date += timedelta(days=2)
+    elif '내일' in msg_clean:
+        target_date += timedelta(days=1)
+    elif '글피' in msg_clean:
+        target_date += timedelta(days=3)
+    elif any(w in msg_clean for w in WEEKDAYS):
+        for wday_name, wday_num in WEEKDAYS.items():
+            if wday_name in msg_clean:
+                days_ahead = (wday_num - now.weekday()) % 7
+                if '다음주' in msg_clean:
+                    days_ahead += 7
+                elif '다다음주' in msg_clean:
+                    days_ahead += 14
+                else:
+                    if days_ahead == 0:
+                        days_ahead = 7 if '다음' in msg_clean else 0
+                target_date += timedelta(days=days_ahead or 7)
+                break
+    elif '다음주' in msg_clean:
+        target_date += timedelta(days=7)
+    elif '이번주' in msg_clean:
+        pass
+
+    # 절대 날짜: 6월 30일, 2026년 6월 30일, 6/30
+    abs_full = re.search(r'(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일', msg)
+    if abs_full:
+        target_date = datetime(int(abs_full.group(1)), int(abs_full.group(2)), int(abs_full.group(3))).date()
+    else:
+        abs_md = re.search(r'(\d{1,2})월\s*(\d{1,2})일', msg)
+        if abs_md:
+            target_date = datetime(now.year, int(abs_md.group(1)), int(abs_md.group(2))).date()
+        else:
+            md = re.search(r'(\d{1,2})/(\d{1,2})', msg)
+            if md:
+                target_date = datetime(now.year, int(md.group(1)), int(md.group(2))).date()
+
+    if hour is None:
+        return None
+    return datetime(target_date.year, target_date.month, target_date.day, hour, minute, tzinfo=KST)
+
 def _parse_schedule_from_text(msg, uid):
     """자연어에서 일정 정보 추출: title, event_date, location"""
     result = {'title': '', 'event_date': None, 'location': '', 'description': ''}
     KST = timezone(timedelta(hours=9))
     now = datetime.now(KST)
 
-    # 1) dateparser로 날짜/시간 추출
-    try:
-        import dateparser
-        settings = {'PREFER_DATES_FROM': 'future', 'RELATIVE_BASE': now.replace(tzinfo=None)}
-        dt = dateparser.parse(msg, settings=settings, languages=['ko'])
-        if dt:
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=KST)
-            result['event_date'] = dt
-    except:
-        pass
+    # 1) 한글 날짜/시간 파싱 (dateparser는 한글 미지원)
+    dt = _parse_korean_datetime(msg, now)
+    if dt:
+        result['event_date'] = dt
 
     # 2) 장소 추출: "~에서", "장소는 ~", "~로"
     loc = ''
