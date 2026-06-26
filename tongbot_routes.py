@@ -683,7 +683,7 @@ def bot_schedule_ai_internal(uid, msg, user, bot=None):
     today_str = now.strftime('%Y-%m-%d %H:%M')
     weekday = ['월','화','수','목','금','토','일'][now.weekday()]
 
-    # 기존 일정 목록
+    # 기존 일정 + 벗 목록
     scheds = TongBotSchedule.query.filter_by(user_id=uid).order_by(TongBotSchedule.event_date.asc()).limit(20).all()
     sched_list = []
     for s in scheds:
@@ -697,6 +697,11 @@ def bot_schedule_ai_internal(uid, msg, user, bot=None):
                 s_str += f" @{s.location}"
             sched_list.append(s_str)
 
+    # 벗 목록
+    from models import Friend
+    friends = User.query.join(Friend, Friend.friend_id == User.id).filter(Friend.user_id == uid, Friend.status == 'accepted').all()
+    friend_names = [f.username for f in friends[:10]]
+
     home_addr = f"{user.town or ''} {user.village or ''}".strip()
     if user.address:
         home_addr = user.address
@@ -705,6 +710,7 @@ def bot_schedule_ai_internal(uid, msg, user, bot=None):
 
 현재: {today_str} ({week요일})
 사용자 기본주소: {home_addr}
+내 벗: {', '.join(friend_names) if friend_names else '없음'}
 기존 일정:
 {chr(10).join(sched_list) if sched_list else '(없음)'}
 
@@ -714,7 +720,8 @@ def bot_schedule_ai_internal(uid, msg, user, bot=None):
 3. 일정 삭제: {{"action":"delete","id":일정번호}}
 4. 일정 변경: {{"action":"update","id":일정번호,"changes":{{"title":"새제목","event_date":"2026-06-27T16:00"}}}}
 5. 빈시간 찾기: {{"action":"find_free","date":"2026-06-27","duration_min":60}}
-6. 일반 대화: {{"action":"chat","reply":"친절한답변"}}
+6. 공통 빈시간: {{"action":"find_common","date":"2026-06-27","friend_names":["벗이름1","벗이름2"],"duration_min":60}}
+7. 일반 대화: {{"action":"chat","reply":"친절한답변"}}
 
 [규칙]
 - event_date는 반드시 ISO형식(YYYY-MM-DDTHH:MM)으로
@@ -832,13 +839,11 @@ def bot_schedule_ai_internal(uid, msg, user, bot=None):
     elif action == 'find_free':
         date_str = action_data.get('date', now.strftime('%Y-%m-%d'))
         duration = int(action_data.get('duration_min', 60))
-        # 해당 날짜의 기존 일정 가져오기
         day_scheds = TongBotSchedule.query.filter_by(user_id=uid).filter(
             TongBotSchedule.event_date >= f'{date_str} 00:00',
             TongBotSchedule.event_date <= f'{date_str} 23:59'
         ).order_by(TongBotSchedule.event_date.asc()).all()
-        # 9시~21시 사이 빈 시간대 찾기
-        busy = [(9, 0)]
+        busy = [(9*60, 9*60)]
         for s in day_scheds:
             evt = s.event_date
             if evt:
@@ -847,9 +852,8 @@ def bot_schedule_ai_internal(uid, msg, user, bot=None):
                 if s.end_date:
                     end_min = s.end_date.hour * 60 + s.end_date.minute
                 busy.append((start_min, end_min))
-        busy.append((21 * 60, 21 * 60))
+        busy.append((21*60, 21*60))
         busy.sort()
-
         free_slots = []
         for i in range(len(busy) - 1):
             gap = busy[i+1][0] - busy[i][1]
@@ -859,11 +863,47 @@ def bot_schedule_ai_internal(uid, msg, user, bot=None):
                 end_h = busy[i+1][0] // 60
                 end_m = busy[i+1][0] % 60
                 free_slots.append(f"{start_h:02d}:{start_m:02d}~{end_h:02d}:{end_m:02d}")
-
         if free_slots:
             return {"reply": f"🕐 {date_str} 빈 시간 ({duration}분 이상):\n" + '\n'.join(f"  {s}" for s in free_slots[:5]), "action": "find_free"}
         else:
             return {"reply": f"😔 {date_str}에 {duration}분 이상 빈 시간이 없습니다.", "action": "find_free"}
+
+    elif action == 'find_common':
+        date_str = action_data.get('date', now.strftime('%Y-%m-%d'))
+        duration = int(action_data.get('duration_min', 60))
+        friend_names = action_data.get('friend_names', [])
+        if not friend_names:
+            return {"reply": "어떤 벗과 일정을 조율할까요?", "action": "chat"}
+        friend_users = User.query.filter(User.username.in_(friend_names)).all()
+        if not friend_users:
+            return {"reply": "해당 벗을 찾을 수 없습니다.", "action": "chat"}
+        friend_ids = [f.id for f in friend_users]
+        all_busy = [(9*60, 9*60)]
+        for fid in friend_ids:
+            f_scheds = TongBotSchedule.query.filter_by(user_id=fid).filter(
+                TongBotSchedule.event_date >= f'{date_str} 00:00',
+                TongBotSchedule.event_date <= f'{date_str} 23:59'
+            ).all()
+            for s in f_scheds:
+                sm = s.event_date.hour * 60 + s.event_date.minute
+                em = sm + 60
+                if s.end_date:
+                    em = s.end_date.hour * 60 + s.end_date.minute
+                all_busy.append((sm, em))
+        all_busy.append((21*60, 21*60))
+        all_busy.sort()
+        free_slots = []
+        for i in range(len(all_busy)-1):
+            gap = all_busy[i+1][0] - all_busy[i][1]
+            if gap >= duration:
+                sh = all_busy[i][1] // 60; sm = all_busy[i][1] % 60
+                eh = all_busy[i+1][0] // 60; em = all_busy[i+1][0] % 60
+                free_slots.append(f"{sh:02d}:{sm:02d}~{eh:02d}:{em:02d}")
+        fnames = ', '.join(friend_names[:3])
+        if free_slots:
+            return {"reply": f"🤝 {fnames} 공통 빈시간 ({date_str}, {duration}분 이상):\n" + '\n'.join(f"  ✅ {s}" for s in free_slots[:5]), "action": "find_common"}
+        else:
+            return {"reply": f"😔 {date_str}에 {fnames} 모두 가능한 시간이 없습니다.", "action": "find_common"}
 
     else:
         return {"reply": action_data.get('reply', '무엇을 도와드릴까요?'), "action": "chat"}
@@ -915,13 +955,11 @@ def bot_schedule():
                             return_time = end + timedelta(minutes=travel_min)
                             item["return_time"] = return_time.strftime("%H:%M")
                             if d > 10:
-                                item["color"] = "blue"  # 10km 이상이면 출장
-                            else:
-                                item["color"] = "blue"  # 근거리도 출장으로
+                                item["color"] = "blue"
                     else:
-                        item["color"] = "green"  # 좌표 못찾으면 기본 초록
+                        item["color"] = "green"
                 else:
-                    item["color"] = "gray"  # 장소 없음
+                    item["color"] = "gray"
             result_list.append(item)
         return jsonify({"schedules": result_list})
     data = request.json
