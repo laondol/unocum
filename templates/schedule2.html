@@ -262,7 +262,12 @@ function calcTravelTime() {
     var loc = document.getElementById('addLoc').value.trim();
     var start = document.getElementById('addStart').value || '09:00';
     if (!loc) return;
-    fetch('/api/bot/schedule/calc-time', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({location: loc, event_time: start})})
+    fetch('/api/bot/schedule/calc-time', {
+        method:'POST', 
+        headers:{'Content-Type':'application/json'},
+        credentials:'same-origin',
+        body:JSON.stringify({location: loc, event_time: start})
+    })
     .then(function(r){return r.json()}).then(function(d){
         if (!d.walk) return;
         var mode = document.querySelector('input[name=transport]:checked');
@@ -270,7 +275,7 @@ function calcTravelTime() {
         var t = d[m];
         document.getElementById('addDepTime').value = t.dep;
         document.getElementById('addRetTime').value = t.ret;
-    });
+    }).catch(function(e){console.error(e);});
 }
 </script>
 </body>
