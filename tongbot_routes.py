@@ -932,7 +932,7 @@ def bot_schedule_ai_internal(uid, msg, user, bot=None):
                     dep_time = evt - timedelta(minutes=travel_min + 15)
                     ret_time = evt + timedelta(hours=1, minutes=travel_min)
                     fb.append(f"출발시간: {dep_time.strftime('%H:%M')} (이동 약{travel_min}분)")
-                    fb.append(f"귀가예상: {ret_time.strftime('%H:%M')}")
+                    fb.append(f"귀가가능시간: {ret_time.strftime('%H:%M')}")
                 else:
                     fb.append("기본장소에서 하시는 모임이 아니신데 장소가 정확하지 않아서 출발시간과 귀가시간을 특정하기 어렵습니다.")
                     fb.append("상세주소를 알려주시면 출발시간과 귀가시간을 알려 드리겠습니다.")
