@@ -86,9 +86,20 @@ function switchTab(t) {
     ['tabView','tabAdd','tabList'].forEach(id => document.getElementById(id).style.display='none');
     document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).style.display='';
     if (t === 'add') {
-        document.getElementById('addDate').value = new Date().toISOString().slice(0,10);
+        var d = new Date().toISOString().slice(0,10);
+        document.getElementById('addDate').value = d;
         document.getElementById('addDepLoc').value = userHome;
         document.getElementById('addRetLoc').value = userHome;
+        // 이전 일정의 장소를 출발장소로
+        var todayScheds = schedules.filter(function(s){
+            return s.event_date && s.event_date.startsWith(d) && s.location;
+        }).sort(function(a,b){
+            return a.event_date.localeCompare(b.event_date);
+        });
+        if (todayScheds.length > 0) {
+            var last = todayScheds[todayScheds.length-1];
+            document.getElementById('addDepLoc').value = last.location;
+        }
     }
 }
 
