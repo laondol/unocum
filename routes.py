@@ -2301,7 +2301,14 @@ def register_routes(app):
     @app.route('/construction')
     @app.route('/construction')
     def construction():
-        notices = ConstructionNotice.query.filter_by(is_active=True).all()
+        six_months_ago = datetime.now() - timedelta(days=180)
+        notices = ConstructionNotice.query.filter(
+            ConstructionNotice.is_active == True,
+            db.or_(
+                ConstructionNotice.start_date >= six_months_ago,
+                ConstructionNotice.start_date == None
+            )
+        ).all()
         # 사용자 집 기준 거리순 정렬
         uid = session.get('user_id')
         if uid:
