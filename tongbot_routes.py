@@ -187,6 +187,7 @@ def bot_chat():
             current_app.logger.error(f'일정AI 오류: {e}')
 
     # 통벗 추천: 문맥에 맞는 기능 제안
+    suggestions = None
     if not schedule_info and not shopping_info and not counselor:
         suggestions = _get_proactive_suggestions(user, msg)
 
@@ -914,15 +915,11 @@ def bot_schedule_ai_internal(uid, msg, user, bot=None):
             db.session.add(s)
             db.session.commit()
             dt_str = evt.strftime('%m/%d %H:%M')
-            # 피드백 구성
-            fb = [f"📅 일정이 등록되었습니다!"]
+            fb = [f"📅 오늘 일정에 등록되었습니다!"]
             fb.append(f"제목: {s.title}")
+            fb.append(f"시간: {dt_str}")
             if s.location:
                 fb.append(f"장소: {s.location}")
-            else:
-                fb.append(f"장소: (입력되지 않음)")
-            fb.append(f"시간: {dt_str}")
-            # 출발/귀가 계산
             user_home = User.query.get(uid)
             if s.location and user_home:
                 loc_lat, loc_lng = _geocode_location(s.location)
@@ -933,10 +930,12 @@ def bot_schedule_ai_internal(uid, msg, user, bot=None):
                     d = haversine_km(home_lat, home_lng, loc_lat, loc_lng)
                     travel_min = round(d * 15)
                     dep_time = evt - timedelta(minutes=travel_min + 15)
+                    ret_time = evt + timedelta(hours=1, minutes=travel_min)
                     fb.append(f"출발시간: {dep_time.strftime('%H:%M')} (이동 약{travel_min}분)")
-                    fb.append(f"귀가예상: {(evt + timedelta(hours=1, minutes=travel_min)).strftime('%H:%M')}")
+                    fb.append(f"귀가예상: {ret_time.strftime('%H:%M')}")
                 else:
-                    fb.append("💡 출발시간과 귀가시간을 알려면 장소의 상세주소가 필요합니다.")
+                    fb.append("기본장소에서 하시는 모임이 아니신데 장소가 정확하지 않아서 출발시간과 귀가시간을 특정하기 어렵습니다.")
+                    fb.append("상세주소를 알려주시면 출발시간과 귀가시간을 알려 드리겠습니다.")
             reply = '\n'.join(fb)
             return {"reply": reply, "action": "create", "schedule": {"id": s.id, "title": s.title, "date": dt_str}}
         except Exception as e:
