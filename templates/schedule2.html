@@ -62,7 +62,8 @@ body{background:#f8f9fa;font-size:0.9rem;}
             <div class="col-3"><label class="small">귀가가능</label><input id="addRetTime" class="form-control form-control-sm" type="time" readonly></div>
         </div>
         <textarea id="addMemo" class="form-control form-control-sm mb-2" rows="2" placeholder="메모"></textarea>
-        <button class="btn btn-sm btn-success w-100" onclick="addEvent()">저장</button>
+        <input type="hidden" id="editId" value="">
+        <button class="btn btn-sm btn-success w-100" id="saveBtn" onclick="saveEvent()">저장</button>
     </div>
 </div>
 
@@ -164,7 +165,7 @@ function renderEventList() {
         let extra = '';
         if (s.departure_time) extra += '<br>🚶 출발: '+s.departure_time;
         if (s.return_time) extra += '<br>🏠 귀가가능: '+s.return_time;
-        return '<div class="border-bottom py-1"><strong>'+badge+' '+s.title+'</strong><br><small>🕐 '+time+'</small>'+(s.location?'<br><small>📍 '+s.location+'</small>':'')+extra+'<br><button class="btn btn-sm btn-outline-danger mt-1" onclick="deleteEvent('+s.id+')">✕</button></div>';
+        return '<div class="border-bottom py-1"><strong>'+badge+' '+s.title+'</strong><br><small>🕐 '+time+'</small>'+(s.location?'<br><small>📍 '+s.location+'</small>':'')+extra+'<br><button class="btn btn-sm btn-outline-secondary mt-1 me-1" onclick="editEvent('+s.id+')">✏️</button><button class="btn btn-sm btn-outline-danger mt-1" onclick="deleteEvent('+s.id+')">✕</button></div>';
     }).join('');
 }
 
@@ -175,21 +176,54 @@ function changeMonth(d) {
     renderCal();
 }
 
-function addEvent() {
-    const title = document.getElementById('addTitle').value.trim();
-    const date = document.getElementById('addDate').value;
-    const start = document.getElementById('addStart').value;
-    const end = document.getElementById('addEnd').value;
-    const loc = document.getElementById('addLoc').value.trim();
-    const depLoc = document.getElementById('addDepLoc').value.trim();
-    const retLoc = document.getElementById('addRetLoc').value.trim();
-    const memo = document.getElementById('addMemo').value.trim();
+function editEvent(id) {
+    var s = schedules.find(function(x){return x.id === id;});
+    if (!s) return;
+    document.getElementById('editId').value = id;
+    document.getElementById('addTitle').value = s.title || '';
+    if (s.event_date) {
+        var parts = s.event_date.split(' ');
+        document.getElementById('addDate').value = parts[0];
+        document.getElementById('addStart').value = parts.length>1 ? parts[1].substring(0,5) : '';
+        if (s.end_date) {
+            document.getElementById('addEnd').value = s.end_date.split(' ')[1].substring(0,5);
+        }
+    }
+    document.getElementById('addLoc').value = s.location || '';
+    document.getElementById('addDepLoc').value = s.departure_location || userHome;
+    document.getElementById('addRetLoc').value = s.return_location || userHome;
+    document.getElementById('addMemo').value = s.memo || s.description || '';
+    document.getElementById('saveBtn').textContent = '수정';
+    switchTab('add');
+}
+
+function saveEvent() {
+    var id = document.getElementById('editId').value;
+    var title = document.getElementById('addTitle').value.trim();
+    var date = document.getElementById('addDate').value;
+    var start = document.getElementById('addStart').value;
+    var end = document.getElementById('addEnd').value;
+    var loc = document.getElementById('addLoc').value.trim();
+    var depLoc = document.getElementById('addDepLoc').value.trim();
+    var retLoc = document.getElementById('addRetLoc').value.trim();
+    var memo = document.getElementById('addMemo').value.trim();
     if (!title || !date) return alert('제목과 날짜를 입력하세요.');
-    const evt = start ? date+'T'+start : date+'T09:00';
-    const data = {title, event_date: evt, location: loc, memo, departure_location: depLoc, return_location: retLoc};
+    var evt = start ? date+'T'+start : date+'T09:00';
+    var data = {title, event_date: evt, location: loc, memo, departure_location: depLoc, return_location: retLoc};
     if (end) data.end_date = date+'T'+end;
-    fetch('/api/bot/schedule', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
-    .then(r=>r.json()).then(d => { if(d.success) { alert('등록 완료'); loadEvents(); switchTab('view'); } });
+    if (id) data.id = parseInt(id);
+    var url = id ? '/api/bot/schedule/update' : '/api/bot/schedule';
+    fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
+    .then(function(r){return r.json()}).then(function(d){
+        if (d.success) {
+            document.getElementById('editId').value = '';
+            document.getElementById('saveBtn').textContent = '저장';
+            ['addTitle','addLoc','addMemo','addStart','addEnd','addDepTime','addRetTime'].forEach(function(x){document.getElementById(x).value='';});
+            alert(id?'수정 완료':'등록 완료');
+            loadEvents();
+            switchTab('view');
+        }
+    });
 }
 
 function deleteEvent(id) {

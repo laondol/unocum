@@ -1167,6 +1167,28 @@ def bot_schedule():
     db.session.commit()
     return jsonify({"success": True, "id": s.id})
 
+@tongbot_bp.route('/api/bot/schedule/update', methods=['POST'])
+def bot_schedule_update():
+    uid = session.get('user_id')
+    if not uid: return jsonify({"error":"로그인"}),401
+    data = request.get_json()
+    s = TongBotSchedule.query.get(data.get('id'))
+    if not s or s.user_id != uid: return jsonify({"error":"권한없음"}),403
+    if data.get('title'): s.title = data['title']
+    if data.get('location'): s.location = data['location']
+    if data.get('description'): s.description = data['description']
+    if data.get('memo'): s.memo = data['memo']
+    if data.get('departure_location') is not None: s.departure_location = data['departure_location']
+    if data.get('return_location') is not None: s.return_location = data['return_location']
+    if data.get('event_date'):
+        try: s.event_date = datetime.fromisoformat(data['event_date'])
+        except: pass
+    if data.get('end_date'):
+        try: s.end_date = datetime.fromisoformat(data['end_date'])
+        except: pass
+    db.session.commit()
+    return jsonify({"success": True})
+
 @tongbot_bp.route('/api/bot/schedule/delete', methods=['POST'])
 def bot_schedule_delete():
     uid = session.get('user_id')
