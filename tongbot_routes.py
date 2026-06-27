@@ -1172,6 +1172,10 @@ def bot_schedule_delete():
     db.session.commit()
     return jsonify({"success":True})
 
+@tongbot_bp.route('/schedule')
+def schedule_popup():
+    return render_template('schedule_popup.html')
+
 @tongbot_bp.route('/schedule2')
 def schedule2_popup():
     return render_template('schedule2.html')
