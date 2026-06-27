@@ -1087,6 +1087,35 @@ def bot_schedule_ai_internal(uid, msg, user, bot=None):
     else:
         return {"reply": action_data.get('reply', '무엇을 도와드릴까요?'), "action": "chat"}
 
+@tongbot_bp.route('/api/bot/schedule/calc-time', methods=['POST'])
+def bot_schedule_calc_time():
+    """장소명→출발/귀가시간 계산 (도보/자전거/대중교통)"""
+    uid = session.get('user_id')
+    if not uid: return jsonify({"error":"로그인"}),401
+    data = request.get_json()
+    loc = data.get('location','').strip()
+    event_time = data.get('event_time','')
+    if not loc: return jsonify({})
+    try:
+        user = User.query.get(uid)
+        home_lat = user.curr_latitude or user.latitude
+        home_lng = user.curr_longitude or user.longitude
+        loc_lat, loc_lng = _geocode_location(loc)
+        if loc_lat and home_lat:
+            from services.transit import haversine_km
+            d = haversine_km(home_lat, home_lng, loc_lat, loc_lng)
+            parts = event_time.split(':')
+            h, m = int(parts[0]) if len(parts)>0 else 9, int(parts[1]) if len(parts)>1 else 0
+            et = datetime.now(KST).replace(hour=h, minute=m)
+            return jsonify({
+                "walk": {"min": round(d*15), "dep": (et - timedelta(minutes=round(d*15)+15)).strftime('%H:%M'), "ret": (et + timedelta(hours=1, minutes=round(d*15))).strftime('%H:%M')},
+                "bike": {"min": round(d*5), "dep": (et - timedelta(minutes=round(d*5)+10)).strftime('%H:%M'), "ret": (et + timedelta(hours=1, minutes=round(d*5))).strftime('%H:%M')},
+                "transit": {"min": round(d*5+15), "dep": (et - timedelta(minutes=round(d*5)+25)).strftime('%H:%M'), "ret": (et + timedelta(hours=1, minutes=round(d*5)+15)).strftime('%H:%M')},
+                "distance_km": round(d,1)
+            })
+    except: pass
+    return jsonify({})
+
 @tongbot_bp.route('/api/bot/schedule', methods=['GET', 'POST'])
 def bot_schedule():
     uid = session.get('user_id')
