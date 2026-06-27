@@ -1105,6 +1105,8 @@ def bot_schedule():
                 "memo": s.memo, "location": s.location,
                 "event_date": s.event_date.strftime("%Y-%m-%d %H:%M") if s.event_date else "",
                 "end_date": s.end_date.strftime("%Y-%m-%d %H:%M") if s.end_date else "",
+                "departure_location": s.departure_location or '',
+                "return_location": s.return_location or '',
                 "invited": s.invited_user_ids, "color": "gray"
             }
             # 컬러 판정
@@ -1152,7 +1154,9 @@ def bot_schedule():
         end_date=end_date,
         location=data.get('location',''),
         memo=data.get('memo',''),
-        invited_user_ids=data.get('invited',''))
+        invited_user_ids=data.get('invited',''),
+        departure_location=data.get('departure_location',''),
+        return_location=data.get('return_location',''))
     db.session.add(s)
     db.session.commit()
     return jsonify({"success": True, "id": s.id})
@@ -1168,7 +1172,9 @@ def bot_schedule_delete():
     db.session.commit()
     return jsonify({"success":True})
 
-@tongbot_bp.route('/schedule')
+@tongbot_bp.route('/schedule2')
+def schedule2_popup():
+    return render_template('schedule2.html')
 def schedule_popup():
     if not session.get('user_id'):
         return redirect(url_for('login', next='/schedule'))

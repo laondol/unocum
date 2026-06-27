@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>일정 2.0</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+body{background:#f8f9fa;font-size:0.9rem;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+.cal-header{text-align:center;font-size:0.75rem;font-weight:bold;color:#6c757d;padding:4px;}
+.cal-day{text-align:center;padding:8px 4px;border-radius:8px;cursor:pointer;font-size:0.85rem;position:relative;}
+.cal-day:hover{background:#e9ecef;}
+.cal-day.today{background:#0d6efd;color:#fff;font-weight:bold;}
+.cal-day::after{content:'';display:none;width:6px;height:6px;border-radius:50%;margin:3px auto 0;}
+.cal-day.event-red::after{display:block;background:#dc3545;}
+.cal-day.event-blue::after{display:block;background:#0d6efd;}
+.cal-day.event-green::after{display:block;background:#198754;}
+.cal-day.event-gray::after{display:block;background:#adb5bd;}
+.cal-day.today.event-red::after,.cal-day.today.event-blue::after,.cal-day.today.event-green::after,.cal-day.today.event-gray::after{background:#fff;}
+</style>
+</head>
+<body>
+<div class="container py-3" style="max-width:800px;">
+<div class="d-flex gap-2 mb-3">
+    <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('view')">📅 달력</button>
+    <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('add')">➕ 추가</button>
+    <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('list')">📋 리스트</button>
+</div>
+
+<!-- 달력 탭 -->
+<div id="tabView">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <button class="btn btn-sm btn-outline-secondary" onclick="changeMonth(-1)">◀</button>
+        <span id="calTitle" class="fw-bold"></span>
+        <button class="btn btn-sm btn-outline-secondary" onclick="changeMonth(1)">▶</button>
+    </div>
+    <div class="cal-grid mb-2" id="calHeaders">
+        <div class="cal-header">일</div><div class="cal-header">월</div><div class="cal-header">화</div><div class="cal-header">수</div><div class="cal-header">목</div><div class="cal-header">금</div><div class="cal-header">토</div>
+    </div>
+    <div class="cal-grid mb-3" id="calGrid"></div>
+    <div id="dayEvents" class="small"></div>
+</div>
+
+<!-- 추가 탭 -->
+<div id="tabAdd" style="display:none;">
+    <div class="card p-3">
+        <h6 class="mb-3">새 일정</h6>
+        <input id="addTitle" class="form-control form-control-sm mb-2" placeholder="제목">
+        <div class="row g-2 mb-2">
+            <div class="col-6"><label class="small">날짜</label><input type="date" id="addDate" class="form-control form-control-sm"></div>
+            <div class="col-3"><label class="small">시작</label><input type="time" id="addStart" class="form-control form-control-sm"></div>
+            <div class="col-3"><label class="small">종료</label><input type="time" id="addEnd" class="form-control form-control-sm"></div>
+        </div>
+        <input id="addLoc" class="form-control form-control-sm mb-2" placeholder="장소">
+        <div class="row g-2 mb-2">
+            <div class="col-6"><label class="small">출발장소</label><input id="addDepLoc" class="form-control form-control-sm" placeholder="기본주소"></div>
+            <div class="col-3"><label class="small">출발시간</label><input id="addDepTime" class="form-control form-control-sm" type="time" readonly></div>
+        </div>
+        <div class="row g-2 mb-2">
+            <div class="col-6"><label class="small">귀가장소</label><input id="addRetLoc" class="form-control form-control-sm" placeholder="기본주소"></div>
+            <div class="col-3"><label class="small">귀가가능</label><input id="addRetTime" class="form-control form-control-sm" type="time" readonly></div>
+        </div>
+        <textarea id="addMemo" class="form-control form-control-sm mb-2" rows="2" placeholder="메모"></textarea>
+        <button class="btn btn-sm btn-success w-100" onclick="addEvent()">저장</button>
+    </div>
+</div>
+
+<!-- 리스트 탭 -->
+<div id="tabList" style="display:none;">
+    <div id="eventList" class="small"></div>
+</div>
+</div>
+
+<script>
+let calYear, calMonth, schedules = [], userHome = '';
+
+// 초기화
+fetch('/api/user/location').then(r=>r.json()).then(d => {
+    userHome = d.address || (d.town+' '+d.village);
+});
+loadEvents();
+renderCal();
+
+function switchTab(t) {
+    ['tabView','tabAdd','tabList'].forEach(id => document.getElementById(id).style.display='none');
+    document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).style.display='';
+    if (t === 'add') {
+        document.getElementById('addDate').value = new Date().toISOString().slice(0,10);
+        document.getElementById('addDepLoc').value = userHome;
+        document.getElementById('addRetLoc').value = userHome;
+    }
+}
+
+function loadEvents() {
+    fetch('/api/bot/schedule').then(r=>r.json()).then(d => {
+        schedules = d.schedules || [];
+        renderCal();
+        renderEventList();
+    });
+}
+
+function renderCal() {
+    const now = new Date();
+    if (!calYear) { calYear = now.getFullYear(); calMonth = now.getMonth()+1; }
+    document.getElementById('calTitle').textContent = calYear+'년 '+calMonth+'월';
+    const firstDay = new Date(calYear, calMonth-1, 1).getDay();
+    const lastDate = new Date(calYear, calMonth, 0).getDate();
+    let html = '';
+    for (let i = 0; i < firstDay; i++) html += '<div></div>';
+    for (let d = 1; d <= lastDate; d++) {
+        const ds = calYear+'-'+String(calMonth).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+        const today = now.getFullYear()===calYear && now.getMonth()+1===calMonth && now.getDate()===d;
+        const evts = schedules.filter(s => s.event_date && s.event_date.startsWith(ds));
+        let cls = '';
+        if (evts.length) {
+            const colors = evts.map(s => s.color||'gray');
+            if (colors.includes('red')) cls = 'event-red';
+            else if (colors.includes('blue')) cls = 'event-blue';
+            else if (colors.includes('green')) cls = 'event-green';
+            else cls = 'event-gray';
+        }
+        html += '<div class="cal-day '+(today?'today ':'')+cls+'" onclick="showDay(\''+ds+'\')">'+d+'</div>';
+    }
+    document.getElementById('calGrid').innerHTML = html;
+}
+
+function showDay(date) {
+    const evts = schedules.filter(s => s.event_date && s.event_date.startsWith(date));
+    const el = document.getElementById('dayEvents');
+    if (!evts.length) { el.innerHTML = '<div class="text-muted small py-2">일정 없음</div>'; return; }
+    let h = '<div class="small fw-bold mb-2">'+date+'</div>';
+    evts.forEach(s => {
+        const badge = {'red':'🔴','blue':'🔵','green':'🟢','gray':'⚪'}[s.color||'gray']||'⚪';
+        const time = s.event_date ? s.event_date.split(' ')[1].substring(0,5) : '';
+        let extra = '';
+        if (s.departure_time) extra += '<br>🚶 출발: '+s.departure_time+' ('+s.travel_min+'분)';
+        if (s.return_time) extra += '<br>🏠 귀가가능: '+s.return_time;
+        let loc = s.location ? '<br>📍 '+s.location : '';
+        if (s.departure_location) loc += '<br>↗ 출발지: '+s.departure_location;
+        if (s.return_location) loc += '<br>↙ 귀가지: '+s.return_location;
+        h += '<div class="border-bottom py-1 mb-1 small"><strong>'+badge+' '+s.title+'</strong><br>🕐 '+time+loc+extra+'</div>';
+    });
+    el.innerHTML = h;
+}
+
+function renderEventList() {
+    const el = document.getElementById('eventList');
+    if (!schedules.length) { el.innerHTML = '<div class="text-muted">일정 없음</div>'; return; }
+    el.innerHTML = schedules.map(s => {
+        const badge = {'red':'🔴','blue':'🔵','green':'🟢','gray':'⚪'}[s.color||'gray']||'⚪';
+        const time = s.event_date ? s.event_date.split(' ')[1].substring(0,5) : '';
+        let extra = '';
+        if (s.departure_time) extra += '<br>🚶 출발: '+s.departure_time;
+        if (s.return_time) extra += '<br>🏠 귀가가능: '+s.return_time;
+        return '<div class="border-bottom py-1"><strong>'+badge+' '+s.title+'</strong><br><small>🕐 '+time+'</small>'+(s.location?'<br><small>📍 '+s.location+'</small>':'')+extra+'<br><button class="btn btn-sm btn-outline-danger mt-1" onclick="deleteEvent('+s.id+')">✕</button></div>';
+    }).join('');
+}
+
+function changeMonth(d) {
+    calMonth += d;
+    if (calMonth > 12) { calMonth = 1; calYear++; }
+    if (calMonth < 1) { calMonth = 12; calYear--; }
+    renderCal();
+}
+
+function addEvent() {
+    const title = document.getElementById('addTitle').value.trim();
+    const date = document.getElementById('addDate').value;
+    const start = document.getElementById('addStart').value;
+    const end = document.getElementById('addEnd').value;
+    const loc = document.getElementById('addLoc').value.trim();
+    const depLoc = document.getElementById('addDepLoc').value.trim();
+    const retLoc = document.getElementById('addRetLoc').value.trim();
+    const memo = document.getElementById('addMemo').value.trim();
+    if (!title || !date) return alert('제목과 날짜를 입력하세요.');
+    const evt = start ? date+'T'+start : date+'T09:00';
+    const data = {title, event_date: evt, location: loc, memo, departure_location: depLoc, return_location: retLoc};
+    if (end) data.end_date = date+'T'+end;
+    fetch('/api/bot/schedule', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
+    .then(r=>r.json()).then(d => { if(d.success) { alert('등록 완료'); loadEvents(); switchTab('view'); } });
+}
+
+function deleteEvent(id) {
+    if (!confirm('삭제?')) return;
+    fetch('/api/bot/schedule/delete', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id})})
+    .then(r=>r.json()).then(d => { if(d.success) loadEvents(); });
+}
+</script>
+</body>
+</html>
