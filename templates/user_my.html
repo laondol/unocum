@@ -53,6 +53,7 @@
         <li class="nav-item"><a class="nav-link active" href="#" data-tab="write">✍️ 글쓰기</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-tab="friendchat">👥 벗 채팅</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-tab="schedule">📅 일정</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" data-tab="task">📋 일</a></li>
     </ul>
 
     <!-- 채팅 탭 -->
@@ -204,8 +205,17 @@
             {% endfor %}
             {% if not schedules %}<div class="text-muted text-center py-3">등록된 일정이 없습니다.</div>{% endif %}
         </div>
+        </div>
     </div>
-</div>
+
+    <!-- 일(todo) 탭 -->
+    <div id="tabTask" style="display:none;">
+        <div class="text-center py-4">
+            <div class="fs-1 mb-2">📋</div>
+            <p class="text-muted small">일정2.0 팝업에서 관리할 수 있습니다.</p>
+            <a href="#" onclick="window.open('/schedule2','sched2','width=800,height=700,left=100,top=50');return false;" class="btn btn-success">일정2.0 열기</a>
+        </div>
+    </div>
 
 <script>
 const BOARD_RULES = {'share':'사진·가게·나눔 정보를 공유합니다','dream':'마을에 바라는 제안을 올립니다','news':'마을 소식을 전합니다','legal':'법률 상담을 요청합니다','psycho':'심리 상담을 요청합니다'};
@@ -216,9 +226,10 @@ document.querySelectorAll('#botTabs .nav-link').forEach(tab => {
         e.preventDefault();
         document.querySelectorAll('#botTabs .nav-link').forEach(t => t.classList.remove('active'));
         this.classList.add('active');
-        ['tabChat','tabWrite','tabFriendchat','tabSchedule'].forEach(id => document.getElementById(id).style.display='none');
+        ['tabChat','tabWrite','tabFriendchat','tabSchedule','tabTask'].forEach(id => document.getElementById(id).style.display='none');
         document.getElementById('tab' + this.dataset.tab.charAt(0).toUpperCase() + this.dataset.tab.slice(1)).style.display = '';
         if (this.dataset.tab === 'friendchat') loadFriendList();
+        if (this.dataset.tab === 'task') window.open('/schedule2','sched2','width=800,height=700,left=100,top=50');
     });
 });
 
