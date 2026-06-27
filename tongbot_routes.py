@@ -1107,6 +1107,8 @@ def bot_schedule():
                 "end_date": s.end_date.strftime("%Y-%m-%d %H:%M") if s.end_date else "",
                 "departure_location": s.departure_location or '',
                 "return_location": s.return_location or '',
+                "departure_time": s.departure_time.strftime('%H:%M') if s.departure_time else '',
+                "return_time": s.return_time.strftime('%H:%M') if s.return_time else '',
                 "invited": s.invited_user_ids, "color": "gray"
             }
             # 컬러 판정
@@ -1157,6 +1159,10 @@ def bot_schedule():
         invited_user_ids=data.get('invited',''),
         departure_location=data.get('departure_location',''),
         return_location=data.get('return_location',''))
+    if data.get('departure_time'):
+        s.departure_time = datetime.fromisoformat(data['departure_time']) if data['departure_time'] else None
+    if data.get('return_time'):
+        s.return_time = datetime.fromisoformat(data['return_time']) if data['return_time'] else None
     db.session.add(s)
     db.session.commit()
     return jsonify({"success": True, "id": s.id})

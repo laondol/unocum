@@ -323,6 +323,8 @@ class TongBotSchedule(db.Model):
     content = db.Column(db.Text)
     departure_location = db.Column(db.String(200))
     return_location = db.Column(db.String(200))
+    departure_time = db.Column(db.DateTime)
+    return_time = db.Column(db.DateTime)
     invited_user_ids = db.Column(db.Text, default='')
     linked_msg_id = db.Column(db.Integer)
     linked_chat_id = db.Column(db.Integer)
