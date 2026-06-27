@@ -1107,10 +1107,19 @@ def bot_schedule_calc_time():
             parts = event_time.split(':')
             h, m = int(parts[0]) if len(parts)>0 else 9, int(parts[1]) if len(parts)>1 else 0
             et = datetime.now(KST).replace(hour=h, minute=m)
+            # 대중교통 막차 정보
+            last_transit = ""
+            try:
+                if user.curr_town and user.curr_village:
+                    from services.transit import suggest_optimal_departure
+                    sug = suggest_optimal_departure(home_lat, home_lng, user.curr_town, user.curr_village)
+                    if sug and sug.get('last_transit_from_station'):
+                        last_transit = f"막차 {sug['last_transit_from_station']} ({sug.get('direction','')})"
+            except: pass
             return jsonify({
                 "walk": {"min": round(d*15), "dep": (et - timedelta(minutes=round(d*15)+15)).strftime('%H:%M'), "ret": (et + timedelta(hours=1, minutes=round(d*15))).strftime('%H:%M')},
                 "bike": {"min": round(d*5), "dep": (et - timedelta(minutes=round(d*5)+10)).strftime('%H:%M'), "ret": (et + timedelta(hours=1, minutes=round(d*5))).strftime('%H:%M')},
-                "transit": {"min": round(d*5+15), "dep": (et - timedelta(minutes=round(d*5)+25)).strftime('%H:%M'), "ret": (et + timedelta(hours=1, minutes=round(d*5)+15)).strftime('%H:%M')},
+                "transit": {"min": round(d*5+15), "dep": (et - timedelta(minutes=round(d*5)+25)).strftime('%H:%M'), "ret": (et + timedelta(hours=1, minutes=round(d*5)+15)).strftime('%H:%M'), "last_transit": last_transit},
                 "distance_km": round(d,1)
             })
     except: pass

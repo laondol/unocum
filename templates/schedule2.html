@@ -59,13 +59,14 @@ body{background:#f8f9fa;font-size:0.9rem;}
             <label class="me-2"><input type="radio" name="transport" value="bike" onchange="calcTravelTime()"> 🚲자전거</label>
             <label><input type="radio" name="transport" value="transit" onchange="calcTravelTime()"> 🚌대중교통</label>
         </div>
+        <div id="lastTransitInfo" class="small text-muted mb-2" style="display:none;"></div>
         <div class="row g-2 mb-2">
             <div class="col-6"><label class="small">출발장소</label><input id="addDepLoc" class="form-control form-control-sm" placeholder="기본주소"></div>
             <div class="col-3"><label class="small">출발시간</label><input id="addDepTime" class="form-control form-control-sm" type="time"></div>
         </div>
         <div class="row g-2 mb-2">
             <div class="col-6"><label class="small">귀가장소</label><input id="addRetLoc" class="form-control form-control-sm" placeholder="기본주소"></div>
-            <div class="col-3"><label class="small">귀가가능</label><input id="addRetTime" class="form-control form-control-sm" type="time"></div>
+            <div class="col-3"><label class="small">귀가가능시간</label><input id="addRetTime" class="form-control form-control-sm" type="time"></div>
         </div>
         <textarea id="addMemo" class="form-control form-control-sm mb-2" rows="2" placeholder="메모"></textarea>
         <div class="mb-2">
@@ -274,7 +275,14 @@ function calcTravelTime() {
         var m = mode ? mode.value : 'walk';
         var t = d[m];
         document.getElementById('addDepTime').value = t.dep;
-        document.getElementById('addRetTime').value = t.ret;
+        document.getElementById('addRetTime').value = (m === 'transit') ? t.ret : '';
+        var ltEl = document.getElementById('lastTransitInfo');
+        if (m === 'transit' && t.last_transit) {
+            ltEl.textContent = '🚌 ' + t.last_transit;
+            ltEl.style.display = '';
+        } else {
+            ltEl.style.display = 'none';
+        }
     }).catch(function(e){console.error(e);});
 }
 </script>
