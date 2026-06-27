@@ -1096,34 +1096,40 @@ def bot_schedule_calc_time():
     loc = data.get('location','').strip()
     event_time = data.get('event_time','')
     if not loc: return jsonify({})
+    user = User.query.get(uid)
+    home_lat = user.curr_latitude or user.latitude or 0
+    home_lng = user.curr_longitude or user.longitude or 0
+    if not home_lat:
+        return jsonify({"error": "기본주소가 설정되지 않았습니다. 회원정보에서 이웃인증을 해주세요."})
     try:
-        user = User.query.get(uid)
-        home_lat = user.curr_latitude or user.latitude
-        home_lng = user.curr_longitude or user.longitude
         loc_lat, loc_lng = _geocode_location(loc)
-        if loc_lat and home_lat:
-            from services.transit import haversine_km
-            d = haversine_km(home_lat, home_lng, loc_lat, loc_lng)
-            parts = event_time.split(':')
-            h, m = int(parts[0]) if len(parts)>0 else 9, int(parts[1]) if len(parts)>1 else 0
-            et = datetime.now(KST).replace(hour=h, minute=m)
-            # 대중교통 막차 정보
-            last_transit = ""
-            try:
-                if user.curr_town and user.curr_village:
-                    from services.transit import suggest_optimal_departure
-                    sug = suggest_optimal_departure(home_lat, home_lng, user.curr_town, user.curr_village)
-                    if sug and sug.get('last_transit_from_station'):
-                        last_transit = f"막차 {sug['last_transit_from_station']} ({sug.get('direction','')})"
-            except: pass
-            return jsonify({
-                "walk": {"min": round(d*15), "dep": (et - timedelta(minutes=round(d*15)+15)).strftime('%H:%M'), "ret": (et + timedelta(hours=1, minutes=round(d*15))).strftime('%H:%M')},
-                "bike": {"min": round(d*5), "dep": (et - timedelta(minutes=round(d*5)+10)).strftime('%H:%M'), "ret": (et + timedelta(hours=1, minutes=round(d*5))).strftime('%H:%M')},
-                "transit": {"min": round(d*5+15), "dep": (et - timedelta(minutes=round(d*5)+25)).strftime('%H:%M'), "ret": (et + timedelta(hours=1, minutes=round(d*5)+15)).strftime('%H:%M'), "last_transit": last_transit},
-                "distance_km": round(d,1)
-            })
-    except: pass
-    return jsonify({})
+        if not loc_lat:
+            # 좌표 못찾으면 양평군 기준으로 대략 계산
+            return jsonify({"error": f"'{loc}'의 위치를 찾을 수 없습니다.", "walk":{"dep":"","ret":""}})
+        from services.transit import haversine_km
+        d = haversine_km(home_lat, home_lng, loc_lat, loc_lng)
+        if d < 0.05: d = 0.5  # 너무 가까우면 최소 500m로
+        parts = event_time.split(':')
+        h = int(parts[0]) if parts and parts[0] else 9
+        m = int(parts[1]) if len(parts)>1 and parts[1] else 0
+        et = datetime.now(KST).replace(hour=h, minute=m, second=0, microsecond=0)
+        # 막차 정보
+        last_transit = ""
+        try:
+            if user.curr_town and user.curr_village:
+                from services.transit import suggest_optimal_departure
+                sug = suggest_optimal_departure(home_lat, home_lng, user.curr_town, user.curr_village)
+                if sug and sug.get('last_transit_from_station'):
+                    last_transit = f"막차 {sug['last_transit_from_station']} ({sug.get('direction','')})"
+        except: pass
+        return jsonify({
+            "walk": {"min": round(d*15), "dep": (et - timedelta(minutes=round(d*15)+15)).strftime('%H:%M')},
+            "bike": {"min": round(d*5), "dep": (et - timedelta(minutes=round(d*5)+10)).strftime('%H:%M')},
+            "transit": {"min": round(d*5+15), "dep": (et - timedelta(minutes=round(d*5)+25)).strftime('%H:%M'), "ret": (et + timedelta(hours=1, minutes=round(d*5)+15)).strftime('%H:%M'), "last_transit": last_transit},
+            "distance_km": round(d,1)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)})
 
 @tongbot_bp.route('/api/bot/schedule', methods=['GET', 'POST'])
 def bot_schedule():
