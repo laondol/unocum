@@ -24,7 +24,7 @@ body{background:#f8f9fa;font-size:0.9rem;}
 <div class="container py-3" style="max-width:800px;">
 <div class="d-flex gap-2 mb-3">
     <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('view')">📅 달력</button>
-    <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('add')">➕ 추가</button>
+    <button class="btn btn-sm btn-success" onclick="switchTab('add')" id="btnAdd">➕ 일정등록</button>
     <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('list')">📋 리스트</button>
 </div>
 
@@ -104,8 +104,10 @@ function switchTab(t) {
     ['tabView','tabAdd','tabList'].forEach(id => document.getElementById(id).style.display='none');
     document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).style.display='';
     if (t === 'add') {
-        var d = new Date().toISOString().slice(0,10);
-        document.getElementById('addDate').value = d;
+        document.getElementById('editId').value = '';
+        document.getElementById('saveBtn').textContent = '저장';
+        document.querySelector('#tabAdd h6').textContent = '새 일정';
+        document.getElementById('addDate').value = new Date().toISOString().slice(0,10);
         document.getElementById('addDepLoc').value = userHome;
         document.getElementById('addRetLoc').value = userHome;
         // 이전 일정의 장소를 출발장소로
@@ -168,7 +170,7 @@ function showDay(date) {
         let loc = s.location ? '<br>📍 '+s.location : '';
         if (s.departure_location) loc += '<br>↗ 출발지: '+s.departure_location;
         if (s.return_location) loc += '<br>↙ 귀가지: '+s.return_location;
-        h += '<div class="border-bottom py-1 mb-1 small"><strong>'+badge+' '+s.title+'</strong><br>🕐 '+time+loc+extra+'</div>';
+        h += '<div class="border-bottom py-1 mb-1 small"><strong>'+badge+' '+s.title+'</strong><br>🕐 '+time+loc+extra+'<br><button class="btn btn-sm btn-outline-secondary py-0 mt-1 me-1" onclick="editEvent('+s.id+')">✏️</button><button class="btn btn-sm btn-outline-danger py-0 mt-1" onclick="deleteEvent('+s.id+')">✕</button></div>';
     });
     el.innerHTML = h;
 }
@@ -196,6 +198,7 @@ function changeMonth(d) {
 function editEvent(id) {
     var s = schedules.find(function(x){return x.id === id;});
     if (!s) return;
+    document.querySelector('#tabAdd h6').textContent = '일정 수정';
     document.getElementById('editId').value = id;
     document.getElementById('addTitle').value = s.title || '';
     if (s.event_date) {
