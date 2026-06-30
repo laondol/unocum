@@ -125,8 +125,8 @@
                     <li class="nav-spacer"></li>
                 </ul>
             </div>
-            {% if session.get('username') %}
-            <a href="/user/{{ session.get('user_id') }}" class="text-decoration-none ms-2" title="{{ session.get('username') }}">👤</a>
+            {% if session.get('user_id') %}
+            <a href="/user/{{ session.get('user_id') }}" class="text-decoration-none ms-2" title="회원정보">👤</a>
             {% else %}
             <a href="/login" class="text-decoration-none text-muted ms-2" title="회원정보">👤</a>
             {% endif %}
