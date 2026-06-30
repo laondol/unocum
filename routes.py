@@ -105,8 +105,8 @@ def register_routes(app):
         from config import Config
         geo = reverse_geocode(lat, lon,
             kakao_key=Config.KAKAO_REST_API_KEY,
-            naver_id=Config.NAVER_CLIENT_ID or Config.NAVER_SEARCH_CLIENT_ID,
-            naver_secret=Config.NAVER_CLIENT_SECRET or Config.NAVER_SEARCH_CLIENT_SECRET)
+            naver_id=Config.NAVER_SEARCH_CLIENT_ID or Config.NAVER_CLIENT_ID,
+            naver_secret=Config.NAVER_SEARCH_CLIENT_SECRET or Config.NAVER_CLIENT_SECRET)
         from services.geocode import gps_to_town_village
         town, village = gps_to_town_village(lat, lon)
         return jsonify({
