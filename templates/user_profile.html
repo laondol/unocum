@@ -207,7 +207,7 @@ function refreshLocation() {
 
 {% if not is_own and session.get('user_id') and session.get('user_id') != profile_user.id %}
 <script>
-function sendFriendRequest(id){if(!confirm('벗신청은 신중하게 하셔야 합니다. 관례를 끊을 때는 중재위원회의 원칙에 따라 관계를 정리해야 합니다. 계속하시겠습니까?'))return;const s=confirm('로그인 위치와 시간을 공유하시겠습니까?');const f=new FormData();f.append('share_login_location',s?'1':'0');fetch('/friends/request/'+id,{method:'POST',body:f}).then(r=>r.json()).then(d=>{if(d.status==='success')location.reload();else alert(d.msg);});}
+function sendFriendRequest(id){fetch('/friends/request/'+id,{method:'POST'}).then(r=>r.json()).then(d=>{if(d.status==='success')location.reload();else alert(d.msg);});}
 </script>
 {% endif %}
 {% endblock %}
