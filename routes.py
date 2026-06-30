@@ -262,12 +262,6 @@ def register_routes(app):
             # username이 비었으면 이메일 앞부분으로 자동 생성
             if not username and verified_email:
                 username = verified_email.split('@')[0][:20]
-                # 중복 체크 후 숫자 붙이기
-                base = username
-                counter = 1
-                while User.query.filter_by(username=username).first():
-                    username = f"{base}{counter}"
-                    counter += 1
             # GPS 기반 위치
             lat = request.form.get('lat', type=float)
             lon = request.form.get('lon', type=float)
@@ -290,9 +284,6 @@ def register_routes(app):
             if User.query.filter_by(email=verified_email).first():
                 session.pop('verify_email', None)
                 return "<script>alert('이미 등록된 이메일입니다.'); location.href='/register';</script>"
-            if User.query.filter_by(username=username).first():
-                return "<script>alert('이미 있는 닉네임입니다.'); history.back();</script>"
-
             hashed_pw = generate_password_hash(password)
             now = datetime.now()
             new_user = User(
