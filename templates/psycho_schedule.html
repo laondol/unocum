@@ -4,20 +4,31 @@
     <h4 class="fw-bold mb-3">📅 방문상담 예약</h4>
 
     {% if not session.user_id %}
-    <div class="alert alert-warning">
-        방문상담 예약은 회원 전용입니다. <a href="/login?next=/psycho/schedule" class="alert-link">로그인</a> 후 이용해 주세요.
+    <div id="verifySection" class="mb-3">
+        <label class="form-label small fw-bold">📧 이메일 인증</label>
+        <div class="input-group input-group-sm">
+            <input type="email" id="verifyEmail" class="form-control" placeholder="이메일 주소">
+            <button type="button" class="btn btn-success" onclick="sendVerify('psycho')">인증하기</button>
+        </div>
+        <div class="input-group input-group-sm mt-1" id="codeSection" style="display:none;">
+            <input type="text" id="verifyCode" class="form-control" placeholder="인증코드 6자리" maxlength="6">
+            <button type="button" class="btn btn-outline-success" onclick="checkVerify('psycho')">확인</button>
+        </div>
+        <div id="verifyStatus" class="small mt-1"></div>
     </div>
     {% endif %}
 
     <div class="card border-0 shadow-sm" style="border-radius: 16px;">
         <div class="card-body p-4">
-            <form method="post" action="/psycho/appointment/book">
+            <form method="post" action="/psycho/appointment/book" onsubmit="return checkBooking('psycho')">
                 <div class="row g-2 mb-3">
                     <div class="col-6">
                         <label class="form-label small fw-bold">이름</label>
                         <input type="text" name="name" class="form-control" value="{{ session.get('username','') }}" required>
                     </div>
                     <div class="col-6">
+                        <label class="form-label small fw-bold">이메일</label>
+                        <input type="email" name="email" id="bookEmail" class="form-control" value="{{ session.get('email','') }}" required readonly>
                         <label class="form-label small fw-bold">연락처</label>
                         <input type="tel" name="phone" class="form-control" placeholder="010-1234-5678">
                     </div>
@@ -85,4 +96,33 @@
         <a href="/service/psycho" class="btn btn-sm btn-outline-secondary">← 심리상담소</a>
     </div>
 </div>
+<script>
+var verified = {{ 'true' if session.user_id else 'false' }};
+function sendVerify(p) {
+    var email = document.getElementById('verifyEmail').value.trim();
+    if (!email) return alert('이메일을 입력하세요.');
+    var fd = new FormData(); fd.append('email', email); fd.append('purpose', p||'psycho');
+    fetch('/register/send-code', {method:'POST', body:fd}).then(r=>r.json()).then(d=>{
+        document.getElementById('verifyStatus').innerHTML = '<span class="text-success">'+d.msg+'</span>';
+        if (d.status==='success') document.getElementById('codeSection').style.display='';
+    });
+}
+function checkVerify(p) {
+    var code = document.getElementById('verifyCode').value.trim();
+    var fd = new FormData(); fd.append('code', code); fd.append('purpose', p||'psycho');
+    fetch('/register/verify-code', {method:'POST', body:fd}).then(r=>r.json()).then(d=>{
+        if (d.status==='success') {
+            verified = true;
+            document.getElementById('bookEmail').value = document.getElementById('verifyEmail').value;
+            document.getElementById('verifyStatus').innerHTML = '<span class="text-success">✅ 인증완료</span>';
+        } else { alert(d.msg); }
+    });
+}
+function checkBooking() {
+    {% if not session.user_id %}
+    if (!verified) { alert('이메일 인증을 완료해 주세요.'); return false; }
+    {% endif %}
+    return true;
+}
+</script>
 {% endblock %}
