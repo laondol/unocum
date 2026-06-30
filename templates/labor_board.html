@@ -1,0 +1,27 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container py-4" style="max-width: 800px;">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="fw-bold mb-0">📋 노동이슈</h4>
+        {% if session.get('role') in ('admin','leader') %}
+        <a href="/legal/issues/write" class="btn btn-success btn-sm">글쓰기</a>
+        {% endif %}
+    </div>
+
+    {% if posts %}
+    <div class="list-group list-group-flush">
+        {% for p in posts %}
+        <a href="/legal/issues/{{ p.id }}" class="list-group-item list-group-item-action">
+            <div class="d-flex justify-content-between">
+                <strong>{{ p.title }}</strong>
+                <small class="text-muted">{{ p.created_at.strftime('%m/%d') if p.created_at else '' }}</small>
+            </div>
+            <small class="text-muted">{{ p.author_name }} | 댓글 {{ (p.comments or '').split('\n')|length - 1 }}</small>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-5 text-muted">등록된 이슈가 없습니다.</div>
+    {% endif %}
+</div>
+{% endblock %}

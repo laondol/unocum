@@ -3428,6 +3428,50 @@ def register_routes(app):
             f'신청자: {name}\n이메일: {email}\n연락처: {phone}\n날짜: {date_str} {time_slot}\n장소: {location}\n내용: {content}')
         return "<script>alert('예약이 신청되었습니다. 승인 후 이메일로 안내드립니다.'); location.href='/service/legal';</script>"
 
+    # --- [노동이슈 게시판] ---
+    @app.route('/legal/issues')
+    def legal_issues():
+        posts = LegalPost.query.order_by(LegalPost.created_at.desc()).limit(20).all()
+        return render_template('labor_board.html', posts=posts)
+
+    @app.route('/legal/issues/write', methods=['GET','POST'])
+    def legal_issues_write():
+        if session.get('role') not in ('admin','leader'):
+            return "<script>alert('관리자만 작성할 수 있습니다.'); history.back();</script>"
+        if request.method == 'POST':
+            title = request.form['title']
+            content = request.form['content']
+            post = LegalPost(title=title, content=content, email=session.get('email',''), 
+                           author_name=session.get('real_name') or session.get('username','이훈노무사'),
+                           user_id=session.get('user_id'), password='')
+            db.session.add(post)
+            db.session.commit()
+            return redirect(url_for('legal_issues'))
+        return render_template('labor_write.html')
+
+    @app.route('/legal/issues/<int:post_id>')
+    def legal_issue_detail(post_id):
+        post = LegalPost.query.get_or_404(post_id)
+        return render_template('labor_detail.html', post=post)
+
+    @app.route('/legal/issues/comment/<int:post_id>', methods=['POST'])
+    def legal_issue_comment(post_id):
+        content = request.form.get('content','').strip()
+        if not content:
+            return redirect(url_for('legal_issue_detail', post_id=post_id))
+        # AI 필터링
+        from services.ai_service import moderate_comment
+        ok, reason = moderate_comment(content)
+        if not ok:
+            return f"<script>alert('{reason}'); history.back();</script>"
+        post = LegalPost.query.get_or_404(post_id)
+        comments = post.comments or ''
+        name = session.get('real_name') or session.get('username','익명')
+        comments += f'\n[{name}] {content} ({datetime.now().strftime("%m/%d %H:%M")})'
+        post.comments = comments
+        db.session.commit()
+        return redirect(url_for('legal_issue_detail', post_id=post_id))
+
     # --- [심리상담소] ---
     @app.route('/psycho/list')
     def psycho_list():
