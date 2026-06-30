@@ -104,16 +104,25 @@ def register_routes(app):
         gps_lng = data.get('gps_lng', type=float) or 0
         if not manual_loc:
             return jsonify({"status":"error","msg":"주소를 입력하세요"})
-        from services.transit import geocode_address
-        from services.transit import haversine_km
+        from services.transit import geocode_address, haversine_km
         from config import Config
         geo = geocode_address(manual_loc, Config.KAKAO_REST_API_KEY)
+        if not geo or not geo.get('lat'):
+            # Kakao 실패시 Naver로 시도
+            naver_id = Config.NAVER_SEARCH_CLIENT_ID or Config.NAVER_CLIENT_ID
+            naver_secret = Config.NAVER_SEARCH_CLIENT_SECRET or Config.NAVER_CLIENT_SECRET
+            if naver_id:
+                geo = geocode_address(manual_loc, kakao_key=None, naver_id=naver_id, naver_secret=naver_secret)
         if geo and geo.get('lat'):
-            d = haversine_km(gps_lat, gps_lng, geo['lat'], geo['lng']) if gps_lat else 0
-            if gps_lat and d <= 0.5:
-                return jsonify({"status":"success","msg":f"'{manual_loc}'(으)로 보정됨 (거리 {d:.2f}km)", "address": manual_loc, "corrected": True, "lat": geo['lat'], "lng": geo['lng']})
-            else:
-                return jsonify({"status":"success","msg":f"'{manual_loc}'(으)로 보정됨 (1회성)", "address": manual_loc, "corrected": False, "lat": geo['lat'] or gps_lat, "lng": geo['lng'] or gps_lng})
+            d = haversine_km(gps_lat, gps_lng, geo['lat'], geo['lng']) if gps_lat else 99
+            corrected = gps_lat > 0 and d <= 0.5
+            return jsonify({
+                "status":"success",
+                "msg": f"'{geo.get('address',manual_loc)}'(으)로 보정됨 (거리 {d:.2f}km)" + (" → 기본주소 저장" if corrected else " → 1회성"),
+                "address": geo.get('address', manual_loc),
+                "corrected": corrected,
+                "lat": geo['lat'], "lng": geo['lng']
+            })
         return jsonify({"status":"error","msg":"주소를 찾을 수 없습니다"})
 
     @app.route('/api/check-neighbor')
