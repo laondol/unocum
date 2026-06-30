@@ -16,9 +16,7 @@
                     <tr>
                         <th style="width:40px;"><input type="checkbox" id="selectAll" onchange="toggleAll()"></th>
                         <th>이메일</th>
-                        <th>아이디</th>
                         <th>소속 리</th>
-                        <th>이름</th>
                         <th>{{ nip() }}</th>
                         <th>인증</th>
                         <th>역할</th>
@@ -30,9 +28,7 @@
                     <tr class="user-row">
                         <td><input type="checkbox" class="user-check" value="{{ u.id }}"></td>
                         <td><a href="/user/{{ u.id }}" class="fw-bold text-decoration-none">{{ u.email or '-' }}</a></td>
-                        <td>{{ u.username or '-' }}</td>
                         <td>{{ u.village or '-' }}</td>
-                        <td>{{ u.real_name or '-' }}</td>
                         <td><span class="fw-bold text-success">{{ u.points }}</span></td>
                         <td>
                             {% if u.is_verified_resident %}<span class="text-success">✅</span>{% endif %}
