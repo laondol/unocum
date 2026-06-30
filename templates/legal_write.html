@@ -17,7 +17,7 @@
     </div>
     {% endif %}
 
-    <form method="post" action="/legal/write" class="card border-0 shadow-sm p-4" style="border-radius:16px;" onsubmit="return checkSubmit()">
+    <form method="post" action="/legal/write" enctype="multipart/form-data" class="card border-0 shadow-sm p-4" style="border-radius:16px;" onsubmit="return checkSubmit()">
         <div class="mb-2">
             <label class="small fw-bold">이름</label>
             <input type="text" name="author_name" class="form-control form-control-sm" value="{{ session.get('real_name','') }}" {{ 'readonly' if session.get('real_name') else '' }} required>
@@ -30,18 +30,69 @@
             <label class="small fw-bold">제목</label>
             <input type="text" name="title" class="form-control form-control-sm" required>
         </div>
-        <div class="mb-3">
-            <label class="small fw-bold">내용</label>
-            <textarea name="content" class="form-control form-control-sm" rows="8" required></textarea>
+
+        <!-- 편집기 -->
+        <label class="small fw-bold mb-1">내용</label>
+        <div class="d-flex gap-1 mb-1 flex-wrap">
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="execCmd('bold')"><b>B</b></button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="execCmd('italic')"><i>I</i></button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="execCmd('underline')"><u>U</u></button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="execCmd('insertUnorderedList')">•목록</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="execCmd('insertOrderedList')">1.목록</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="drawBtn" title="그리기" onclick="toggleDraw()">🖌️</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="insertLink()">🔗</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleHtml()">📝HTML</button>
         </div>
-        <button class="btn btn-success w-100">등록</button>
+
+        <!-- 그리기 -->
+        <div id="drawArea" style="display:none;" class="mb-2">
+            <canvas id="drawCanvas" width="600" height="300" style="border:1px solid #ddd;border-radius:8px;cursor:crosshair;" 
+                onmousedown="startDraw(event)" onmousemove="draw(event)" onmouseup="stopDraw()" 
+                ontouchstart="startDrawTouch(event)" ontouchmove="drawTouch(event)" ontouchend="stopDraw()"></canvas>
+            <div class="d-flex gap-1 mt-1">
+                <input type="color" id="drawColor" value="#000000" class="form-control form-control-color" style="width:30px;height:30px;">
+                <input type="range" id="drawSize" min="1" max="10" value="2" style="width:80px;">
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearDraw()">지우기</button>
+                <button type="button" class="btn btn-sm btn-primary" onclick="insertDrawing()">삽입</button>
+            </div>
+        </div>
+
+        <!-- HTML 모드 -->
+        <div id="htmlArea" style="display:none;" class="mb-2">
+            <textarea id="htmlEditor" class="form-control form-control-sm" rows="8"></textarea>
+        </div>
+
+        <div id="editor" contenteditable="true" class="form-control mb-2" style="min-height:200px;max-height:400px;overflow-y:auto;" placeholder="내용을 작성하세요..."></div>
+        <input type="hidden" name="content" id="contentInput">
+
+        <div class="mb-3">
+            <label class="small fw-bold">파일 첨부</label>
+            <input type="file" name="attachment" class="form-control form-control-sm" accept="image/*,.pdf,.doc,.docx,.hwp">
+        </div>
+
+        <button type="submit" class="btn btn-success w-100">등록</button>
         <a href="/legal/list" class="btn btn-sm btn-outline-secondary w-100 mt-2">취소</a>
     </form>
 </div>
+
 <script>
 var verified = {{ 'true' if session.get('user_id') else 'false' }};
 function sendVerify(p){var email=document.getElementById('verifyEmail').value.trim();if(!email)return alert('이메일 입력');var fd=new FormData();fd.append('email',email);fd.append('purpose',p||'legal');fetch('/register/send-code',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{document.getElementById('verifyStatus').innerHTML=d.msg;if(d.status==='success')document.getElementById('codeSection').style.display='';});}
 function checkVerify(p){var code=document.getElementById('verifyCode').value.trim();var fd=new FormData();fd.append('code',code);fd.append('purpose',p||'legal');fetch('/register/verify-code',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status==='success'){verified=true;document.getElementById('postEmail').value=document.getElementById('verifyEmail').value;document.getElementById('verifyStatus').innerHTML='✅ 인증완료';}else alert(d.msg);});}
-function checkSubmit(){if(!verified&&!{{ 'true' if session.get('user_id') else 'false' }}){alert('이메일 인증을 먼저 완료해 주세요.');return false;}return true;}
+function checkSubmit(){if(!verified&&!{{ 'true' if session.get('user_id') else 'false' }}){alert('이메일 인증을 먼저 완료해 주세요.');return false;}document.getElementById('contentInput').value=document.getElementById('editor').innerHTML;return true;}
+
+function execCmd(cmd){document.execCommand(cmd,false,null);document.getElementById('editor').focus();}
+function insertLink(){var url=prompt('URL:');if(url)document.execCommand('createLink',false,url);}
+function toggleHtml(){var ed=document.getElementById('editor');var ha=document.getElementById('htmlArea');var ht=document.getElementById('htmlEditor');if(ha.style.display==='none'){ha.style.display='';ht.value=ed.innerHTML;ed.style.display='none';}else{ha.style.display='none';ed.innerHTML=ht.value;ed.style.display='';}}
+
+var drawing=false,drawCtx=null;
+function toggleDraw(){var da=document.getElementById('drawArea');da.style.display=da.style.display==='none'?'':'none';if(da.style.display!=='none'){var c=document.getElementById('drawCanvas');drawCtx=c.getContext('2d');drawCtx.lineWidth=2;drawCtx.strokeStyle='#000';}}
+function startDraw(e){drawing=true;drawCtx.beginPath();drawCtx.moveTo(e.offsetX,e.offsetY);}
+function draw(e){if(!drawing)return;drawCtx.lineWidth=document.getElementById('drawSize').value;drawCtx.strokeStyle=document.getElementById('drawColor').value;drawCtx.lineTo(e.offsetX,e.offsetY);drawCtx.stroke();}
+function stopDraw(){drawing=false;}
+function startDrawTouch(e){e.preventDefault();var t=e.touches[0];var c=document.getElementById('drawCanvas');var r=c.getBoundingClientRect();drawing=true;drawCtx.beginPath();drawCtx.moveTo(t.clientX-r.left,t.clientY-r.top);}
+function drawTouch(e){e.preventDefault();if(!drawing)return;var t=e.touches[0];var c=document.getElementById('drawCanvas');var r=c.getBoundingClientRect();drawCtx.lineWidth=document.getElementById('drawSize').value;drawCtx.strokeStyle=document.getElementById('drawColor').value;drawCtx.lineTo(t.clientX-r.left,t.clientY-r.top);drawCtx.stroke();}
+function clearDraw(){drawCtx.clearRect(0,0,600,300);}
+function insertDrawing(){var data=document.getElementById('drawCanvas').toDataURL();document.execCommand('insertImage',false,data);toggleDraw();document.getElementById('editor').focus();}
 </script>
 {% endblock %}
