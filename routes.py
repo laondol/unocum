@@ -3687,24 +3687,6 @@ def register_routes(app):
         EmailService.send('eou@kakao.com', f'[심리상담] {title}',
             f'신청자: {name}\n이메일: {email}\n연락처: {phone}\n날짜: {date_str} {time_slot}\n장소: {location}\n내용: {content}')
         return "<script>alert('예약이 신청되었습니다. 승인 후 이메일로 안내드립니다.'); location.href='/service/psycho';</script>"
-            name=name, email=email, phone=phone,
-            date=date.fromisoformat(date_str),
-            time_slot=time_slot, location=location, content=content
-        )
-        db.session.add(appt)
-        db.session.commit()
-        return "<script>alert('예약이 신청되었습니다. 승인 후 이메일로 안내드립니다.'); location.href='/service/psycho';</script>"
-
-    # --- [벗 (친구) 시스템] ---
-
-    @app.context_processor
-    def inject_friend_info():
-        uid = session.get('user_id')
-        if not uid:
-            return dict(has_friends=False, friend_count=0)
-        friend_ids = [f.receiver_id for f in Friend.query.filter_by(requester_id=uid, status='accepted').all()] + \
-                     [f.requester_id for f in Friend.query.filter_by(receiver_id=uid, status='accepted').all()]
-        return dict(has_friends=True, friend_count=len(friend_ids))
 
     @app.route('/friends')
     def friends():
