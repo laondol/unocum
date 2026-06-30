@@ -2400,10 +2400,10 @@ def register_routes(app):
         uid = session.get('user_id')
         if uid:
             user = User.query.get(uid)
-            if user and (user.curr_latitude or user.latitude):
+            if user and (user.curr_latitude or user.reg_latitude):
                 from services.transit import haversine_km
-                home_lat = user.curr_latitude or user.latitude
-                home_lng = user.curr_longitude or user.longitude
+                home_lat = user.curr_latitude or user.reg_latitude
+                home_lng = user.curr_longitude or user.reg_longitude
                 def dist_key(n):
                     if n.latitude and n.longitude:
                         return haversine_km(home_lat, home_lng, n.latitude, n.longitude)
@@ -2570,8 +2570,8 @@ def register_routes(app):
         gps_village = gps_result[1] if gps_result else ""
         same_village = bool(gps_town and gps_town == home_town and gps_village == home_village)
         # 집 판정: 보정좌표와 등록좌표 거리 1km 이내면 집
-        user_home_lat = user.curr_latitude or user.latitude or 0
-        user_home_lng = user.curr_longitude or user.longitude or 0
+        user_home_lat = user.curr_latitude or user.reg_latitude or 0
+        user_home_lng = user.curr_longitude or user.reg_longitude or 0
         is_home = False
         if user_home_lat and user_home_lng:
             d = haversine_km(corrected_lat, corrected_lng, user_home_lat, user_home_lng)
