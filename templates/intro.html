@@ -55,11 +55,9 @@
         <div class="card border-0 shadow-sm p-2 h-100" style="border-radius:15px; background:linear-gradient(135deg,#e8f5e9,#fff); min-width:0;">
             <h6 class="fw-bold text-success text-center mb-1">🌍 세계와 양평</h6>
             {% if world_news %}
-            {% for n in world_news %}
-            <a href="/news/{{ n.id }}" class="text-decoration-none d-block" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-                <small class="text-dark">{{ n.title }}</small>
+            <a href="/news/{{ world_news.id }}" class="text-decoration-none d-block" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                <small class="text-dark">{{ world_news.title }}</small>
             </a>
-            {% endfor %}
             {% else %}
             <p class="small text-muted mb-0 text-center">등록된 소식이 없습니다</p>
             {% endif %}
