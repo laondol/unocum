@@ -34,9 +34,16 @@ def register_routes(app):
     def intro():
         # 최신 국내 소식 5개
         yp_news = NewsArticle.query.filter(NewsArticle.is_selected == True, NewsArticle.world_admin_approved == True, NewsArticle.category.notin_(['세계뉴스', '해외뉴스'])).order_by(NewsArticle.updated_at.desc()).limit(5).all()
-        # 최신 세계 소식 1개
+        # 최신 세계 소식 5개
         world_news = NewsArticle.query.filter(NewsArticle.is_selected == True, NewsArticle.world_admin_approved == True, NewsArticle.category.in_(['세계뉴스', '해외뉴스'])).order_by(NewsArticle.updated_at.desc()).limit(5).all()
-        return render_template('intro.html', yp_news=yp_news, world_news=world_news)
+        # 배경 이미지: 공유마당 승인된 사진들
+        bg_images = db.session.query(ShareReport.image_path).filter(
+            ShareReport.status == 'approved',
+            ShareReport.image_path.isnot(None),
+            ShareReport.image_path != ''
+        ).order_by(db.func.random()).limit(10).all()
+        bg_images = [img[0] for img in bg_images if img[0]]
+        return render_template('intro.html', yp_news=yp_news, world_news=world_news, bg_images=bg_images)
 
     @app.route('/presentation')
     def presentation():
