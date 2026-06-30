@@ -42,6 +42,9 @@
                         </td>
                         <td>
                             <a href="/message/send/{{ u.id }}" class="btn btn-sm btn-outline-success" title="쪽지">✉️</a>
+                            {% if session.get('role') == 'leader' %}
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteUser({{ u.id }},'{{ u.email or u.username }}')" title="회원 삭제">🗑️</button>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}

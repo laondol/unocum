@@ -100,7 +100,22 @@
 
     <!-- 닢 내역 (숨김) -->
     <div id="nipSection" class="card border-0 shadow-sm mb-3 d-none" style="border-radius: 18px;">
-        <div class="card-header bg-white fw-bold" style="border-radius: 18px 18px 0 0;">💎 닢 내역</div>
+        <div class="card-header bg-white fw-bold d-flex justify-content-between" style="border-radius: 18px 18px 0 0;">
+            <span>💎 닢 내역</span>
+            {% if session.get('role') == 'leader' %}
+            <div>
+                <button class="btn btn-sm btn-outline-warning me-1" onclick="showPointEdit()">💰 조정</button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteProfileUser({{ profile_user.id }})">🗑️ 삭제</button>
+            </div>
+            {% endif %}
+        </div>
+        <div id="pointEditForm" class="p-2 bg-light border-bottom" style="display:none;">
+            <div class="input-group input-group-sm">
+                <input type="number" id="pointAmount" class="form-control" placeholder="금액 (+/-)">
+                <input type="text" id="pointReason" class="form-control" placeholder="사유">
+                <button class="btn btn-sm btn-warning" onclick="adjustPoints({{ profile_user.id }})">적용</button>
+            </div>
+        </div>
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-hover mb-0 small">
@@ -208,6 +223,21 @@ function refreshLocation() {
 {% if not is_own and session.get('user_id') and session.get('user_id') != profile_user.id %}
 <script>
 function sendFriendRequest(id){fetch('/friends/request/'+id,{method:'POST'}).then(r=>r.json()).then(d=>{if(d.status==='success')location.reload();else alert(d.msg);});}
+
+function showPointEdit(){document.getElementById('pointEditForm').style.display='';}
+function adjustPoints(uid){
+    var amount=parseInt(document.getElementById('pointAmount').value)||0;
+    var reason=document.getElementById('pointReason').value||'관리자 조정';
+    if(!amount)return alert('금액을 입력하세요.');
+    var fd=new FormData();fd.append('amount',amount);fd.append('reason',reason);
+    fetch('/admin/users/points/'+uid,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{alert(d.msg);if(d.status==='success')location.reload();});
+}
+{% if session.get('role') == 'leader' %}
+function deleteProfileUser(uid){
+    if(!confirm('이 회원을 정말 삭제하시겠습니까?'))return;
+    fetch('/admin/users/delete/'+uid,{method:'POST'}).then(r=>r.json()).then(d=>{alert(d.msg);if(d.status==='success')location.href='/admin/users';});
+}
+{% endif %}
 </script>
 {% endif %}
 {% endblock %}
