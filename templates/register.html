@@ -195,7 +195,6 @@ function submitRegister() {
     var nick = document.getElementById('nickname').value.trim();
     var pw = document.getElementById('password').value;
     var pw2 = document.getElementById('password2').value;
-    if (!name || !nick) return alert('이름과 별명을 입력하세요.');
     if (pw !== pw2 || pw.length < 4) return alert('비밀번호를 확인하세요.');
 
     var fd = new FormData();
