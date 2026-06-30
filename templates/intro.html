@@ -42,8 +42,8 @@
             <h6 class="fw-bold text-primary text-center mb-2">대한민국과 양평</h6>
             {% if yp_news %}
             {% for n in yp_news %}
-            <a href="/news/{{ n.id }}" class="text-decoration-none">
-                <p class="small text-dark mb-1 text-truncate">{{ n.title }}</p>
+            <a href="/news/{{ n.id }}" class="text-decoration-none d-block">
+                <p class="small text-dark mb-1" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ n.title }}</p>
             </a>
             {% endfor %}
             {% else %}
@@ -56,8 +56,8 @@
             <h6 class="fw-bold text-success text-center mb-2">🌍 세계와 양평</h6>
             {% if world_news %}
             {% for n in world_news %}
-            <a href="/news/{{ n.id }}" class="text-decoration-none">
-                <p class="small text-dark mb-1 text-truncate">{{ n.title }}</p>
+            <a href="/news/{{ n.id }}" class="text-decoration-none d-block">
+                <p class="small text-dark mb-1" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ n.title }}</p>
             </a>
             {% endfor %}
             {% else %}
