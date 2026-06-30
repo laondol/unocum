@@ -237,7 +237,10 @@ function saveEvent() {
     var memo = document.getElementById('addMemo').value.trim();
     if (!title || !date) return alert('제목과 날짜를 입력하세요.');
     var evt = start ? date+'T'+start : date+'T09:00';
-    var data = {title, event_date: evt, location: loc, memo, departure_location: depLoc, return_location: retLoc};
+    var cbs = document.querySelectorAll('.friend-cb:checked');
+    var invited = [];
+    cbs.forEach(function(cb){ invited.push(parseInt(cb.value)); });
+    var data = {title, event_date: evt, location: loc, memo, departure_location: depLoc, return_location: retLoc, invited: JSON.stringify(invited)};
     if (end) data.end_date = date+'T'+end;
     if (id) data.id = parseInt(id);
     var url = id ? '/api/bot/schedule/update' : '/api/bot/schedule';
