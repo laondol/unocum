@@ -3660,11 +3660,13 @@ def register_routes(app):
         phone = request.form.get('phone', '')
         date_str = request.form['date']
         time_slot = request.form['time_slot']
+        title = request.form.get('title', '심리상담')
+        from datetime import date
+        appt_date = date.fromisoformat(date_str)
+        if appt_date <= date.today() + timedelta(days=1):
+            return "<script>alert('이틀 후부터 예약 가능합니다.'); history.back();</script>"
         uid = session.get('user_id')
-        # 통벗 일정 충돌 체크
         if uid:
-            from datetime import date
-            appt_date = date.fromisoformat(date_str)
             conflict = TongBotSchedule.query.filter(
                 TongBotSchedule.user_id == uid,
                 db.func.date(TongBotSchedule.event_date) == appt_date
@@ -3674,9 +3676,17 @@ def register_routes(app):
         location_parts = [request.form.get('location', ''), request.form.get('location_detail', '')]
         location = ' '.join(p for p in location_parts if p)
         content = request.form.get('content', '')
-        from datetime import date
         appt = PsychoAppointment(
-            user_id=uid,
+            user_id=uid, name=name, email=email, phone=phone,
+            date=appt_date,
+            time_slot=time_slot, location=location, content=content, title=title
+        )
+        db.session.add(appt)
+        db.session.commit()
+        from services.email_service import EmailService
+        EmailService.send('eou@kakao.com', f'[심리상담] {title}',
+            f'신청자: {name}\n이메일: {email}\n연락처: {phone}\n날짜: {date_str} {time_slot}\n장소: {location}\n내용: {content}')
+        return "<script>alert('예약이 신청되었습니다. 승인 후 이메일로 안내드립니다.'); location.href='/service/psycho';</script>"
             name=name, email=email, phone=phone,
             date=date.fromisoformat(date_str),
             time_slot=time_slot, location=location, content=content
