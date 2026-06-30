@@ -38,30 +38,30 @@
 <!-- 뉴스 2종 -->
 <div class="row g-3 mb-4">
     <div class="col-md-6">
-        <div class="card border-0 shadow-sm p-3 h-100" style="border-radius:15px; background:linear-gradient(135deg,#e3f2fd,#fff);">
-            <h6 class="fw-bold text-primary text-center mb-2">대한민국과 양평</h6>
+        <div class="card border-0 shadow-sm p-2 h-100" style="border-radius:15px; background:linear-gradient(135deg,#e3f2fd,#fff); min-width:0;">
+            <h6 class="fw-bold text-primary text-center mb-1">대한민국과 양평</h6>
             {% if yp_news %}
             {% for n in yp_news %}
-            <a href="/news/{{ n.id }}" class="text-decoration-none d-block">
-                <p class="small text-dark mb-1" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ n.title }}</p>
+            <a href="/news/{{ n.id }}" class="text-decoration-none d-block" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                <small class="text-dark">{{ n.title }}</small>
             </a>
             {% endfor %}
             {% else %}
-            <p class="small text-muted mb-0">등록된 소식이 없습니다</p>
+            <p class="small text-muted mb-0 text-center">등록된 소식이 없습니다</p>
             {% endif %}
         </div>
     </div>
     <div class="col-md-6">
-        <div class="card border-0 shadow-sm p-3 h-100" style="border-radius:15px; background:linear-gradient(135deg,#e8f5e9,#fff);">
-            <h6 class="fw-bold text-success text-center mb-2">🌍 세계와 양평</h6>
+        <div class="card border-0 shadow-sm p-2 h-100" style="border-radius:15px; background:linear-gradient(135deg,#e8f5e9,#fff); min-width:0;">
+            <h6 class="fw-bold text-success text-center mb-1">🌍 세계와 양평</h6>
             {% if world_news %}
             {% for n in world_news %}
-            <a href="/news/{{ n.id }}" class="text-decoration-none d-block">
-                <p class="small text-dark mb-1" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ n.title }}</p>
+            <a href="/news/{{ n.id }}" class="text-decoration-none d-block" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                <small class="text-dark">{{ n.title }}</small>
             </a>
             {% endfor %}
             {% else %}
-            <p class="small text-muted mb-0">등록된 소식이 없습니다</p>
+            <p class="small text-muted mb-0 text-center">등록된 소식이 없습니다</p>
             {% endif %}
         </div>
     </div>
