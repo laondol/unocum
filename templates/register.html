@@ -40,8 +40,24 @@
     </div>
 </div>
 
-<!-- Step 2: 위치 (이메일 인증 후 표시) -->
+<!-- Step 2: 비밀번호 (이메일 인증 후 표시) -->
 <div id="locationSection" style="display:none;">
+    <hr>
+    <h6 class="small fw-bold mb-2">🔑 비밀번호</h6>
+    <div class="mb-2">
+        <div class="input-group input-group-sm">
+            <input type="password" id="password" class="form-control" placeholder="비밀번호" required>
+            <button class="btn btn-outline-secondary" type="button" onclick="togglePw('password',this)">👁️</button>
+        </div>
+    </div>
+    <div class="mb-2">
+        <div class="input-group input-group-sm">
+            <input type="password" id="password2" class="form-control" placeholder="비밀번호 확인" required>
+            <button class="btn btn-outline-secondary" type="button" onclick="togglePw('password2',this)">👁️</button>
+        </div>
+    </div>
+
+    <!-- Step 3: 위치 & 이웃인증 -->
     <hr>
     <h6 class="small fw-bold mb-2">📍 현재위치 & 이웃인증</h6>
     <div id="gpsStatus" class="small text-muted mb-1">GPS 확인 중...</div>
@@ -56,22 +72,6 @@
     <div id="correctForm" style="display:none;" class="mb-2 p-2 bg-light rounded small">
         <input type="text" id="manualAddr" class="form-control form-control-sm mb-1" placeholder="상세주소 (예: 양수로 123)">
         <button class="btn btn-sm btn-success" onclick="doCorrect()">보정하기</button>
-    </div>
-
-    <!-- Step 3: 기본정보 -->
-    <hr>
-    <h6 class="small fw-bold mb-2">🔑 비밀번호</h6>
-    <div class="mb-2">
-        <div class="input-group input-group-sm">
-            <input type="password" id="password" class="form-control" placeholder="비밀번호" required>
-            <button class="btn btn-outline-secondary" type="button" onclick="togglePw('password',this)">👁️</button>
-        </div>
-    </div>
-    <div class="mb-2">
-        <div class="input-group input-group-sm">
-            <input type="password" id="password2" class="form-control" placeholder="비밀번호 확인" required>
-            <button class="btn btn-outline-secondary" type="button" onclick="togglePw('password2',this)">👁️</button>
-        </div>
     </div>
 
     <h6 class="small fw-bold mb-2 mt-3">👤 선택정보</h6>
