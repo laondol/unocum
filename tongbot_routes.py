@@ -1246,10 +1246,6 @@ def bot_schedule_delete():
 
 @tongbot_bp.route('/schedule')
 def schedule_popup():
-    return render_template('schedule_popup.html')
-
-@tongbot_bp.route('/schedule2')
-def schedule2_popup():
     return render_template('schedule2.html')
 def schedule_popup():
     if not session.get('user_id'):
