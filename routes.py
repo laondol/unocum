@@ -151,8 +151,24 @@ def register_routes(app):
             password = request.form['password']
             real_name = request.form['real_name']
             username = request.form['username']
-            town = request.form['town']
-            village = request.form['village']
+            # GPS 기반 위치
+            lat = request.form.get('lat', type=float)
+            lon = request.form.get('lon', type=float)
+            town = ''
+            village = ''
+            neighbor = False
+            if lat and lon:
+                from services.geocode import gps_to_town_village, is_in_yangpyeong
+                if is_in_yangpyeong(lat, lon):
+                    t, v = gps_to_town_village(lat, lon)
+                    town = t or ''
+                    village = v or ''
+                    neighbor = True
+            # town/village 없는 경우 form에서 가져오기
+            if not town:
+                town = request.form.get('town', '')
+            if not village:
+                village = request.form.get('village', '')
             
             if User.query.filter_by(email=verified_email).first():
                 session.pop('verify_email', None)
@@ -169,9 +185,19 @@ def register_routes(app):
                 town=town, village=village,
                 reg_town=town, reg_village=village,
                 curr_town=town, curr_village=village,
+                is_neighbor=neighbor,
                 location_updated_at=now,
                 points=1000
             )
+            # 프로필 이미지 저장
+            profile_img = request.files.get('profile_img')
+            if profile_img and profile_img.filename:
+                from werkzeug.utils import secure_filename
+                fn = secure_filename(f"{username}_{int(now.timestamp())}_{profile_img.filename}")
+                img_path = os.path.join(current_app.root_path, 'static', 'uploads', 'profiles')
+                os.makedirs(img_path, exist_ok=True)
+                profile_img.save(os.path.join(img_path, fn))
+                new_user.profile_image = f'/static/uploads/profiles/{fn}'
             db.session.add(new_user)
             db.session.flush()
             new_user.last_payout = now
