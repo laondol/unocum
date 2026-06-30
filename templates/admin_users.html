@@ -29,7 +29,7 @@
                         <td><input type="checkbox" class="user-check" value="{{ u.id }}"></td>
                         <td><a href="/user/{{ u.id }}" class="fw-bold text-decoration-none">{{ u.email or '-' }}</a></td>
                         <td>{{ u.village or '-' }}</td>
-                        <td><span class="fw-bold text-success">{{ u.points }}</span></td>
+                        <td><a href="/user/{{ u.id }}" class="fw-bold text-success text-decoration-none">{{ u.points }}</a></td>
                         <td>
                             {% if u.is_verified_resident %}<span class="text-success">✅</span>{% endif %}
                         </td>
@@ -42,10 +42,6 @@
                         </td>
                         <td>
                             <a href="/message/send/{{ u.id }}" class="btn btn-sm btn-outline-success" title="쪽지">✉️</a>
-                            <a href="/admin/users/points/{{ u.id }}" class="btn btn-sm btn-outline-warning" title="닢 관리">💰</a>
-                            {% if session.get('role') == 'leader' or session.get('role') == 'admin' %}
-                            <button class="btn btn-sm btn-outline-danger" onclick="deleteUser({{ u.id }},'{{ u.email or u.username }}')" title="회원 삭제">🗑️</button>
-                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}
