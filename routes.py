@@ -258,7 +258,16 @@ def register_routes(app):
                 return "<script>alert('이메일 인증을 먼저 완료해 주세요.'); location.href='/register';</script>"
             password = request.form['password']
             real_name = request.form['real_name']
-            username = request.form['username']
+            username = request.form.get('username','').strip()
+            # username이 비었으면 이메일 앞부분으로 자동 생성
+            if not username and verified_email:
+                username = verified_email.split('@')[0][:20]
+                # 중복 체크 후 숫자 붙이기
+                base = username
+                counter = 1
+                while User.query.filter_by(username=username).first():
+                    username = f"{base}{counter}"
+                    counter += 1
             # GPS 기반 위치
             lat = request.form.get('lat', type=float)
             lon = request.form.get('lon', type=float)
