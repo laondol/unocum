@@ -1,0 +1,35 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container-xl">
+<div class="row justify-content-center py-5">
+    <div class="col-lg-8 col-xl-7">
+        <div class="card p-5 shadow-lg border-0 bg-white" style="border-radius: 25px;">
+            <div class="text-center mb-4">
+                <span class="fs-1">🔐</span>
+                <h3 class="fw-bold mt-2 text-success">새 비밀번호 설정</h3>
+            </div>
+            <div class="mb-3">
+                <input type="password" id="newPw" class="form-control p-3 border-0 bg-light" placeholder="새 비밀번호" style="border-radius:12px;" required>
+            </div>
+            <div class="mb-3">
+                <input type="password" id="newPw2" class="form-control p-3 border-0 bg-light" placeholder="새 비밀번호 확인" style="border-radius:12px;" required>
+            </div>
+            <button class="btn btn-success w-100 py-3 fw-bold" onclick="resetPw()" style="border-radius:12px;">비밀번호 변경</button>
+            <div id="resetMsg" class="small text-center mt-2"></div>
+        </div>
+    </div>
+</div>
+</div>
+<script>
+function resetPw() {
+    var pw = document.getElementById('newPw').value;
+    var pw2 = document.getElementById('newPw2').value;
+    if (pw !== pw2 || pw.length < 4) return alert('비밀번호를 확인하세요.');
+    fetch('/reset-password/confirm', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({token:'{{ token }}', password:pw})})
+    .then(r=>r.json()).then(d=>{
+        document.getElementById('resetMsg').innerHTML = d.msg;
+        if (d.status==='success') setTimeout(function(){location.href='/login';}, 1500);
+    });
+}
+</script>
+{% endblock %}

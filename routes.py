@@ -205,6 +205,51 @@ def register_routes(app):
         session.pop('verify_code_time', None)
         return jsonify({'status':'success','msg':'이메일 인증 완료!'})
 
+    @app.route('/reset-password')
+    def reset_password():
+        return render_template('reset_password.html')
+
+    @app.route('/reset-password/send', methods=['POST'])
+    def reset_password_send():
+        data = request.get_json()
+        email = data.get('email','').strip()
+        if not email:
+            return jsonify({"status":"error","msg":"이메일을 입력하세요."})
+        user = User.query.filter_by(email=email).first()
+        if not user:
+            return jsonify({"status":"error","msg":"등록되지 않은 이메일입니다."})
+        import secrets, time
+        token = secrets.token_urlsafe(32)
+        user.reset_token = token
+        user.reset_token_expiry = datetime.now() + timedelta(hours=1)
+        db.session.commit()
+        reset_url = url_for('reset_password_confirm', token=token, _external=True)
+        from services.email_service import EmailService
+        EmailService.send(email, '[양평마을] 비밀번호 재설정',
+            f'비밀번호 재설정 링크:\n{reset_url}\n\n1시간 내에 사용해 주세요.')
+        return jsonify({"status":"success","msg":"재설정 링크를 이메일로 발송했습니다."})
+
+    @app.route('/reset-password/<token>')
+    def reset_password_confirm(token):
+        user = User.query.filter_by(reset_token=token).first()
+        if not user or not user.reset_token_expiry or user.reset_token_expiry < datetime.now():
+            return "<script>alert('만료된 링크입니다.'); location.href='/reset-password';</script>"
+        return render_template('reset_confirm.html', token=token)
+
+    @app.route('/reset-password/confirm', methods=['POST'])
+    def reset_password_confirm_post():
+        data = request.get_json()
+        token = data.get('token','')
+        password = data.get('password','')
+        user = User.query.filter_by(reset_token=token).first()
+        if not user or not user.reset_token_expiry or user.reset_token_expiry < datetime.now():
+            return jsonify({"status":"error","msg":"만료된 링크입니다."})
+        user.password = generate_password_hash(password)
+        user.reset_token = None
+        user.reset_token_expiry = None
+        db.session.commit()
+        return jsonify({"status":"success","msg":"비밀번호가 변경되었습니다. 로그인해 주세요."})
+
     @app.route('/register', methods=['GET', 'POST'])
     def register():
         if request.method == 'POST':
@@ -288,7 +333,7 @@ def register_routes(app):
             login_id = request.form['username']
             u = User.query.filter_by(email=login_id).first()
             if u and check_password_hash(u.password, request.form['password']):
-                session.update({'user_id': u.id, 'username': u.username, 'role': u.role})
+                session.update({'user_id': u.id, 'username': u.username, 'role': u.role, 'email': u.email or ''})
                 now = datetime.now()
                 u.last_login = now
                 # 로그인 위치 기록 (GPS from form)
@@ -418,7 +463,7 @@ def register_routes(app):
                 db.session.add(ph)
                 db.session.commit()
 
-        session.update({'user_id': user.id, 'username': user.username, 'role': user.role})
+        session.update({'user_id': user.id, 'username': user.username, 'role': user.role, 'email': user.email or ''})
         now = datetime.now()
         user.last_login = now
         if user.last_payout and (now - user.last_payout).days >= 30:

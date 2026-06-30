@@ -55,6 +55,8 @@ class User(db.Model):
     social_email = db.Column(db.String(100), nullable=True)
     email_verification_token = db.Column(db.String(100), nullable=True)
     email_verification_sent_at = db.Column(db.DateTime, nullable=True)
+    reset_token = db.Column(db.String(100), nullable=True)
+    reset_token_expiry = db.Column(db.DateTime, nullable=True)
 
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
