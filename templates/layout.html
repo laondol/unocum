@@ -125,19 +125,8 @@
                     <li class="nav-spacer"></li>
 
                     {% if session.get('username') %}
-                    <li class="nav-item me-1">
-                        <a href="/user/{{ session.get('user_id') }}" class="badge bg-light text-dark p-2 text-decoration-none position-relative" title="내 프로필">
-                            💎 {{ session.get('username') }}님
-                            <span id="unreadBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;font-size:0.6rem;"></span>
-                        </a>
-                    </li>
-                    <li class="nav-item me-1">
-                        <a class="nav-link px-2 position-relative" href="/message/inbox" title="쪽지">
-                            📬<span id="msgBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:0.6rem;display:none;">0</span>
-                        </a>
-                    </li>
-                    <li class="nav-item me-1" {% if not has_friends %}style="display:none;"{% endif %}>
-                        <a class="nav-link px-2" href="/friends" title="벗 관리">👥</a>
+                    <li class="nav-item ms-auto">
+                        <a href="/user/{{ session.get('user_id') }}" class="text-decoration-none small fw-bold text-dark">👤 {{ session.get('username') }}</a>
                     </li>
                     {% else %}
                     <li class="nav-item me-1">
