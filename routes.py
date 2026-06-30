@@ -95,6 +95,41 @@ def register_routes(app):
         return render_template('all_proposals.html', posts=posts, now=now, timedelta=timedelta)
 
     # --- [회원가입] 이웃 가입 및 선택적 주민 인증 수집 ---
+    @app.route('/api/correct-address', methods=['POST'])
+    def correct_address_nologin():
+        """회원가입용: 주소 보정 (로그인 불필요)"""
+        data = request.get_json()
+        manual_loc = data.get('manual_loc','').strip()
+        gps_lat = data.get('gps_lat', type=float) or 0
+        gps_lng = data.get('gps_lng', type=float) or 0
+        if not manual_loc:
+            return jsonify({"status":"error","msg":"주소를 입력하세요"})
+        from services.transit import geocode_address
+        from services.transit import haversine_km
+        from config import Config
+        geo = geocode_address(manual_loc, Config.KAKAO_REST_API_KEY)
+        if geo and geo.get('lat'):
+            d = haversine_km(gps_lat, gps_lng, geo['lat'], geo['lng']) if gps_lat else 0
+            if gps_lat and d <= 0.5:
+                return jsonify({"status":"success","msg":f"'{manual_loc}'(으)로 보정됨 (거리 {d:.2f}km)", "address": manual_loc, "corrected": True, "lat": geo['lat'], "lng": geo['lng']})
+            else:
+                return jsonify({"status":"success","msg":f"'{manual_loc}'(으)로 보정됨 (1회성)", "address": manual_loc, "corrected": False, "lat": geo['lat'] or gps_lat, "lng": geo['lng'] or gps_lng})
+        return jsonify({"status":"error","msg":"주소를 찾을 수 없습니다"})
+
+    @app.route('/api/check-neighbor')
+    def check_neighbor():
+        """회원가입용: GPS가 양평군 내인지 확인 (로그인 불필요)"""
+        lat = request.args.get('lat', type=float)
+        lon = request.args.get('lon', type=float)
+        if not lat or not lon:
+            return jsonify({"in_yangpyeong": False})
+        from services.geocode import is_in_yangpyeong, gps_to_town_village
+        ok = is_in_yangpyeong(lat, lon)
+        town, village = ('', '')
+        if ok:
+            town, village = gps_to_town_village(lat, lon)
+        return jsonify({"in_yangpyeong": ok, "town": town or '', "village": village or ''})
+
     @app.route('/api/reverse-geocode-detail')
     def reverse_geocode_detail():
         lat = request.args.get('lat', type=float)

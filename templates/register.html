@@ -60,31 +60,32 @@
 
     <!-- Step 3: 기본정보 -->
     <hr>
-    <h6 class="small fw-bold mb-2">👤 기본정보</h6>
-    <div class="row g-2 mb-2">
-        <div class="col-6">
-            <label class="small">이름</label>
-            <input type="text" id="realName" class="form-control form-control-sm" required>
-        </div>
-        <div class="col-6">
-            <label class="small">별명</label>
-            <input type="text" id="nickname" class="form-control form-control-sm" required>
-        </div>
-    </div>
-    <div class="row g-2 mb-2">
-        <div class="col-6">
-            <label class="small">비밀번호</label>
-            <input type="password" id="password" class="form-control form-control-sm" required>
-        </div>
-        <div class="col-6">
-            <label class="small">비밀번호 확인</label>
-            <input type="password" id="password2" class="form-control form-control-sm" required>
+    <h6 class="small fw-bold mb-2">🔑 비밀번호</h6>
+    <div class="mb-2">
+        <div class="input-group input-group-sm">
+            <input type="password" id="password" class="form-control" placeholder="비밀번호" required>
+            <button class="btn btn-outline-secondary" type="button" onclick="togglePw('password',this)">👁️</button>
         </div>
     </div>
     <div class="mb-2">
-        <label class="small">프로필 사진</label>
+        <div class="input-group input-group-sm">
+            <input type="password" id="password2" class="form-control" placeholder="비밀번호 확인" required>
+            <button class="btn btn-outline-secondary" type="button" onclick="togglePw('password2',this)">👁️</button>
+        </div>
+    </div>
+
+    <h6 class="small fw-bold mb-2 mt-3">👤 선택정보</h6>
+    <div class="row g-2 mb-2">
+        <div class="col-6">
+            <input type="text" id="realName" class="form-control form-control-sm" placeholder="이름 (선택)">
+        </div>
+        <div class="col-6">
+            <input type="text" id="nickname" class="form-control form-control-sm" placeholder="별명 (선택)">
+        </div>
+    </div>
+    <div class="mb-2">
         <input type="file" id="profileImg" class="form-control form-control-sm" accept="image/*">
-        <div id="imgPreview" class="mt-1"></div>
+        <div id="imgPreview" class="mt-1 small text-muted">프로필 사진 (선택)</div>
     </div>
     <button class="btn btn-success w-100" onclick="submitRegister()">🌳 회원가입 완료</button>
 </div>
@@ -151,11 +152,17 @@ function getGPS() {
 
 function doNeighborVerify() {
     if (!gpsLat) return alert('GPS를 먼저 확인하세요.');
-    var fd = new FormData(); fd.append('lat', gpsLat); fd.append('lon', gpsLng);
-    fetch('/neighbor/verify', {method:'POST', body:fd})
+    document.getElementById('neighborStatus').innerHTML = '인증 확인 중...';
+    fetch('/api/check-neighbor?lat='+gpsLat+'&lon='+gpsLng)
     .then(r=>r.json()).then(d=>{
-        document.getElementById('neighborStatus').innerHTML = d.status==='success' ? '<span class="text-success">✅ '+d.msg+'</span>' : '<span class="text-danger">'+d.msg+'</span>';
-        if (d.status==='success') isNeighbor = true;
+        if (d.in_yangpyeong) {
+            isNeighbor = true;
+            document.getElementById('neighborStatus').innerHTML = '<span class="text-success">✅ 이웃인증 완료! ('+d.town+' '+d.village+')</span>';
+            document.getElementById('locDetail').innerHTML = '🏠 '+d.town+' '+d.village;
+            document.getElementById('locDetail').style.display='';
+        } else {
+            document.getElementById('neighborStatus').innerHTML = '<span class="text-danger">❌ 양평군 내에서만 인증 가능합니다.</span>';
+        }
     });
 }
 
@@ -165,15 +172,21 @@ function doCorrect() {
     var addr = document.getElementById('manualAddr').value.trim();
     if (!addr) return alert('주소를 입력하세요.');
     document.getElementById('correctStatus').innerHTML = '보정 중...';
-    fetch('/user/location/correct', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({manual_loc:addr, gps_lat:gpsLat, gps_lng:gpsLng})})
+    fetch('/api/correct-address', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({manual_loc:addr, gps_lat:gpsLat, gps_lng:gpsLng})})
     .then(r=>r.json()).then(d=>{
         document.getElementById('correctStatus').innerHTML = d.msg;
         if (d.status==='success') {
-            correctedAddr = addr;
-            document.getElementById('gpsStatus').innerHTML = '📍 ' + addr + ' (보정됨)';
+            correctedAddr = d.address;
+            document.getElementById('gpsStatus').innerHTML = '📍 ' + d.address + ' (보정됨)';
             document.getElementById('locDetail').innerHTML = '🏠 기본주소로 저장됨';
         }
     });
+}
+
+function togglePw(id, btn) {
+    var el = document.getElementById(id);
+    el.type = el.type === 'password' ? 'text' : 'password';
+    btn.textContent = el.type === 'password' ? '👁️' : '🙈';
 }
 
 function submitRegister() {
