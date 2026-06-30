@@ -20,7 +20,7 @@
                     <div class="d-flex gap-1 flex-wrap mb-2">
                         <span class="badge bg-light text-dark small">{{ profile_user.town }} {{ profile_user.village }}</span>
                         {% if profile_user.is_neighbor %}<span class="badge bg-success small">이웃</span>{% endif %}
-                        {% if profile_user.role == 'admin' %}<span class="badge bg-danger small">관리자</span>{% elif profile_user.role == 'leader' %}<span class="badge bg-primary small">리더</span>{% endif %}
+                        {% if profile_user.role == 'admin' %}<span class="badge bg-danger small">관</span>{% elif profile_user.role == 'leader' %}<span class="badge bg-primary small">책</span>{% endif %}
                     </div>
                     <a href="#" onclick="document.getElementById('nipSection').classList.toggle('d-none'); return false;" class="text-decoration-none">
                         <span class="fw-bold text-success fs-5">{{ profile_user.points }}</span>
@@ -107,7 +107,7 @@
                     <thead class="table-light"><tr><th>일시</th><th>유형</th><th>변동</th><th>잔액</th><th>설명</th></tr></thead>
                     <tbody>
                         {% for h in point_history %}
-                        <tr><td class="text-muted">{{ h.created_at.strftime('%m/%d %H:%M') }}</td><td>{{ {'signup':'가입','monthly':'월급','post':'제안','comment':'댓글','like':'추천','village_report':'제보','share_report':'공유','admin_adjust':'관리자'}.get(h.change_type, h.change_type) }}</td><td class="fw-bold {{ 'text-success' if h.amount > 0 else 'text-danger' }}">{{ '+' if h.amount > 0 }}{{ h.amount }}</td><td>{{ h.balance_after }}</td><td class="small">{{ h.description }}</td></tr>
+                        <tr><td class="text-muted">{{ h.created_at.strftime('%m/%d %H:%M') }}</td><td>{{ {'signup':'가입','monthly':'월급','post':'제안','comment':'댓글','like':'추천','village_report':'제보','share_report':'공유','admin_adjust':'관리자 조정'}.get(h.change_type, h.change_type) }}</td><td class="fw-bold {{ 'text-success' if h.amount > 0 else 'text-danger' }}">{{ '+' if h.amount > 0 }}{{ h.amount }}</td><td>{{ h.balance_after }}</td><td class="small">{{ h.description }}</td></tr>
                         {% else %}
                         <tr><td colspan="5" class="text-center text-muted py-4">내역 없음</td></tr>
                         {% endfor %}
