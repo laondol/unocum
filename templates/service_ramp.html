@@ -71,7 +71,7 @@
                 </div>
                 <div class="mb-3">
                     <label class="form-label small fw-bold">이메일 <span class="text-danger">*</span></label>
-                    <input type="email" name="email" class="form-control" required>
+                    <input type="email" name="email" id="rampEmail1" class="form-control" value="{{ session.get('email','') }}" required {{ 'readonly' if session.get('email') else '' }}>
                     <div class="form-text">접수 확인 메일이 발송됩니다.</div>
                 </div>
                 <div class="mb-3">
@@ -157,7 +157,7 @@
                             <input type="text" name="name" class="form-control form-control-sm" placeholder="이름" required>
                         </div>
                         <div class="col-4">
-                            <input type="email" name="email" class="form-control form-control-sm" placeholder="이메일" required>
+                            <input type="email" name="email" class="form-control form-control-sm" placeholder="이메일" value="{{ session.get('email','') }}" required {{ 'readonly' if session.get('email') else '' }}>
                         </div>
                         <div class="col-4">
                             <input type="tel" name="phone" class="form-control form-control-sm" placeholder="연락처">
