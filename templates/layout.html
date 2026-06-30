@@ -128,7 +128,7 @@
             {% if session.get('username') %}
             <a href="/user/{{ session.get('user_id') }}" class="text-decoration-none ms-2" title="{{ session.get('username') }}">👤</a>
             {% else %}
-            <a href="/login?next=/user" class="text-decoration-none text-muted ms-2" title="회원정보">👤</a>
+            <a href="/login" class="text-decoration-none text-muted ms-2" title="회원정보">👤</a>
             {% endif %}
         </div>
     </nav>
