@@ -1403,20 +1403,6 @@ def register_routes(app):
             running -= h.amount
         return render_template('mypage_points.html', user=user, history=raw_history)
 
-    @app.route('/admin/users/points/<int:user_id>', methods=['GET', 'POST'])
-    def admin_user_points(user_id):
-        if session.get('role') not in ['admin', 'leader']:
-            return "권한 없음", 403
-        user = User.query.get_or_404(user_id)
-        if request.method == 'POST':
-            amount = int(request.form.get('amount', 0))
-            change_type = request.form.get('change_type', 'admin_adjust')
-            description = request.form.get('description', '관리자 조정')
-            add_points(user.id, amount, change_type, description)
-            return redirect(url_for('admin_user_points', user_id=user.id))
-        history = PointHistory.query.filter_by(user_id=user.id).order_by(PointHistory.created_at.desc()).all()
-        return render_template('admin_user_points.html', user=user, history=history)
-
     @app.route('/mypage/points/charge')
     def points_charge():
         if not session.get('username'):
