@@ -1,0 +1,14 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container py-4" style="max-width: 700px;">
+    <h4 class="fw-bold mb-3">📰 노동이슈 작성</h4>
+    <form method="post" class="card border-0 shadow-sm p-4" style="border-radius:16px;">
+        <input type="text" name="title" class="form-control mb-2" placeholder="제목" required>
+        <textarea name="content" class="form-control mb-3" rows="10" placeholder="내용을 입력하세요" required></textarea>
+        <div class="d-flex gap-2">
+            <button class="btn btn-success">등록</button>
+            <a href="/legal/issues" class="btn btn-outline-secondary">취소</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
