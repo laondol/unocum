@@ -38,20 +38,32 @@
 <!-- 뉴스 2종 -->
 <div class="row g-3 mb-4">
     <div class="col-md-6">
-        <a href="/kr-yp-news" class="text-decoration-none">
-            <div class="card border-0 shadow-sm p-3 h-100" style="border-radius:15px; background:linear-gradient(135deg,#e3f2fd,#fff);">
-                <h6 class="fw-bold text-primary">대한민국과 양평</h6>
-                {% if yp_news %}<p class="small text-muted mb-0">{{ yp_news.title[:60] }}</p>{% endif %}
-            </div>
-        </a>
+        <div class="card border-0 shadow-sm p-3 h-100" style="border-radius:15px; background:linear-gradient(135deg,#e3f2fd,#fff);">
+            <h6 class="fw-bold text-primary text-center mb-2">대한민국과 양평</h6>
+            {% if yp_news %}
+            {% for n in yp_news %}
+            <a href="/news/{{ n.id }}" class="text-decoration-none">
+                <p class="small text-dark mb-1 text-truncate">{{ n.title }}</p>
+            </a>
+            {% endfor %}
+            {% else %}
+            <p class="small text-muted mb-0">등록된 소식이 없습니다</p>
+            {% endif %}
+        </div>
     </div>
     <div class="col-md-6">
-        <a href="/world-news" class="text-decoration-none">
-            <div class="card border-0 shadow-sm p-3 h-100" style="border-radius:15px; background:linear-gradient(135deg,#e8f5e9,#fff);">
-                <h6 class="fw-bold text-success">🌍 세계와 양평</h6>
-                {% if world_news %}<p class="small text-muted mb-0">{{ world_news.title[:60] }}</p>{% endif %}
-            </div>
-        </a>
+        <div class="card border-0 shadow-sm p-3 h-100" style="border-radius:15px; background:linear-gradient(135deg,#e8f5e9,#fff);">
+            <h6 class="fw-bold text-success text-center mb-2">🌍 세계와 양평</h6>
+            {% if world_news %}
+            {% for n in world_news %}
+            <a href="/news/{{ n.id }}" class="text-decoration-none">
+                <p class="small text-dark mb-1 text-truncate">{{ n.title }}</p>
+            </a>
+            {% endfor %}
+            {% else %}
+            <p class="small text-muted mb-0">등록된 소식이 없습니다</p>
+            {% endif %}
+        </div>
     </div>
 </div>
 {% endblock %}
