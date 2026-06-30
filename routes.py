@@ -773,8 +773,8 @@ def register_routes(app):
 
     @app.route('/admin/users/points/<int:user_id>', methods=['GET','POST'])
     def admin_user_points(user_id):
-        if session.get('role') not in ('admin', 'leader'):
-            return jsonify({"status":"error","msg":"권한 없음"}), 403
+        if session.get('role') != 'leader':
+            return jsonify({"status":"error","msg":"최고책임자만 가능합니다"}), 403
         user = User.query.get_or_404(user_id)
         if request.method == 'POST':
             amount = int(request.form.get('amount', 0))
@@ -1612,7 +1612,7 @@ def register_routes(app):
             is_friend = bool(f)
         
         is_own = (session.get('user_id') == user.id)
-        is_admin = session.get('role') in ('admin','leader')
+        is_admin = session.get('role') == 'leader'
         bot_name = ''
         posts = []
         curr_location = ''
