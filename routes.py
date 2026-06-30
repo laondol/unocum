@@ -185,16 +185,18 @@ def register_routes(app):
         email = request.form.get('email', '').strip()
         if not email:
             return jsonify({'status':'error','msg':'이메일을 입력해 주세요.'})
-        if User.query.filter_by(email=email).first():
+        # 회원가입용 이메일 체크
+        purpose = request.form.get('purpose', 'register')
+        if purpose == 'register' and User.query.filter_by(email=email).first():
             return jsonify({'status':'error','msg':'이미 등록된 이메일입니다.'})
         import secrets, time
         code = ''.join(secrets.choice('0123456789') for _ in range(6))
         session['verify_code'] = code
         session['verify_email'] = email
         session['verify_code_time'] = time.time()
+        session['verify_purpose'] = purpose
         from services.email_service import EmailService
-        EmailService.send(email, '[양평마을] 이메일 인증 코드',
-            f'인증 코드: {code}\n\n회원가입 페이지에서 위 코드를 입력해 주세요.\n코드는 5분간 유효합니다.')
+        EmailService.send(email, '[양평마을] 이메일 인증 코드', f'인증 코드: {code}\n\n5분간 유효합니다.')
         return jsonify({'status':'success','msg':'인증 코드를 이메일로 발송했습니다.'})
 
     @app.route('/register/verify-code', methods=['POST'])
@@ -3217,30 +3219,49 @@ def register_routes(app):
     # --- [법률상담 게시판] ---
     @app.route('/legal/list')
     def legal_list():
-        posts = LegalPost.query.order_by(LegalPost.created_at.desc()).all()
+        uid = session.get('user_id')
+        if uid:
+            posts = LegalPost.query.filter_by(user_id=uid).order_by(LegalPost.created_at.desc()).all()
+        else:
+            posts = LegalPost.query.order_by(LegalPost.created_at.desc()).all()
         return render_template('legal_board.html', posts=posts)
 
     @app.route('/legal/write', methods=['GET', 'POST'])
     def legal_write():
         if request.method == 'POST':
+            # 이메일 인증 확인 (비로그인 시 필수)
+            email = request.form['email']
+            uid = session.get('user_id')
+            if not uid:
+                if not session.get('email_verified_for_legal'):
+                    return "<script>alert('이메일 인증을 먼저 완료해 주세요.'); history.back();</script>"
+                if session.get('verify_email') != email:
+                    return "<script>alert('인증된 이메일과 일치하지 않습니다.'); history.back();</script>"
             title = request.form['title']
             content = request.form['content']
             password = generate_password_hash(request.form['password'])
-            email = request.form['email']
             author_name = request.form.get('author_name', '익명') or '익명'
-            post = LegalPost(title=title, content=content, password=password, email=email, author_name=author_name)
+            post = LegalPost(title=title, content=content, password=password, email=email, author_name=author_name, user_id=uid)
             db.session.add(post)
             db.session.commit()
-            return "<script>alert('상담 글이 등록되었습니다. 답변은 이메일로 알려드립니다.'); location.href='/legal/list';</script>"
+            session.pop('email_verified_for_legal', None)
+            session.pop('verify_email', None)
+            return "<script>alert('상담 글이 등록되었습니다.'); location.href='/legal/list';</script>"
         return render_template('legal_write.html')
 
     @app.route('/legal/post/<int:post_id>', methods=['GET', 'POST'])
     def legal_post(post_id):
         post = LegalPost.query.get_or_404(post_id)
+        uid = session.get('user_id')
+        role = session.get('role','')
+        is_author = uid and post.user_id == uid
+        is_admin = role in ('admin','leader')
         if request.method == 'POST':
             if check_password_hash(post.password, request.form['password']):
                 return render_template('legal_post.html', post=post, need_password=False, error=False)
             return render_template('legal_post.html', post=post, need_password=True, error=True)
+        if is_author or is_admin:
+            return render_template('legal_post.html', post=post, need_password=False, error=False)
         return render_template('legal_post.html', post=post, need_password=True, error=False)
 
     @app.route('/legal/admin')
@@ -3376,12 +3397,22 @@ def register_routes(app):
         phone = request.form.get('phone', '')
         date_str = request.form['date']
         time_slot = request.form['time_slot']
+        uid = session.get('user_id')
+        # 통벗 일정 충돌 체크
+        if uid:
+            from datetime import date
+            appt_date = date.fromisoformat(date_str)
+            conflict = TongBotSchedule.query.filter(
+                TongBotSchedule.user_id == uid,
+                db.func.date(TongBotSchedule.event_date) == appt_date
+            ).first()
+            if conflict:
+                return "<script>alert('해당 날짜에 통벗 일정이 있습니다. 상담 예약이 불가능합니다.'); history.back();</script>"
         location_parts = [request.form.get('location', ''), request.form.get('location_detail', '')]
         location = ' '.join(p for p in location_parts if p)
         content = request.form.get('content', '')
-        from datetime import date
         appt = LegalAppointment(
-            user_id=session.get('user_id'),
+            user_id=uid,
             name=name, email=email, phone=phone,
             date=date.fromisoformat(date_str),
             time_slot=time_slot, location=location, content=content
@@ -3393,30 +3424,48 @@ def register_routes(app):
     # --- [심리상담소] ---
     @app.route('/psycho/list')
     def psycho_list():
-        posts = PsychoPost.query.order_by(PsychoPost.created_at.desc()).all()
+        uid = session.get('user_id')
+        if uid:
+            posts = PsychoPost.query.filter_by(user_id=uid).order_by(PsychoPost.created_at.desc()).all()
+        else:
+            posts = PsychoPost.query.order_by(PsychoPost.created_at.desc()).all()
         return render_template('psycho_board.html', posts=posts)
 
     @app.route('/psycho/write', methods=['GET', 'POST'])
     def psycho_write():
         if request.method == 'POST':
+            email = request.form['email']
+            uid = session.get('user_id')
+            if not uid:
+                if not session.get('email_verified_for_psycho'):
+                    return "<script>alert('이메일 인증을 먼저 완료해 주세요.'); history.back();</script>"
+                if session.get('verify_email') != email:
+                    return "<script>alert('인증된 이메일과 일치하지 않습니다.'); history.back();</script>"
             title = request.form['title']
             content = request.form['content']
             password = generate_password_hash(request.form['password'])
-            email = request.form['email']
             author_name = request.form.get('author_name', '익명') or '익명'
-            post = PsychoPost(title=title, content=content, password=password, email=email, author_name=author_name)
+            post = PsychoPost(title=title, content=content, password=password, email=email, author_name=author_name, user_id=uid)
             db.session.add(post)
             db.session.commit()
-            return "<script>alert('상담 글이 등록되었습니다. 답변은 이메일로 알려드립니다.'); location.href='/psycho/list';</script>"
+            session.pop('email_verified_for_psycho', None)
+            session.pop('verify_email', None)
+            return "<script>alert('상담 글이 등록되었습니다.'); location.href='/psycho/list';</script>"
         return render_template('psycho_write.html')
 
     @app.route('/psycho/post/<int:post_id>', methods=['GET', 'POST'])
     def psycho_post(post_id):
         post = PsychoPost.query.get_or_404(post_id)
+        uid = session.get('user_id')
+        role = session.get('role','')
+        is_author = uid and post.user_id == uid
+        is_admin = role in ('admin','leader')
         if request.method == 'POST':
             if check_password_hash(post.password, request.form['password']):
                 return render_template('psycho_post.html', post=post, need_password=False, error=False)
             return render_template('psycho_post.html', post=post, need_password=True, error=True)
+        if is_author or is_admin:
+            return render_template('psycho_post.html', post=post, need_password=False, error=False)
         return render_template('psycho_post.html', post=post, need_password=True, error=False)
 
     @app.route('/psycho/admin')
@@ -3544,12 +3593,23 @@ def register_routes(app):
         phone = request.form.get('phone', '')
         date_str = request.form['date']
         time_slot = request.form['time_slot']
+        uid = session.get('user_id')
+        # 통벗 일정 충돌 체크
+        if uid:
+            from datetime import date
+            appt_date = date.fromisoformat(date_str)
+            conflict = TongBotSchedule.query.filter(
+                TongBotSchedule.user_id == uid,
+                db.func.date(TongBotSchedule.event_date) == appt_date
+            ).first()
+            if conflict:
+                return "<script>alert('해당 날짜에 통벗 일정이 있습니다. 상담 예약이 불가능합니다.'); history.back();</script>"
         location_parts = [request.form.get('location', ''), request.form.get('location_detail', '')]
         location = ' '.join(p for p in location_parts if p)
         content = request.form.get('content', '')
         from datetime import date
         appt = PsychoAppointment(
-            user_id=session.get('user_id'),
+            user_id=uid,
             name=name, email=email, phone=phone,
             date=date.fromisoformat(date_str),
             time_slot=time_slot, location=location, content=content
