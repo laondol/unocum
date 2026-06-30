@@ -40,9 +40,9 @@
                 </div>
                 <!-- 오른쪽 절반: 통벗 -->
                 <div class="col-6 text-center">
-                    {% if is_own and bot_name %}
+                    {% if is_own %}
                     <div class="mb-2">
-                        <a href="#" onclick="window.open('/user/my?popup=1','tongbotPopup','width=700,height=700,left=100,top=50'); return false;" class="btn btn-warning btn-sm">🤖 통벗-{{ bot_name }}</a>
+                        <a href="#" onclick="window.open('/user/my?popup=1','tongbotPopup','width=700,height=700,left=100,top=50'); return false;" class="btn btn-warning btn-sm">🤖 통벗{% if bot_name %}-{{ bot_name }}{% endif %}</a>
                     </div>
                     <div class="d-flex flex-wrap gap-1 justify-content-center">
                         <a href="#" onclick="window.open('/user/my?popup=1&tab=write','writePopup','width=700,height=700,left=100,top=50'); return false;" class="btn btn-sm btn-outline-success">✍️ 글쓰기</a>
