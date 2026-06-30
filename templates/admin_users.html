@@ -50,6 +50,9 @@
                         <td>
                             <a href="/message/send/{{ u.id }}" class="btn btn-sm btn-outline-success" title="쪽지">✉️</a>
                             <a href="/admin/users/points/{{ u.id }}" class="btn btn-sm btn-outline-warning" title="닢 관리">💰</a>
+                            {% if session.get('role') == 'leader' or session.get('role') == 'admin' %}
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteUser({{ u.id }},'{{ u.email or u.username }}')" title="회원 삭제">🗑️</button>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}
@@ -89,6 +92,15 @@ function createGroupFromSelected() {
         if(d.status==='success') alert('✅ ' + d.msg);
         else alert('❌ ' + d.msg);
     }).catch(e=>alert('오류: '+e));
+}
+
+function deleteUser(id, name) {
+    if (!confirm(name + ' 회원을 정말 삭제하시겠습니까? 복구할 수 없습니다.')) return;
+    fetch('/admin/users/delete/' + id, {method:'POST'})
+    .then(r=>r.json()).then(d=>{
+        alert(d.msg);
+        if (d.status==='success') location.reload();
+    });
 }
 </script>
 {% endblock %}

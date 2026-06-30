@@ -759,6 +759,33 @@ def register_routes(app):
         return jsonify({"status": "success"})
 
     # --- [지킴이 전용] 이웃 관리 및 고지서 즉시 영구 파기 ---
+    @app.route('/admin/users/delete/<int:user_id>', methods=['POST'])
+    def admin_delete_user(user_id):
+        if session.get('role') not in ('admin', 'leader'):
+            return jsonify({"status":"error","msg":"권한 없음"}), 403
+        user = User.query.get_or_404(user_id)
+        if user.role == 'admin':
+            return jsonify({"status":"error","msg":"관리자는 삭제할 수 없습니다"})
+        name = user.email or user.username
+        db.session.delete(user)
+        db.session.commit()
+        return jsonify({"status":"success","msg":f"'{name}' 회원이 삭제되었습니다."})
+
+    @app.route('/admin/users/points/<int:user_id>', methods=['GET','POST'])
+    def admin_user_points(user_id):
+        if session.get('role') not in ('admin', 'leader'):
+            return jsonify({"status":"error","msg":"권한 없음"}), 403
+        user = User.query.get_or_404(user_id)
+        if request.method == 'POST':
+            amount = int(request.form.get('amount', 0))
+            reason = request.form.get('reason', '관리자 조정')
+            user.points = (user.points or 0) + amount
+            db.session.add(PointHistory(user_id=user.id, change_type='admin_adjust', amount=amount,
+                balance_after=user.points, description=reason))
+            db.session.commit()
+            return jsonify({"status":"success","msg":f"{amount}닢 조정 완료"})
+        return jsonify({"id":user.id,"email":user.email,"username":user.username,"points":user.points})
+
     @app.route('/admin/users')
     def admin_users():
         if session.get('role') not in ['admin', 'leader']: return "권한 부족", 403
