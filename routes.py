@@ -40,7 +40,7 @@ def register_routes(app):
 
     @app.route('/presentation')
     def presentation():
-        return render_template('presentation.html')
+        return render_template('presentation.html', selected_news=None)
 
     @app.route('/terms')
     def terms():
