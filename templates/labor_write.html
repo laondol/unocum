@@ -1,14 +1,73 @@
 {% extends 'layout.html' %}
 {% block content %}
-<div class="container py-4" style="max-width: 700px;">
+<div class="container py-4" style="max-width: 800px;">
     <h4 class="fw-bold mb-3">📰 노동이슈 작성</h4>
-    <form method="post" class="card border-0 shadow-sm p-4" style="border-radius:16px;">
-        <input type="text" name="title" class="form-control mb-2" placeholder="제목" required>
-        <textarea name="content" class="form-control mb-3" rows="10" placeholder="내용을 입력하세요" required></textarea>
-        <div class="d-flex gap-2">
+
+    <ul class="nav nav-tabs mb-3" id="writeTabs">
+        <li class="nav-item"><a class="nav-link active" href="#" data-tab="direct">✍️ 직접작성</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" data-tab="url">🔗 URL 요약</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" data-tab="ai">🤖 AI 도움</a></li>
+    </ul>
+
+    <!-- 직접작성 -->
+    <div id="tabDirect">
+        <form method="post" action="/legal/issues/write" class="card border-0 shadow-sm p-4" style="border-radius:16px;">
+            <input type="text" name="title" class="form-control mb-2" placeholder="제목" required>
+            <textarea name="content" id="summernote" class="form-control mb-3" rows="10"></textarea>
             <button class="btn btn-success">등록</button>
-            <a href="/legal/issues" class="btn btn-outline-secondary">취소</a>
+            <a href="/legal/issues" class="btn btn-outline-secondary ms-2">취소</a>
+        </form>
+    </div>
+
+    <!-- URL 요약 -->
+    <div id="tabUrl" style="display:none;">
+        <div class="card border-0 shadow-sm p-4" style="border-radius:16px;">
+            <input type="url" id="aiUrl" class="form-control mb-2" placeholder="기사 URL">
+            <button class="btn btn-primary mb-3" onclick="summarizeUrl()">AI 요약하기</button>
+            <form method="post" action="/legal/issues/write">
+                <input type="text" name="title" id="urlTitle" class="form-control mb-2" placeholder="제목">
+                <textarea name="content" id="urlContent" class="form-control mb-3" rows="10"></textarea>
+                <button class="btn btn-success">등록</button>
+                <a href="/legal/issues" class="btn btn-outline-secondary ms-2">취소</a>
+            </form>
         </div>
-    </form>
+    </div>
+
+    <!-- AI 도움 -->
+    <div id="tabAi" style="display:none;">
+        <form method="post" action="/legal/issues/write" class="card border-0 shadow-sm p-4" style="border-radius:16px;">
+            <input type="text" name="title" class="form-control mb-2" placeholder="제목">
+            <textarea name="content" class="form-control mb-3" rows="10" placeholder="AI가 작성한 내용이 여기에 표시됩니다"></textarea>
+            <button class="btn btn-success">등록</button>
+            <a href="/legal/issues" class="btn btn-outline-secondary ms-2">취소</a>
+        </form>
+    </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/summernote@0.9.0/dist/summernote-bs5.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+    $('#summernote').summernote({height:300,toolbar:[['style',['bold','italic','underline']],['para',['ul','ol']],['insert',['link']]]});
+    document.querySelectorAll('#writeTabs .nav-link').forEach(function(t){
+        t.addEventListener('click',function(e){e.preventDefault();
+            document.querySelectorAll('#writeTabs .nav-link').forEach(function(x){x.classList.remove('active')});
+            this.classList.add('active');
+            ['tabDirect','tabUrl','tabAi'].forEach(function(id){document.getElementById(id).style.display='none'});
+            document.getElementById('tab'+this.dataset.tab.charAt(0).toUpperCase()+this.dataset.tab.slice(1)).style.display='';
+        });
+    });
+});
+
+function summarizeUrl(){
+    var url=document.getElementById('aiUrl').value.trim();
+    if(!url)return alert('URL을 입력하세요.');
+    var btn=event.target;btn.disabled=true;btn.textContent='요약 중...';
+    fetch('/api/news/summarize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:url})})
+    .then(r=>r.json()).then(d=>{
+        document.getElementById('urlTitle').value=d.title||'';
+        document.getElementById('urlContent').value=d.summary||'';
+        btn.disabled=false;btn.textContent='AI 요약하기';
+    }).catch(function(){btn.disabled=false;btn.textContent='AI 요약하기';alert('실패');});
+}
+</script>
 {% endblock %}

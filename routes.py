@@ -3429,6 +3429,22 @@ def register_routes(app):
         return "<script>alert('예약이 신청되었습니다. 승인 후 이메일로 안내드립니다.'); location.href='/service/legal';</script>"
 
     # --- [노동이슈 게시판] ---
+    @app.route('/api/news/summarize', methods=['POST'])
+    def api_news_summarize():
+        data = request.get_json()
+        url = data.get('url','').strip()
+        if not url:
+            return jsonify({"error":"URL 필요"})
+        from services.news_service import ai_summarize_url
+        import requests as req_lib
+        try:
+            resp = req_lib.get(url, headers={'User-Agent':'Mozilla/5.0'}, timeout=10)
+            body = resp.text[:5000]
+            result = ai_summarize_url(body)
+            return jsonify({"title": result.get('title',''), "summary": result.get('summary','')})
+        except Exception as e:
+            return jsonify({"error": str(e)})
+
     @app.route('/legal/issues')
     def legal_issues():
         posts = LegalPost.query.order_by(LegalPost.created_at.desc()).limit(20).all()

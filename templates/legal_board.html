@@ -3,46 +3,63 @@
 <div class="container py-4" style="max-width: 800px;">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h4 class="fw-bold mb-0">📋 법률상담 게시판</h4>
-        <a href="/legal/write" class="btn btn-sm btn-success fw-bold">상담 글쓰기</a>
+        {% if session.get('user_id') %}
+        <a href="/legal/write" class="btn btn-sm btn-success">상담 글쓰기</a>
+        {% endif %}
     </div>
-    <p class="text-muted small mb-3">비회원도 이메일 인증으로 질문할 수 있습니다. 답변 등록 시 입력하신 이메일로 알림이 발송됩니다.</p>
+    {% if not session.get('user_id') %}
+    <div id="verifySection" class="card border-0 shadow-sm p-3 mb-3" style="border-radius:12px;">
+        <p class="small text-muted mb-2">📧 비회원은 이메일 인증 후 글을 쓰고 볼 수 있습니다.</p>
+        <div class="input-group input-group-sm">
+            <input type="email" id="verifyEmail" class="form-control" placeholder="이메일">
+            <button class="btn btn-success" onclick="sendVerify('legal')">인증하기</button>
+        </div>
+        <div class="input-group input-group-sm mt-1" id="codeSection" style="display:none;">
+            <input type="text" id="verifyCode" class="form-control" placeholder="인증코드 6자리" maxlength="6">
+            <button class="btn btn-outline-success" onclick="checkVerify('legal')">확인</button>
+        </div>
+        <div id="verifyStatus" class="small mt-1"></div>
+    </div>
+    {% endif %}
 
-    <div class="card border-0 shadow-sm" style="border-radius: 16px;">
+    <div class="card border-0 shadow-sm" style="border-radius:16px;">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0 small">
-                <thead class="table-light">
-                    <tr>
-                        <th style="width:5%;">#</th>
-                        <th style="width:45%;">제목</th>
-                        <th style="width:15%;">작성자</th>
-                        <th style="width:15%;">답변</th>
-                        <th style="width:20%;">작성일</th>
-                    </tr>
-                </thead>
+                <thead class="table-light"><tr><th>#</th><th>제목</th><th>작성자</th><th>답변</th><th>작성일</th></tr></thead>
                 <tbody>
                     {% for p in posts %}
                     <tr>
-                        <td class="text-muted">{{ p.id }}</td>
-                        <td><a href="/legal/post/{{ p.id }}" class="text-decoration-none fw-bold">{{ p.title }}</a></td>
-                        <td>{{ p.author_name or '익명' }}</td>
+                        <td>{{ p.id }}</td>
                         <td>
-                            {% if p.answer %}
-                            <span class="badge bg-success">답변완료</span>
+                            <a href="/legal/post/{{ p.id }}" class="text-decoration-none">
+                                {% if session.get('user_id') and session.get('user_id') == p.user_id %}
+                                {{ p.title }}
+                                {% elif session.get('role') in ('admin','leader') %}
+                                {{ p.title }}
+                                {% else %}
+                                {{ p.title[:6] }}{% if p.title|length > 6 %}...{% endif %}
+                                {% endif %}
+                            </a>
+                        </td>
+                        <td>
+                            {% if p.email and not session.get('user_id') %}
+                            {{ p.email[:2] }}{% if p.email|length > 2 %}***{% endif %}
                             {% else %}
-                            <span class="badge bg-secondary">대기중</span>
+                            {{ p.author_name or '익명' }}
                             {% endif %}
                         </td>
-                        <td class="text-muted">{{ p.created_at.strftime('%Y-%m-%d') }}</td>
+                        <td>{% if p.answer %}<span class="badge bg-success">완료</span>{% else %}<span class="badge bg-warning">대기</span>{% endif %}</td>
+                        <td>{{ p.created_at.strftime('%m/%d') if p.created_at else '' }}</td>
                     </tr>
-                    {% else %}
-                    <tr><td colspan="5" class="text-center text-muted py-4">상담 글이 없습니다.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
-    <div class="text-center mt-3">
-        <a href="/service/legal" class="btn btn-sm btn-outline-secondary">← 법률사무소</a>
-    </div>
 </div>
+<script>
+var verified=false;
+function sendVerify(p){var email=document.getElementById('verifyEmail').value.trim();if(!email)return alert('이메일 입력');var fd=new FormData();fd.append('email',email);fd.append('purpose',p||'legal');fetch('/register/send-code',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{document.getElementById('verifyStatus').innerHTML=d.msg;if(d.status==='success')document.getElementById('codeSection').style.display='';});}
+function checkVerify(p){var code=document.getElementById('verifyCode').value.trim();var fd=new FormData();fd.append('code',code);fd.append('purpose',p||'legal');fetch('/register/verify-code',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status==='success'){verified=true;document.getElementById('verifyStatus').innerHTML='✅ 인증완료';}else alert(d.msg);});}
+</script>
 {% endblock %}
