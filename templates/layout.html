@@ -129,8 +129,8 @@
                         <a href="/user/{{ session.get('user_id') }}" class="text-decoration-none small fw-bold text-dark">👤 {{ session.get('username') }}</a>
                     </li>
                     {% else %}
-                    <li class="nav-item me-1">
-                        <a class="btn btn-success text-white btn-sm px-3" href="/login?next={{ request.path }}">시작하기</a>
+                    <li class="nav-item ms-auto">
+                        <a href="/login?next={{ request.path }}" class="text-decoration-none small fw-bold text-muted">👤 회원정보</a>
                     </li>
                     {% endif %}
                 </ul>
