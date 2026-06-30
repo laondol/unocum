@@ -16,4 +16,55 @@
     <a href="/world-news" class="btn btn-sm btn-outline-success">🌍 세계소식</a>
 </div>
 {% endif %}
+
+<!-- 서비스 3종 -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <a href="/service/ramp" class="text-decoration-none">
+            <div class="card border-0 shadow-sm p-3 text-center h-100" style="border-radius:15px;">
+                <div class="fs-2">♿</div>
+                <h6 class="fw-bold text-dark mt-1">휠체어 경사로 보급</h6>
+                <small class="text-muted">이동약자를 위한 경사로 설치</small>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a href="/service/legal" class="text-decoration-none">
+            <div class="card border-0 shadow-sm p-3 text-center h-100" style="border-radius:15px;">
+                <div class="fs-2">⚖️</div>
+                <h6 class="fw-bold text-dark mt-1">이훈의 법률상담소</h6>
+                <small class="text-muted">전문 노무사의 무료 상담</small>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a href="/service/psycho" class="text-decoration-none">
+            <div class="card border-0 shadow-sm p-3 text-center h-100" style="border-radius:15px;">
+                <div class="fs-2">🧠</div>
+                <h6 class="fw-bold text-dark mt-1">숨상담심리연구소</h6>
+                <small class="text-muted">자녀양육·청소년·장애인가족</small>
+            </div>
+        </a>
+    </div>
+</div>
+
+<!-- 뉴스 2종 -->
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <a href="/kr-yp-news" class="text-decoration-none">
+            <div class="card border-0 shadow-sm p-3 h-100" style="border-radius:15px; background:linear-gradient(135deg,#e3f2fd,#fff);">
+                <h6 class="fw-bold text-primary">🇰🇷 대한민국과 양평</h6>
+                {% if yp_news %}<p class="small text-muted mb-0">{{ yp_news.title[:60] }}</p>{% endif %}
+            </div>
+        </a>
+    </div>
+    <div class="col-md-6">
+        <a href="/world-news" class="text-decoration-none">
+            <div class="card border-0 shadow-sm p-3 h-100" style="border-radius:15px; background:linear-gradient(135deg,#e8f5e9,#fff);">
+                <h6 class="fw-bold text-success">🌍 세계와 양평</h6>
+                {% if world_news %}<p class="small text-muted mb-0">{{ world_news.title[:60] }}</p>{% endif %}
+            </div>
+        </a>
+    </div>
+</div>
 {% endblock %}
