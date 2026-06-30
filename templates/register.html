@@ -64,16 +64,8 @@
     <div id="locDetail" class="small mb-1" style="display:none;"></div>
     <div class="d-flex gap-1 mb-2">
         <button class="btn btn-sm btn-outline-success" onclick="doNeighborVerify()" id="neighborBtn">🏠 이웃인증</button>
-        <button class="btn btn-sm btn-outline-secondary" onclick="showCorrect()">📍 보정</button>
     </div>
     <div id="neighborStatus" class="small mb-2"></div>
-
-    <!-- 보정 폼 -->
-    <div id="correctForm" style="display:none;" class="mb-2 p-2 bg-light rounded small">
-        <input type="text" id="manualAddr" class="form-control form-control-sm mb-1" placeholder="상세주소 (예: 양수로 123)">
-        <button class="btn btn-sm btn-success" onclick="doCorrect()">보정하기</button>
-        <div id="correctStatus" class="small mt-1"></div>
-    </div>
 
     <h6 class="small fw-bold mb-2 mt-3">👤 선택정보</h6>
     <div class="row g-2 mb-2">
@@ -95,7 +87,7 @@
 </div>
 
 <script>
-let gpsLat=0, gpsLng=0, verifiedEmail='', isNeighbor=false, correctedAddr='';
+let gpsLat=0, gpsLng=0, verifiedEmail='', isNeighbor=false;
 
 function toggleVerifyBtn() {
     document.getElementById('verifyBtn').disabled = !document.getElementById('agreeTerms').checked;
@@ -163,23 +155,6 @@ function doNeighborVerify() {
             document.getElementById('locDetail').style.display='';
         } else {
             document.getElementById('neighborStatus').innerHTML = '<span class="text-danger">❌ 양평군 내에서만 인증 가능합니다.</span>';
-        }
-    });
-}
-
-function showCorrect() { document.getElementById('correctForm').style.display=''; }
-
-function doCorrect() {
-    var addr = document.getElementById('manualAddr').value.trim();
-    if (!addr) return alert('주소를 입력하세요.');
-    document.getElementById('correctStatus').innerHTML = '보정 중...';
-    fetch('/api/correct-address', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({manual_loc:addr, gps_lat:gpsLat, gps_lng:gpsLng})})
-    .then(r=>r.json()).then(d=>{
-        document.getElementById('correctStatus').innerHTML = d.msg;
-        if (d.status==='success') {
-            correctedAddr = d.address;
-            document.getElementById('gpsStatus').innerHTML = '📍 ' + d.address + ' (보정됨)';
-            document.getElementById('locDetail').innerHTML = '🏠 기본주소로 저장됨';
         }
     });
 }
