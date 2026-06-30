@@ -29,7 +29,7 @@
                         <td><input type="checkbox" class="user-check" value="{{ u.id }}"></td>
                         <td><a href="/user/{{ u.id }}" class="fw-bold text-decoration-none">{{ u.email or '-' }}</a></td>
                         <td>{{ u.village or '-' }}</td>
-                        <td><a href="/user/{{ u.id }}" class="fw-bold text-success text-decoration-none">{{ u.points }}</a></td>
+                        <td><a href="/user/{{ u.id }}" class="fw-bold text-success text-decoration-none">{{ "{:,}".format(u.points or 0) }}</a></td>
                         <td>
                             {% if u.is_verified_resident %}<span class="text-success">✅</span>{% endif %}
                         </td>
