@@ -123,18 +123,13 @@
                     <li class="nav-spacer"></li>
                     <li class="nav-spacer"></li>
                     <li class="nav-spacer"></li>
-
-                    {% if session.get('username') %}
-                    <li class="nav-item ms-auto">
-                        <a href="/user/{{ session.get('user_id') }}" class="text-decoration-none small fw-bold text-dark">👤 {{ session.get('username') }}</a>
-                    </li>
-                    {% else %}
-                    <li class="nav-item ms-auto">
-                        <a href="/login?next={{ request.path }}" class="text-decoration-none small fw-bold text-muted">👤 회원정보</a>
-                    </li>
-                    {% endif %}
                 </ul>
             </div>
+            {% if session.get('username') %}
+            <a href="/user/{{ session.get('user_id') }}" class="text-decoration-none ms-2" title="{{ session.get('username') }}">👤</a>
+            {% else %}
+            <a href="/login?next={{ request.path }}" class="text-decoration-none text-muted ms-2" title="회원정보">👤</a>
+            {% endif %}
         </div>
     </nav>
 
