@@ -197,9 +197,7 @@ def register_routes(app):
             next_url = url_for('intro')
         if request.method == 'POST':
             login_id = request.form['username']
-            u = User.query.filter_by(username=login_id).first()
-            if not u:
-                u = User.query.filter_by(email=login_id).first()
+            u = User.query.filter_by(email=login_id).first()
             if u and check_password_hash(u.password, request.form['password']):
                 session.update({'user_id': u.id, 'username': u.username, 'role': u.role})
                 now = datetime.now()
