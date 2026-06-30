@@ -25,7 +25,7 @@ body{background:#f8f9fa;font-size:0.9rem;}
 <div class="d-flex gap-2 mb-3">
     <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('view')">📅 달력</button>
     <button class="btn btn-sm btn-success" onclick="switchTab('add')" id="btnAdd">➕ 일정등록</button>
-    <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('list')">📋 리스트</button>
+    <button class="btn btn-sm btn-outline-warning" onclick="switchTab('fav')">⭐ 즐겨찾기</button>
 </div>
 
 <!-- 달력 탭 -->
@@ -81,10 +81,13 @@ body{background:#f8f9fa;font-size:0.9rem;}
     </div>
 </div>
 
-<!-- 리스트 탭 -->
-<div id="tabList" style="display:none;">
-    <div id="eventList" class="small"></div>
+<!-- 즐겨찾기 탭 -->
+<div id="tabFav" style="display:none;">
+    <div id="favList" class="small">⭐ 즐겨찾기한 일정이 여기에 표시됩니다.</div>
 </div>
+
+<!-- 리스트 탭 (숨김, 렌더링용) -->
+<div id="tabList" style="display:none;"></div>
 </div>
 
 <script>
@@ -111,8 +114,8 @@ function renderFriendCheckboxes() {
 renderCal();
 
 function switchTab(t) {
-    ['tabView','tabAdd','tabList'].forEach(id => document.getElementById(id).style.display='none');
-    document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).style.display='';
+    ['tabView','tabAdd','tabList','tabFav'].forEach(id => document.getElementById(id).style.display='none');
+    document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).style.display = '';
     if (t === 'add') {
         document.getElementById('editId').value = '';
         document.getElementById('saveBtn').textContent = '저장';
