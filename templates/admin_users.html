@@ -21,18 +21,26 @@
                         <th>이름</th>
                         <th>{{ nip() }}</th>
                         <th>인증</th>
+                        <th>역할</th>
                         <th>관리</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for u in users %}
-                    <tr class="user-row" data-name="{{ u.email }} {{ u.username }} {{ u.real_name or '' }} {{ u.village or '' }}">
+                    <tr class="user-row">
                         <td><input type="checkbox" class="user-check" value="{{ u.id }}"></td>
                         <td><a href="/user/{{ u.id }}" class="fw-bold text-decoration-none">{{ u.email or '-' }}</a></td>
                         <td>{{ u.username or '-' }}</td>
                         <td>{{ u.village or '-' }}</td>
                         <td>{{ u.real_name or '-' }}</td>
                         <td><span class="fw-bold text-success">{{ u.points }}</span></td>
+                        <td>
+                            {% if u.is_verified_resident %}<span class="text-success">✅</span>{% endif %}
+                        </td>
+                        <td>
+                            {% if u.role == 'leader' %}<span class="badge bg-primary">책</span>
+                            {% elif u.role == 'admin' %}<span class="badge bg-danger">관</span>{% endif %}
+                        </td>
                         <td>
                             {% if u.is_verified_resident %}<span class="text-success">✅</span>{% endif %}
                         </td>
