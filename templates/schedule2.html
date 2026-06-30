@@ -53,6 +53,7 @@ body{background:#f8f9fa;font-size:0.9rem;}
             <div class="col-3"><label class="small">종료</label><input type="time" id="addEnd" class="form-control form-control-sm"></div>
         </div>
         <input id="addLoc" class="form-control form-control-sm mb-2" placeholder="장소" onchange="calcTravelTime()">
+        <div id="travelSection">
         <div class="mb-2 small">
             <span class="me-1">이동:</span>
             <label class="me-2"><input type="radio" name="transport" value="walk" onchange="calcTravelTime()"> 🚶도보</label>
@@ -68,6 +69,7 @@ body{background:#f8f9fa;font-size:0.9rem;}
         <div class="row g-2 mb-2">
             <div class="col-6"><label class="small">귀가장소</label><input id="addRetLoc" class="form-control form-control-sm" placeholder="기본주소"></div>
             <div class="col-3"><label class="small">귀가가능시간</label><input id="addRetTime" class="form-control form-control-sm" type="time"></div>
+        </div>
         </div>
         <textarea id="addMemo" class="form-control form-control-sm mb-2" rows="2" placeholder="메모"></textarea>
         <div class="mb-2">
@@ -265,8 +267,10 @@ function deleteEvent(id) {
 
 function calcTravelTime() {
     var loc = document.getElementById('addLoc').value.trim();
+    var ts = document.getElementById('travelSection');
+    if (!loc) { ts.style.display = 'none'; return; }
+    ts.style.display = '';
     var start = document.getElementById('addStart').value || '09:00';
-    if (!loc) return;
     fetch('/api/bot/schedule/calc-time', {
         method:'POST', 
         headers:{'Content-Type':'application/json'},
@@ -274,8 +278,10 @@ function calcTravelTime() {
         body:JSON.stringify({location: loc, event_time: start})
     })
     .then(function(r){return r.json()}).then(function(d){
-        if (d.error) { document.getElementById('calcError').textContent = d.error; document.getElementById('calcError').style.display = ''; return; }
-        if (!d.walk) return;
+        var ts = document.getElementById('travelSection');
+        if (d.error || !d.walk) { ts.style.display = 'none'; return; }
+        if (d.distance_km && d.distance_km < 0.2) { ts.style.display = 'none'; return; }
+        ts.style.display = '';
         document.getElementById('calcError').style.display = 'none';
         var mode = document.querySelector('input[name=transport]:checked');
         var m = mode ? mode.value : 'walk';
