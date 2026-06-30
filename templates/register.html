@@ -131,14 +131,20 @@ function getGPS() {
     if (!navigator.geolocation) { document.getElementById('gpsStatus').innerHTML='GPS 미지원'; return; }
     navigator.geolocation.getCurrentPosition(function(pos){
         gpsLat=pos.coords.latitude; gpsLng=pos.coords.longitude;
-        document.getElementById('gpsStatus').innerHTML = '📍 현재위치: '+gpsLat.toFixed(5)+', '+gpsLng.toFixed(5);
-        // 역지오코딩으로 주소 표시
-        fetch('/api/reverse-geocode?lat='+gpsLat+'&lon='+gpsLng)
+        document.getElementById('gpsStatus').innerHTML = '<span class="spinner-border spinner-border-sm"></span> 위치 확인 중...';
+        // 상세주소 역지오코딩
+        fetch('/api/reverse-geocode-detail?lat='+gpsLat+'&lon='+gpsLng)
         .then(r=>r.json()).then(d=>{
-            if (d.status==='success') {
+            if (d.address) {
+                document.getElementById('gpsStatus').innerHTML = '📍 '+d.address;
                 document.getElementById('locDetail').innerHTML = '🏠 '+d.town+' '+d.village;
                 document.getElementById('locDetail').style.display='';
+            } else {
+                document.getElementById('gpsStatus').innerHTML = '📍 '+gpsLat.toFixed(5)+', '+gpsLng.toFixed(5);
+                document.getElementById('locDetail').style.display='none';
             }
+        }).catch(function(){
+            document.getElementById('gpsStatus').innerHTML = '📍 '+gpsLat.toFixed(5)+', '+gpsLng.toFixed(5);
         });
     }, function(){ document.getElementById('gpsStatus').innerHTML='GPS 실패'; });
 }
@@ -158,10 +164,14 @@ function showCorrect() { document.getElementById('correctForm').style.display=''
 function doCorrect() {
     var addr = document.getElementById('manualAddr').value.trim();
     if (!addr) return alert('주소를 입력하세요.');
+    document.getElementById('correctStatus').innerHTML = '보정 중...';
     fetch('/user/location/correct', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({manual_loc:addr, gps_lat:gpsLat, gps_lng:gpsLng})})
     .then(r=>r.json()).then(d=>{
-        alert(d.msg);
-        if (d.status==='success') correctedAddr = addr;
+        document.getElementById('correctStatus').innerHTML = d.msg;
+        if (d.status==='success') {
+            correctedAddr = addr;
+            document.getElementById('gpsStatus').innerHTML = '📍 ' + addr + ' (보정됨)';
+        }
     });
 }
 

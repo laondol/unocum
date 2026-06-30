@@ -95,6 +95,25 @@ def register_routes(app):
         return render_template('all_proposals.html', posts=posts, now=now, timedelta=timedelta)
 
     # --- [회원가입] 이웃 가입 및 선택적 주민 인증 수집 ---
+    @app.route('/api/reverse-geocode-detail')
+    def reverse_geocode_detail():
+        lat = request.args.get('lat', type=float)
+        lon = request.args.get('lon', type=float)
+        if not lat or not lon:
+            return jsonify({"error": "위도/경도 필요"})
+        from services.transit import reverse_geocode
+        from config import Config
+        geo = reverse_geocode(lat, lon,
+            kakao_key=Config.KAKAO_REST_API_KEY,
+            naver_id=Config.NAVER_CLIENT_ID or Config.NAVER_SEARCH_CLIENT_ID,
+            naver_secret=Config.NAVER_CLIENT_SECRET or Config.NAVER_SEARCH_CLIENT_SECRET)
+        from services.geocode import gps_to_town_village
+        town, village = gps_to_town_village(lat, lon)
+        return jsonify({
+            "address": geo.get('address','') if geo else '',
+            "town": town or '', "village": village or ''
+        })
+
     @app.route('/api/reverse-geocode')
     def reverse_geocode():
         lat = request.args.get('lat', type=float)
