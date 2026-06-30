@@ -345,7 +345,7 @@ def register_routes(app):
             login_id = request.form['username']
             u = User.query.filter_by(email=login_id).first()
             if u and check_password_hash(u.password, request.form['password']):
-                session.update({'user_id': u.id, 'username': u.username, 'role': u.role, 'email': u.email or ''})
+                session.update({'user_id': u.id, 'username': u.username, 'role': u.role, 'email': u.email or '', 'real_name': u.real_name or ''})
                 now = datetime.now()
                 u.last_login = now
                 # 로그인 위치 기록 (GPS from form)
@@ -475,7 +475,7 @@ def register_routes(app):
                 db.session.add(ph)
                 db.session.commit()
 
-        session.update({'user_id': user.id, 'username': user.username, 'role': user.role, 'email': user.email or ''})
+        session.update({'user_id': user.id, 'username': user.username, 'role': user.role, 'email': user.email or '', 'real_name': user.real_name or ''})
         now = datetime.now()
         user.last_login = now
         if user.last_payout and (now - user.last_payout).days >= 30:

@@ -24,7 +24,7 @@
                 <div class="row g-2 mb-3">
                     <div class="col-6">
                         <label class="form-label small fw-bold">이름</label>
-                        <input type="text" name="name" class="form-control" value="{{ session.get('username','') }}" required>
+                        <input type="text" name="name" class="form-control" value="{{ session.get('real_name', session.get('username','')) }}" required>
                     </div>
                     <div class="col-6">
                         <label class="form-label small fw-bold">이메일</label>
