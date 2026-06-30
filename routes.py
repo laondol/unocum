@@ -35,7 +35,7 @@ def register_routes(app):
         # 최신 국내 소식 5개
         yp_news = NewsArticle.query.filter(NewsArticle.is_selected == True, NewsArticle.world_admin_approved == True, NewsArticle.category.notin_(['세계뉴스', '해외뉴스'])).order_by(NewsArticle.updated_at.desc()).limit(5).all()
         # 최신 세계 소식 1개
-        world_news = NewsArticle.query.filter(NewsArticle.is_selected == True, NewsArticle.world_admin_approved == True, NewsArticle.category.in_(['세계뉴스', '해외뉴스'])).order_by(NewsArticle.updated_at.desc()).first()
+        world_news = NewsArticle.query.filter(NewsArticle.is_selected == True, NewsArticle.world_admin_approved == True, NewsArticle.category.in_(['세계뉴스', '해외뉴스'])).order_by(NewsArticle.updated_at.desc()).limit(5).all()
         return render_template('intro.html', yp_news=yp_news, world_news=world_news)
 
     @app.route('/presentation')
