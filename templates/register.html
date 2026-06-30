@@ -171,6 +171,7 @@ function doCorrect() {
         if (d.status==='success') {
             correctedAddr = addr;
             document.getElementById('gpsStatus').innerHTML = '📍 ' + addr + ' (보정됨)';
+            document.getElementById('locDetail').innerHTML = '🏠 기본주소로 저장됨';
         }
     });
 }
