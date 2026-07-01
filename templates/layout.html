@@ -126,6 +126,9 @@
                 </ul>
             </div>
             {% if session.get('user_id') %}
+            {% if 'village' in (session.get('managed_pages','')) or session.get('role') == 'leader' %}
+            <a href="/village" class="text-decoration-none ms-2" title="마을지기">🏘️</a>
+            {% endif %}
             <a href="/user/{{ session.get('user_id') }}" class="text-decoration-none ms-2" title="회원정보">👤</a>
             {% else %}
             <a href="/login" class="text-decoration-none text-muted ms-2" title="회원정보">👤</a>

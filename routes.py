@@ -360,7 +360,7 @@ def register_routes(app):
             login_id = request.form['username']
             u = User.query.filter_by(email=login_id).first()
             if u and check_password_hash(u.password, request.form['password']):
-                session.update({'user_id': u.id, 'username': u.username, 'role': u.role, 'email': u.email or '', 'real_name': u.real_name or ''})
+                session.update({'user_id': u.id, 'username': u.username, 'role': u.role, 'email': u.email or '', 'real_name': u.real_name or '', 'managed_pages': u.managed_pages or ''})
                 now = datetime.now()
                 u.last_login = now
                 # 로그인 위치 기록 (GPS from form)
