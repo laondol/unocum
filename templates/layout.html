@@ -30,7 +30,7 @@
         <div class="container">
             <a class="navbar-brand d-flex align-items-center" href="/intro">
                 <img src="/static/images/logo.png" alt="양평" height="36" class="me-2">
-                <span class="fw-bold text-success" style="font-size: 1.2rem;">함께사는양평</span>
+                <span class="fw-bold text-success" style="font-size: 1.2rem;">{{ '함께사는테스트' if 'test.unocum.kr' in request.host else '함께사는양평' }}</span>
                 <div class="d-inline-flex align-items-center ms-2 position-relative" id="navQuick">
                     <button class="btn btn-sm btn-outline-warning px-2 py-0" style="font-size:0.9rem;" onclick="document.getElementById('quickMenu').classList.toggle('d-none')" onmouseenter="document.getElementById('quickMenu').classList.remove('d-none')">⭐</button>
                     <a href="/share-report" class="btn btn-sm btn-outline-success px-2 py-0 ms-1" style="font-size:0.9rem;">📸</a>
