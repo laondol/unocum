@@ -1,0 +1,59 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container py-4" style="max-width: 800px;">
+    <div class="card border-0 shadow-sm" style="border-radius:16px;">
+        <div class="card-header bg-white border-bottom-0 pt-3 pb-1">
+            <h5 class="fw-bold mb-0">🤖 양평AI</h5>
+            <small class="text-muted">무엇이든 물어보세요. 양평 생활부터 플랫폼 이용까지 도와드려요.</small>
+        </div>
+        <div class="card-body p-3">
+            <div id="chatMessages" class="mb-3" style="min-height:350px; max-height:500px; overflow-y:auto; border:1px solid #dee2e6; border-radius:12px; padding:12px; background:#f8f9fa;">
+                <div class="text-center text-muted small py-3">
+                    <div class="fs-1 mb-2">🤖</div>
+                    <p>안녕하세요, 양평AI예요.<br>함께사는양평에 대해 궁금한 점이나 양평 생활에 대해 무엇이든 물어보세요.</p>
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <input type="text" id="chatInput" class="form-control" placeholder="양평AI에게 물어보세요..." onkeypress="if(event.key==='Enter')sendMessage()">
+                <button class="btn btn-success px-4" onclick="sendMessage()">전송</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.msg-user { text-align:right; margin-bottom:8px; }
+.msg-user .bubble { display:inline-block; background:#27ae60; color:white; padding:8px 14px; border-radius:16px 16px 4px 16px; max-width:75%; text-align:left; font-size:0.9rem; }
+.msg-ai { text-align:left; margin-bottom:8px; }
+.msg-ai .bubble { display:inline-block; background:white; border:1px solid #dee2e6; padding:8px 14px; border-radius:16px 16px 16px 4px; max-width:85%; font-size:0.9rem; }
+.bubble p { margin-bottom: 4px; }
+.bubble p:last-child { margin-bottom: 0; }
+.bubble ul,.bubble ol { margin: 4px 0; padding-left: 18px; }
+.bubble code { background:#f0f0f0; padding:1px 4px; border-radius:3px; font-size:0.85rem; }
+</style>
+
+<script>
+function sendMessage() {
+    var input = document.getElementById('chatInput');
+    var msg = input.value.trim();
+    if (!msg) return;
+    var container = document.getElementById('chatMessages');
+    container.innerHTML += '<div class="msg-user"><div class="bubble">' + escapeHtml(msg) + '</div></div>';
+    input.value = '';
+    container.innerHTML += '<div class="msg-ai"><div class="bubble text-muted"><em>입력 중...</em></div></div>';
+    container.scrollTop = container.scrollHeight;
+    fetch('/ai/chat/send', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg})})
+    .then(r=>r.json()).then(d=>{
+        var bubbles = container.querySelectorAll('.msg-ai .bubble');
+        bubbles[bubbles.length-1].innerHTML = d.reply ? d.reply.replace(/\n/g,'<br>') : '응답 없음';
+        bubbles[bubbles.length-1].classList.remove('text-muted');
+        container.scrollTop = container.scrollHeight;
+    }).catch(e=>{
+        var bubbles = container.querySelectorAll('.msg-ai .bubble');
+        bubbles[bubbles.length-1].innerHTML = '오류: ' + e.message;
+        bubbles[bubbles.length-1].classList.remove('text-muted');
+    });
+}
+function escapeHtml(text) { var div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+</script>
+{% endblock %}

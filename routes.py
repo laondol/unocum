@@ -60,6 +60,50 @@ def register_routes(app):
         bg_images = [img[0] for img in bg_images if img[0]]
         return render_template('intro.html', yp_news=yp_news, world_news=world_news, bg_images=bg_images)
 
+    @app.route('/ai/chat')
+    def ai_chat():
+        return render_template('ai_chat.html')
+
+    @app.route('/ai/chat/send', methods=['POST'])
+    def ai_chat_send():
+        msg = request.json.get('message','').strip()
+        if not msg:
+            return jsonify({"reply":"메시지를 입력하세요."})
+        # 문맥 정보
+        user_count = User.query.count()
+        post_count = Post.query.count()
+        uid = session.get('user_id')
+        user_info = ''
+        if uid:
+            u = User.query.get(uid)
+            if u:
+                user_info = f'현재 대화중인 사용자: {u.real_name or u.username} (이웃인증: {"O" if u.is_verified_resident else "X"})'
+        context = f"함께사는양평 현황: 회원 {user_count}명, 꿈꾸기 제안 {post_count}건. {user_info}"
+        try:
+            from openai import OpenAI
+            client = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=current_app.config.get('GROQ_API_KEY',''))
+            system_prompt = f"""너는 함께사는양평의 '양평AI'야. 경기도 양평군 주민 커뮤니티 플랫폼에 상주하는 AI 도우미로, 누구나 편하게 대화할 수 있어.
+{context}
+네 역할:
+1. 양평군 생활 정보·관공서·축제·날씨·교통 관련 질문에 답변
+2. 함께사는양평 플랫폼 이용 방법 안내 (꿈꾸기, 공유마당, 법률상담, 심리상담, 경사로사업, 마을지기 등)
+3. 일상 대화와 고민 상담 (친근하고 따뜻한 말투)
+4. 필요한 경우 적절한 게시판이나 서비스로 안내
+5. 비회원에게는 가입을 권유하고 플랫폼의 장점 소개
+말투는 반말 쓰지 말고 ~요, ~입니다 체로 자연스럽게 대화해. 이모지는 가끔만 써. 한국어로 답변해."""
+            resp = client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[
+                    {"role":"system","content":system_prompt},
+                    {"role":"user","content":msg}
+                ],
+                temperature=0.7, max_tokens=1024
+            )
+            reply = resp.choices[0].message.content
+        except Exception as e:
+            reply = f"죄송합니다, 일시적인 오류가 발생했습니다: {str(e)}"
+        return jsonify({"reply": reply})
+
     @app.route('/presentation')
     def presentation():
         return render_template('presentation.html', selected_news=None)
