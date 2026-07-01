@@ -4214,6 +4214,23 @@ def register_routes(app):
         db.session.commit()
         return jsonify({"status":"success"})
 
+    @app.route('/village/event/<int:event_id>/ping', methods=['POST'])
+    def village_event_ping(event_id):
+        uid = session.get('user_id')
+        if not uid:
+            return jsonify({"error":"로그인 필요"}), 401
+        att = VillageEventAttendee.query.filter_by(event_id=event_id, user_id=uid).first()
+        if att:
+            att.last_ping = datetime.now()
+            db.session.commit()
+        attendees = VillageEventAttendee.query.filter_by(event_id=event_id).all()
+        now = datetime.now()
+        away = []
+        for a in attendees:
+            if a.last_ping and (now - a.last_ping).total_seconds() > 30:
+                away.append({'id':a.id,'name':a.name or a.email or '익명','seconds':int((now - a.last_ping).total_seconds())})
+        return jsonify({"status":"ok","away":away})
+
     @app.route('/api/village/images')
     def village_images():
         myeon = request.args.get('myeon','')

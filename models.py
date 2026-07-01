@@ -547,6 +547,7 @@ class VillageEventAttendee(db.Model):
     consented = db.Column(db.Boolean, default=False)
     role = db.Column(db.String(50))
     status = db.Column(db.String(20), default='pending')  # pending, confirmed, attended, absent
+    last_ping = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.now)
 
 class VillageEventChat(db.Model):

@@ -90,14 +90,17 @@
 
             <!-- 참석자 목록 -->
             <div class="card border-0 shadow-sm" style="border-radius:12px;">
-                <div class="card-header bg-white fw-bold small">👥 참석자 ({{ attendees|length }})</div>
+                <div class="card-header bg-white fw-bold small d-flex justify-content-between">
+                    <span>👥 참석자 ({{ attendees|length }})</span>
+                    <span id="presenceStatus" class="text-success small">● 연결됨</span>
+                </div>
                 <div class="card-body p-0">
                     <div style="max-height:300px;overflow-y:auto;">
                         {% for a in attendees %}
-                        <div class="p-2 border-bottom small">
+                        <div class="p-2 border-bottom small attendee-row" data-aid="{{ a.id }}">
                             <div class="d-flex justify-content-between">
                                 <strong>{{ a.name or a.email or '익명' }}</strong>
-                                <span>{{ {'pending':'대기','confirmed':'참석','attended':'출석','absent':'불참'}.get(a.status,'') }}</span>
+                                <span class="att-status">{{ {'pending':'대기','confirmed':'참석','attended':'출석','absent':'불참'}.get(a.status,'') }}</span>
                             </div>
                             {% if a.consented and a.email %}<div class="text-muted">{{ a.email }}</div>{% endif %}
                             {% if has_page_access('village') %}
@@ -117,6 +120,43 @@
 </div>
 
 <script>
+{% if session.get('user_id') %}
+// 하트비트: 10초마다 핑 (핫스팟 이탈 감지)
+setInterval(function(){
+    fetch('/village/event/{{ event.id }}/ping', {method:'POST'}).then(r=>r.json()).then(d=>{
+        if(d.status!=='ok') return;
+        var status = document.getElementById('presenceStatus');
+        // 이탈자 경고
+        var warnings = [];
+        document.querySelectorAll('.attendee-row').forEach(function(row){
+            var aid = parseInt(row.getAttribute('data-aid'));
+            var away = d.away.find(function(a){return a.id===aid;});
+            var indicator = row.querySelector('.presence-dot');
+            if(!indicator){
+                indicator = document.createElement('span');
+                indicator.className = 'presence-dot ms-1';
+                row.querySelector('strong').appendChild(indicator);
+            }
+            if(away){
+                indicator.textContent = '⚠️이탈';
+                indicator.style.color = '#dc3545';
+                warnings.push(away.name+'('+away.seconds+'초)');
+            } else {
+                indicator.textContent = '●';
+                indicator.style.color = '#27ae60';
+            }
+        });
+        if(warnings.length > 0){
+            status.textContent = '⚠️ 이탈: '+warnings.join(', ');
+            status.className = 'text-danger small';
+        } else {
+            status.textContent = '● 모두 연결됨';
+            status.className = 'text-success small';
+        }
+    });
+}, 10000);
+{% endif %}
+
 function sendChat() {
     var msg = document.getElementById('chatInput').value.trim();
     if (!msg) return;
