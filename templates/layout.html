@@ -27,151 +27,78 @@
 
     {% set page_name = {'/intro':'사업소개','/presentation':'운영계획','/terms':'회원약관','/charter':'정관','/world-news':'세계와양평','/kr-yp-news':'대한민국과양평','/main':'꿈꾸기','/all-proposals':'누구의꿈','/share-report':'공유하기','/share':'공유마당','/share/map':'지도로보기','/construction':'위치기반안내','/user/my':'내 통벗','/mypage/points/charge':'닢 충전','/admin':'누구의꿈(관리)','/admin/news':'소식(관리)','/admin/share-reports':'공유마당(관리)','/admin/alerts':'알림(관리)','/service/ramp':'휠체어경사로','/service/legal':'법률상담','/service/psycho':'심리상담소','/legal/list':'법률상담','/legal/write':'상담글쓰기','/legal/schedule':'상담예약','/legal/admin':'법률상담관리','/psycho/list':'심리상담','/psycho/write':'심리글쓰기','/psycho/schedule':'심리예약','/psycho/admin':'심리상담관리','/login':'로그인','/register':'회원가입','/user':'내 프로필','/mypage/points':'닢내역'}.get(request.path.rstrip('/') or '/', '') %}
     <nav class="navbar navbar-expand-lg sticky-top mb-1">
-        <div class="container">
-            <a class="navbar-brand d-flex align-items-center" href="/intro">
-                <img src="/static/images/logo.png" alt="양평" height="36" class="me-2" title="{{ '함께사는로컬' if 'localhost' in request.host or '127.0.0.1' in request.host else ('함께사는테스트' if 'test.unocum.kr' in request.host else '함께사는양평') }}">
-                <span class="fw-bold text-success d-none d-lg-inline" style="font-size: 1.2rem;">{{ '함께사는로컬' if 'localhost' in request.host or '127.0.0.1' in request.host else ('함께사는테스트' if 'test.unocum.kr' in request.host else '함께사는양평') }}</span>
-                <div class="d-inline-flex align-items-center ms-2 position-relative" id="navQuick">
-                    <button class="btn btn-sm btn-outline-warning px-2 py-0" style="font-size:0.9rem;" onclick="document.getElementById('quickMenu').classList.toggle('d-none')" onmouseenter="document.getElementById('quickMenu').classList.remove('d-none')">⭐</button>
-                    <a href="/share-report" class="btn btn-sm btn-outline-success px-2 py-0 ms-1" style="font-size:0.9rem;">📸</a>
-                    {% if session.get('user_id') %}
-                    {% if 'village' in (session.get('managed_pages','')) or session.get('role') == 'leader' %}
-                    {% set mp = session.get('managed_pages','') %}
-                    {% set tooltip_text = '주민봉사' %}
-                    {% for vp in mp.split(',') %}
-                        {% if vp.startswith('vi_') %}
-                            {% set parts = vp[3:].split('_') %}
-                            {% set tooltip_text = parts[1] + ' 봉사' %}
-                        {% endif %}
-                    {% endfor %}
-                    <div class="d-inline-flex align-items-center ms-1 position-relative" id="villageIconWrap">
-                        <a href="/village" class="text-decoration-none" title="{{ tooltip_text }}" style="font-size:1.2rem;" onmouseenter="document.getElementById('villageMenu').classList.remove('d-none')">🏘️</a>
-                        <div class="position-absolute bg-white border rounded shadow-sm p-2 d-none" id="villageMenu" style="z-index:1000;min-width:130px;top:100%;left:0;" onmouseleave="this.classList.add('d-none')">
-                            <a class="d-block small py-1 px-2 text-dark text-decoration-none rounded" href="/village">📝 봉사페이지</a>
-                            {% set mp2 = session.get('managed_pages','') %}
-                            {% set myeon = '' %}{% set ri2 = '' %}
-                            {% for vp in mp2.split(',') %}{% if vp.startswith('vi_') %}{% set parts = vp[3:].split('_') %}{% set myeon = parts[0] %}{% set ri2 = parts[1] %}{% endif %}{% endfor %}
-                            <a class="d-block small py-1 px-2 text-dark text-decoration-none rounded" href="/village/view/{{ myeon }}/{{ ri2 }}">📖 마을소개</a>
-                        </div>
-                    </div>
-                    {% endif %}
-                    {% endif %}
-                    <div class="position-absolute bg-white border rounded shadow-sm p-2 d-none" id="quickMenu" style="z-index:1000;min-width:140px;top:100%;left:0;" onmouseleave="this.classList.add('d-none')">
-                        <a class="d-block small py-1 px-2 text-dark text-decoration-none rounded" href="/main">💭 꿈꾸기</a>
-                        <a class="d-block small py-1 px-2 text-dark text-decoration-none rounded" href="/construction">📍 위치기반안내</a>
-                        <a class="d-block small py-1 px-2 text-dark text-decoration-none rounded" href="#" onclick="window.open('/user/my?popup=1','tongbotPopup','width=700,height=700,left=100,top=50');return false;">🤖 통벗채팅</a>
+        <div class="container flex-nowrap">
+            <!-- 왼쪽: 로고 + 아이콘 -->
+            <div class="d-flex align-items-center flex-shrink-0">
+            <a class="navbar-brand d-flex align-items-center me-1" href="/intro">
+                <img src="/static/images/logo.png" alt="양평" height="36" title="{{ '함께사는로컬' if 'localhost' in request.host or '127.0.0.1' in request.host else ('함께사는테스트' if 'test.unocum.kr' in request.host else '함께사는양평') }}">
+                <span class="fw-bold text-success d-none d-lg-inline ms-2" style="font-size: 1.2rem;">{{ '함께사는로컬' if 'localhost' in request.host or '127.0.0.1' in request.host else ('함께사는테스트' if 'test.unocum.kr' in request.host else '함께사는양평') }}</span>
+            </a>
+            <div class="d-inline-flex align-items-center position-relative" id="navQuick">
+                <button class="btn btn-sm btn-outline-warning px-2 py-0" style="font-size:0.9rem;" onclick="document.getElementById('quickMenu').classList.toggle('d-none')" onmouseenter="document.getElementById('quickMenu').classList.remove('d-none')">⭐</button>
+                <a href="/share-report" class="btn btn-sm btn-outline-success px-2 py-0 ms-1" style="font-size:0.9rem;">📸</a>
+                {% if session.get('user_id') %}
+                {% if 'village' in (session.get('managed_pages','')) or session.get('role') == 'leader' %}
+                {% set mp = session.get('managed_pages','') %}
+                {% set tooltip_text = '주민봉사' %}
+                {% for vp in mp.split(',') %}{% if vp.startswith('vi_') %}{% set parts = vp[3:].split('_') %}{% set tooltip_text = parts[1] + ' 봉사' %}{% endif %}{% endfor %}
+                <div class="d-inline-flex align-items-center ms-1 position-relative" id="villageIconWrap">
+                    <a href="/village" class="text-decoration-none" title="{{ tooltip_text }}" style="font-size:1.2rem;">🏘️</a>
+                    <div class="position-absolute bg-white border rounded shadow-sm p-2 d-none" id="villageMenu" style="z-index:1000;min-width:130px;top:100%;left:0;" onmouseleave="this.classList.add('d-none')">
+                        <a class="d-block small py-1 px-2 text-dark text-decoration-none rounded" href="/village">📝 봉사페이지</a>
+                        {% set mp2 = session.get('managed_pages','') %}{% set myeon = '' %}{% set ri2 = '' %}{% for vp in mp2.split(',') %}{% if vp.startswith('vi_') %}{% set parts = vp[3:].split('_') %}{% set myeon = parts[0] %}{% set ri2 = parts[1] %}{% endif %}{% endfor %}
+                        <a class="d-block small py-1 px-2 text-dark text-decoration-none rounded" href="/village/view/{{ myeon }}/{{ ri2 }}">📖 마을소개</a>
                     </div>
                 </div>
-            </a>
+                {% endif %}
+                {% endif %}
+                <div class="position-absolute bg-white border rounded shadow-sm p-2 d-none" id="quickMenu" style="z-index:1000;min-width:140px;top:100%;left:0;" onmouseleave="this.classList.add('d-none')">
+                    <a class="d-block small py-1 px-2 text-dark text-decoration-none rounded" href="/main">💭 꿈꾸기</a>
+                    <a class="d-block small py-1 px-2 text-dark text-decoration-none rounded" href="/construction">📍 위치기반안내</a>
+                    <a class="d-block small py-1 px-2 text-dark text-decoration-none rounded" href="#" onclick="window.open('/user/my?popup=1','tongbotPopup','width=700,height=700,left=100,top=50');return false;">🤖 통벗채팅</a>
+                </div>
+            </div>
+            </div>
+
+            <!-- 가운데: 검색 (넓을 때) -->
+            <div class="d-none d-lg-flex mx-auto flex-shrink-0">
+                <form class="d-flex" action="/search" method="GET" role="search">
+                    <input class="form-control form-control-sm" type="search" name="q" placeholder="검색" style="width:130px;border-radius:20px;" value="{{ request.args.get('q','') }}">
+                </form>
+            </div>
+
+            <!-- 메뉴 (collapse) -->
             <div class="collapse navbar-collapse" id="navbarNav">
-                <!-- 가운데: 주 메뉴 -->
                 <ul class="navbar-nav mx-auto align-items-center">
-
-                    <!-- 소개 -->
-                    <li class="nav-item dropdown mx-1">
-                        <a class="nav-link dropdown-toggle px-2" href="#" data-bs-toggle="dropdown">소개</a>
-                        <ul class="dropdown-menu border-0 shadow">
-                            <li class="dropdown-header-custom">소개</li>
-                            <li><a class="dropdown-item" href="/presentation">사업소개</a></li>
-                            <li><a class="dropdown-item" href="/presentation">운영계획</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="/terms">회원약관</a></li>
-                            <li><a class="dropdown-item" href="/charter">정관</a></li>
-                        </ul>
-                    </li>
-
-                    <!-- 소식 -->
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle px-2" href="#" data-bs-toggle="dropdown">소식</a>
-                        <ul class="dropdown-menu">
-                            <li class="dropdown-header-custom">소식</li>
-                            <li><a class="dropdown-item" href="/kr-yp-news">대한민국과양평</a></li>
-                            <li><a class="dropdown-item" href="/world-news">세계와양평</a></li>
-                            <li><a class="dropdown-item" href="/share">공유마당</a></li>
-                            <li><a class="dropdown-item" href="/construction">📍 위치기반안내</a></li>
-                        </ul>
-                    </li>
-
-                    <!-- 하는일 -->
-                    <li class="nav-item dropdown mx-1">
-                        <a class="nav-link dropdown-toggle px-2" href="#" data-bs-toggle="dropdown">하는일</a>
-                        <ul class="dropdown-menu border-0 shadow">
-                            <li class="dropdown-header-custom">하는일</li>
-                            <li><a class="dropdown-item" href="/service/ramp">휠체어경사로보급사업</a></li>
-                            <li><a class="dropdown-item" href="/service/legal">노무사 이훈의 법률상담</a></li>
-                            <li><a class="dropdown-item" href="/service/psycho">심리상담소</a></li>
-                        </ul>
-                    </li>
-
-                    <!-- 제안 -->
-                    <li class="nav-item dropdown mx-1">
-                        <a class="nav-link dropdown-toggle px-2" href="#" data-bs-toggle="dropdown">제안</a>
-                        <ul class="dropdown-menu border-0 shadow">
-                            <li class="dropdown-header-custom">제안</li>
-                            <li><a class="dropdown-item" href="/main">꿈꾸기</a></li>
-                            <li><a class="dropdown-item" href="/all-proposals">누구의꿈</a></li>
-                        </ul>
-                    </li>
-
-                    <!-- 관리 (관리자/리더 전용) -->
+                    <li class="nav-item dropdown mx-1"><a class="nav-link dropdown-toggle px-2" href="#" data-bs-toggle="dropdown">소개</a>
+                        <ul class="dropdown-menu border-0 shadow"><li class="dropdown-header-custom">소개</li><li><a class="dropdown-item" href="/presentation">사업소개</a></li><li><a class="dropdown-item" href="/presentation">운영계획</a></li><li><hr class="dropdown-divider"></li><li><a class="dropdown-item" href="/terms">회원약관</a></li><li><a class="dropdown-item" href="/charter">정관</a></li></ul></li>
+                    <li class="nav-item dropdown"><a class="nav-link dropdown-toggle px-2" href="#" data-bs-toggle="dropdown">소식</a>
+                        <ul class="dropdown-menu"><li class="dropdown-header-custom">소식</li><li><a class="dropdown-item" href="/kr-yp-news">대한민국과양평</a></li><li><a class="dropdown-item" href="/world-news">세계와양평</a></li><li><a class="dropdown-item" href="/share">공유마당</a></li><li><a class="dropdown-item" href="/construction">📍 위치기반안내</a></li></ul></li>
+                    <li class="nav-item dropdown mx-1"><a class="nav-link dropdown-toggle px-2" href="#" data-bs-toggle="dropdown">하는일</a>
+                        <ul class="dropdown-menu border-0 shadow"><li class="dropdown-header-custom">하는일</li><li><a class="dropdown-item" href="/service/ramp">휠체어경사로보급사업</a></li><li><a class="dropdown-item" href="/service/legal">노무사 이훈의 법률상담</a></li><li><a class="dropdown-item" href="/service/psycho">심리상담소</a></li></ul></li>
+                    <li class="nav-item dropdown mx-1"><a class="nav-link dropdown-toggle px-2" href="#" data-bs-toggle="dropdown">제안</a>
+                        <ul class="dropdown-menu border-0 shadow"><li class="dropdown-header-custom">제안</li><li><a class="dropdown-item" href="/main">꿈꾸기</a></li><li><a class="dropdown-item" href="/all-proposals">누구의꿈</a></li></ul></li>
                     {% if session.get('role') in ['admin', 'leader'] %}
-                    <li class="nav-item dropdown mx-1">
-                        <a class="nav-link dropdown-toggle px-2" href="#" data-bs-toggle="dropdown">관리</a>
-                        <ul class="dropdown-menu border-0 shadow">
-                            <li class="dropdown-header-custom">관리</li>
-                            <li><a class="dropdown-item" href="/admin">누구의꿈(관리)</a></li>
-                            <li><a class="dropdown-item" href="/admin/users">회원관리</a></li>
-                            <li><a class="dropdown-item" href="/admin/news">소식(관리)</a></li>
-                            <li><a class="dropdown-item" href="/admin/share-reports">공유(관리)</a></li>
-                            <li><a class="dropdown-item" href="/admin/stores">🏪 동네가게(관리)</a></li>
-                            <li><a class="dropdown-item" href="/admin/alerts">🚨 알림(관리)</a></li>
-                            <li><div class="dropdown-divider"></div></li>
-                            <li><a class="dropdown-item" href="/admin/ai-chat">🤖 관리자 AI</a></li>
-                            <li><a class="dropdown-item" href="/admin/ai-feedback">📋 AI 피드백</a></li>
-                            {% if session.get('role') == 'leader' %}
-                            <li><a class="dropdown-item" href="/admin/ai-train">📚 양평AI 가르치기</a></li>
-                            {% endif %}
-                            <li><div class="dropdown-divider"></div></li>
-                            {% if 'test.unocum.kr' in request.host or 'localhost' in request.host %}
-                            <li><a class="dropdown-item" href="/admin/page-managers">🔑 페이지관리자</a></li>
-                            {% endif %}
-                            <li><a class="dropdown-item" href="/admin/message/send">쪽지 발송</a></li>
-                        </ul>
-                    </li>
+                    <li class="nav-item dropdown mx-1"><a class="nav-link dropdown-toggle px-2" href="#" data-bs-toggle="dropdown">관리</a>
+                        <ul class="dropdown-menu border-0 shadow"><li class="dropdown-header-custom">관리</li><li><a class="dropdown-item" href="/admin">누구의꿈(관리)</a></li><li><a class="dropdown-item" href="/admin/users">회원관리</a></li><li><a class="dropdown-item" href="/admin/news">소식(관리)</a></li><li><a class="dropdown-item" href="/admin/share-reports">공유(관리)</a></li><li><a class="dropdown-item" href="/admin/stores">🏪 동네가게(관리)</a></li><li><a class="dropdown-item" href="/admin/alerts">🚨 알림(관리)</a></li><li><div class="dropdown-divider"></div></li><li><a class="dropdown-item" href="/admin/ai-chat">🤖 관리자 AI</a></li><li><a class="dropdown-item" href="/admin/ai-feedback">📋 AI 피드백</a></li>{% if session.get('role') == 'leader' %}<li><a class="dropdown-item" href="/admin/ai-train">📚 양평AI 가르치기</a></li>{% endif %}<li><div class="dropdown-divider"></div></li>{% if 'test.unocum.kr' in request.host or 'localhost' in request.host %}<li><a class="dropdown-item" href="/admin/page-managers">🔑 페이지관리자</a></li>{% endif %}<li><a class="dropdown-item" href="/admin/message/send">쪽지 발송</a></li></ul></li>
                     {% endif %}
-
-                </ul>
-
-                <!-- 오른쪽: 검색 + 시작하기/사용자명 + 공유 -->
-                <ul class="navbar-nav align-items-center">
-                    <li class="nav-item me-2">
-                        <form class="d-flex" action="/search" method="GET" role="search">
-                            <input class="form-control form-control-sm" type="search" name="q" placeholder="검색" aria-label="검색" style="width:130px;border-radius:20px;" value="{{ request.args.get('q','') }}">
-                        </form>
-                    </li>
-                    <li class="nav-spacer"></li>
-                    <li class="nav-spacer"></li>
-                    <li class="nav-spacer"></li>
+                    <!-- 좁을 때 검색 -->
+                    <li class="nav-item d-lg-none"><form class="d-flex mt-1" action="/search" method="GET"><input class="form-control form-control-sm" type="search" name="q" placeholder="검색" value="{{ request.args.get('q','') }}"></form></li>
                 </ul>
             </div>
-            <a href="/ai/chat" class="btn btn-sm btn-outline-success px-2 py-0 ms-2" style="font-size:1.1rem; border-radius:50%; width:34px; height:34px; line-height:1;" title="양평AI">🤖</a>
+
+            <!-- 오른쪽: AI + 회원정보 + 삼선 -->
+            <div class="d-flex align-items-center flex-shrink-0">
+            <a href="/ai/chat" class="btn btn-sm btn-outline-success px-2 py-0" style="font-size:1.1rem; border-radius:50%; width:34px; height:34px; line-height:1;" title="양평AI">🤖</a>
             {% if session.get('user_id') %}
             <a href="/friends" class="text-decoration-none ms-2 d-none d-lg-inline" title="벗" id="friendIcon">👥</a>
-            <a href="/message/inbox" class="text-decoration-none ms-2 position-relative d-none d-lg-inline" title="쪽지" id="msgIcon" style="display:none;">
-                💬
-                <span id="msgBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;font-size:0.6rem;">0</span>
-            </a>
-            <a href="/user/{{ session.get('user_id') }}" class="text-decoration-none ms-2 position-relative" title="회원정보">
-                👤
-                <span id="userMsgBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;font-size:0.6rem;">0</span>
-                <span id="friendReqBadge" class="position-absolute top-100 start-100 translate-middle badge rounded-pill bg-success" style="display:none;font-size:0.6rem;">0</span>
-            </a>
+            <a href="/message/inbox" class="text-decoration-none ms-2 position-relative d-none d-lg-inline" title="쪽지" id="msgIcon" style="display:none;">💬<span id="msgBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;font-size:0.6rem;">0</span></a>
+            <a href="/user/{{ session.get('user_id') }}" class="text-decoration-none ms-2 position-relative" title="회원정보">👤<span id="userMsgBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;font-size:0.6rem;">0</span><span id="friendReqBadge" class="position-absolute top-100 start-100 translate-middle badge rounded-pill bg-success" style="display:none;font-size:0.6rem;">0</span></a>
             {% else %}
             <a href="/login" class="text-decoration-none text-muted ms-2" title="회원정보">👤</a>
             {% endif %}
-            <button class="navbar-toggler ms-2" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" style="border:none; padding:0;">
-                <span class="navbar-toggler-icon"></span>
-            </button>
+            <button class="navbar-toggler ms-2" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" style="border:none; padding:0;"><span class="navbar-toggler-icon"></span></button>
+            </div>
         </div>
     </nav>
 
