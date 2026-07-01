@@ -851,7 +851,20 @@ def register_routes(app):
             },
             {
                 'title': '하는일',
-                'pages': {'legal':'법률상담', 'psycho':'심리상담', 'ramp':'휠체어경사로사업'}
+                'groups': [
+                    {
+                        'label': '⚖️ 이훈노무사 노동법률상담실',
+                        'pages': {'legal':'법률상담', 'legal_issues':'노동이슈', 'legal_visit':'방문상담'}
+                    },
+                    {
+                        'label': '🫂 심리상담소',
+                        'pages': {'psycho':'심리상담'}
+                    },
+                    {
+                        'label': '♿ 휠체어경사로보급사업',
+                        'pages': {'ramp':'휠체어경사로사업'}
+                    },
+                ]
             },
             {
                 'title': '제안',

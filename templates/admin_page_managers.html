@@ -42,6 +42,33 @@
             <h6 class="fw-bold mb-0 text-success">{{ group.title }}</h6>
         </div>
         <div class="card-body pt-2 pb-2">
+            {% if group.groups %}
+                {% for sg in group.groups %}
+                <div class="mb-2">
+                    <div class="small fw-bold text-success mb-1">{{ sg.label }}</div>
+                    <div class="row g-2 ps-3">
+                        {% for page_key, page_name in sg.pages.items() %}
+                        {% set checked = page_key in (u.managed_pages or '').split(',') %}
+                        <div class="col-md-4 col-6">
+                            <form method="post" class="d-flex align-items-center">
+                                <input type="hidden" name="user_id" value="{{ u.id }}">
+                                <input type="hidden" name="page" value="{{ page_key }}">
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" id="chk_{{ u.id }}_{{ page_key }}"
+                                        {% if checked %}checked{% endif %}
+                                        onchange="this.form.submit()">
+                                    <label class="form-check-label small" for="chk_{{ u.id }}_{{ page_key }}"
+                                        style="{% if checked %}font-weight:600; color:#27ae60;{% endif %}">
+                                        {% if checked %}✅ {% endif %}{{ page_name }}
+                                    </label>
+                                </div>
+                            </form>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
             <div class="row g-2">
                 {% for page_key, page_name in group.pages.items() %}
                 {% set checked = page_key in (u.managed_pages or '').split(',') %}
@@ -62,6 +89,7 @@
                 </div>
                 {% endfor %}
             </div>
+            {% endif %}
         </div>
     </div>
     {% endfor %}
