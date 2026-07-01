@@ -1,0 +1,27 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container py-4" style="max-width: 700px;">
+    <h4 class="fw-bold mb-3">💭 내가 보낸 마을 바람</h4>
+    {% for w in wishes %}
+    <div class="card border-0 shadow-sm mb-2" style="border-radius:12px; border-left:4px solid #fd7e14;">
+        <div class="card-body p-3">
+            <div class="d-flex justify-content-between">
+                <span class="badge {{ {'pending':'bg-secondary','in_progress':'bg-info','done':'bg-success','rejected':'bg-danger'}.get(w.status,'bg-secondary') }}">{{ {'pending':'대기중','in_progress':'진행중','done':'완료','rejected':'기각'}.get(w.status,w.status) }}</span>
+                <small class="text-muted">{{ w.created_at.strftime('%m/%d %H:%M') if w.created_at else '' }}</small>
+            </div>
+            <div class="mt-1">{{ w.content[:200] }}</div>
+            {% if w.reply %}
+            <div class="mt-2 p-2 bg-light rounded small">
+                <strong>마을지기 답변:</strong> {{ w.reply }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="text-center py-4 text-muted">아직 보낸 바람이 없습니다.</div>
+    {% endfor %}
+    <div class="text-center mt-3">
+        <a href="/user/{{ session.get('user_id') }}" class="btn btn-sm btn-outline-secondary">&larr; 내 프로필</a>
+    </div>
+</div>
+{% endblock %}

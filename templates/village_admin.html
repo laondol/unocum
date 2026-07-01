@@ -67,7 +67,36 @@
             </div>
             {% endfor %}
 
-            {% if not village_posts and not village_shares %}
+            <!-- 마을에 바란다 -->
+            {% for w in village_wishes %}
+            <div class="card border-0 shadow-sm mb-2 feed-item" style="border-radius:12px; border-left:4px solid #fd7e14;" data-id="{{ w.id }}" data-type="wish">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <span class="badge bg-warning me-1">바람</span>
+                            <span class="badge {{ {'pending':'bg-secondary','in_progress':'bg-info','done':'bg-success','rejected':'bg-danger'}.get(w.status,'bg-secondary') }}">{{ {'pending':'대기','in_progress':'진행중','done':'완료','rejected':'기각'}.get(w.status,w.status) }}</span>
+                        </div>
+                        <small class="text-muted">{{ w.created_at.strftime('%m/%d %H:%M') if w.created_at else '' }}</small>
+                    </div>
+                    <div class="mt-1 small">{{ w.content[:200] }}</div>
+                    {% if w.reply %}<div class="mt-1 small text-success">💬 {{ w.reply[:100] }}</div>{% endif %}
+                    <div class="mt-1">
+                        <button class="btn btn-sm btn-outline-info py-0 px-1" onclick="replyWish({{ w.id }})">답변</button>
+                    </div>
+                    <div id="wishReply{{ w.id }}" class="mt-1 d-none">
+                        <select id="wishStatus{{ w.id }}" class="form-select form-select-sm mb-1">
+                            <option value="in_progress">진행중</option>
+                            <option value="done">완료</option>
+                            <option value="rejected">기각</option>
+                        </select>
+                        <input type="text" id="wishReplyText{{ w.id }}" class="form-control form-control-sm mb-1" placeholder="답변 내용">
+                        <button class="btn btn-sm btn-success py-0" onclick="saveWishReply({{ w.id }})">저장</button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+
+            {% if not village_posts and not village_shares and not village_wishes %}
             <div class="text-center py-4 text-muted">아직 마을 피드가 없습니다.</div>
             {% endif %}
         </div>
@@ -209,6 +238,17 @@ function sendVillageMessage(e) {
     if (file) fd.append('attachment', file);
     fetch('/village/message-all', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
         document.getElementById('msgResult').innerHTML = '<span class="text-success">'+d.msg+'</span>';
+    });
+}
+function replyWish(id) {
+    document.getElementById('wishReply'+id).classList.toggle('d-none');
+}
+function saveWishReply(id) {
+    var fd = new FormData();
+    fd.append('status', document.getElementById('wishStatus'+id).value);
+    fd.append('reply', document.getElementById('wishReplyText'+id).value);
+    fetch('/village/wish/'+id+'/reply', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+        if(d.status==='success') location.reload();
     });
 }
 </script>

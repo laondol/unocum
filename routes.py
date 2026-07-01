@@ -6,7 +6,7 @@ from sqlalchemy import or_
 from urllib.parse import quote
 import json, base64, os, threading, requests
 
-from models import db, User, Post, Comment, NewsArticle, NewsComment, NewsRecommendation, NewsVote, PointHistory, ShareReport, Message, ShareComment, ConstructionNotice, VillageAlert, HeritageStamp, TongBot, TongBotDraft, TongBotSchedule, ChatRoom, ChatMessage, VillageCache, LegalPost, LegalAppointment, LawyerSchedule, GoogleCalendarConfig, PsychoPost, PsychoAppointment, PsychoDoctorSchedule, PsychoGoogleCalendarConfig, RampApplication, Friend, FriendGroup, PostVote, StoreInfo, AiKnowledge, VillagePage, VillageEvent, VillageEventAttendee, VillageEventChat
+from models import db, User, Post, Comment, NewsArticle, NewsComment, NewsRecommendation, NewsVote, PointHistory, ShareReport, Message, ShareComment, ConstructionNotice, VillageAlert, HeritageStamp, TongBot, TongBotDraft, TongBotSchedule, ChatRoom, ChatMessage, VillageCache, LegalPost, LegalAppointment, LawyerSchedule, GoogleCalendarConfig, PsychoPost, PsychoAppointment, PsychoDoctorSchedule, PsychoGoogleCalendarConfig, RampApplication, Friend, FriendGroup, PostVote, StoreInfo, AiKnowledge, VillagePage, VillageEvent, VillageEventAttendee, VillageEventChat, VillageWish
 from services.oauth import oauth
 from services.security import save_village_file
 from services.ai_service import call_ai_judge, call_ai_debate, background_ai_judge, moderate_image, background_process_share
@@ -3780,6 +3780,10 @@ def register_routes(app):
         # 중복 제거 후 통합
         all_users = {u.id: u for u in village_users + qr_users}
         village_users = list(all_users.values())
+        # 마을에 바란다
+        village_wishes = VillageWish.query.filter(
+            VillageWish.village_ri.in_([vr['ri'] for vr in village_ris])
+        ).order_by(VillageWish.created_at.desc()).limit(20).all() if village_ris else []
         # 마을의 게시글 (제안)
         village_posts = Post.query.filter(
             Post.user_id.in_([u.id for u in village_users])
@@ -3802,7 +3806,7 @@ def register_routes(app):
             village_ris=village_ris, village_posts=village_posts,
             village_shares=village_shares, village_news=village_news,
             village_users=village_users, jin_users=jin_users,
-            member_count=member_count)
+            member_count=member_count, village_wishes=village_wishes)
 
     @app.route('/village/ai-categorize', methods=['POST'])
     def village_ai_categorize():
@@ -4270,6 +4274,40 @@ def register_routes(app):
             if page:
                 redirect = url_for('village_page_view', tmyeon=page.myeon, tri=page.ri)
         return jsonify({"status":"success","redirect":redirect})
+
+    @app.route('/village/wish', methods=['POST'])
+    def village_wish_create():
+        uid = session.get('user_id')
+        if not uid:
+            return jsonify({"error":"로그인 필요"}), 401
+        user = User.query.get(uid)
+        content = request.form.get('content','').strip()
+        ri = user.village or user.curr_village or ''
+        if not content:
+            return jsonify({"error":"내용을 입력하세요."})
+        w = VillageWish(user_id=uid, content=content, village_ri=ri)
+        db.session.add(w)
+        db.session.commit()
+        return jsonify({"status":"success","msg":"마을에 전달되었습니다."})
+
+    @app.route('/village/wish/<int:wish_id>/reply', methods=['POST'])
+    def village_wish_reply(wish_id):
+        if not has_page_access('village'):
+            return jsonify({"error":"권한 없음"}), 403
+        w = VillageWish.query.get_or_404(wish_id)
+        w.status = request.form.get('status', w.status)
+        w.reply = request.form.get('reply','')
+        w.replied_by = session.get('user_id')
+        db.session.commit()
+        return jsonify({"status":"success"})
+
+    @app.route('/village/my-wishes')
+    def village_my_wishes():
+        uid = session.get('user_id')
+        if not uid:
+            return redirect(url_for('login'))
+        wishes = VillageWish.query.filter_by(user_id=uid).order_by(VillageWish.created_at.desc()).all()
+        return render_template('village_my_wishes.html', wishes=wishes)
 
     @app.route('/api/village/images')
     def village_images():
