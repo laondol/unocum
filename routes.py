@@ -15,6 +15,23 @@ from services.construction import sync_construction_notices, sync_traffic_incide
 from services.news_service import ai_search_news, ai_translate_and_format, ai_summarize_url
 from services.geocode import haversine, gps_to_town_village, get_nearby_reports, is_in_yangpyeong, YANGPYEONG_BOUNDS, YANGPYEONG_VILLAGES
 
+# --- [페이지 관리 권한] ---
+def has_page_access(page):
+    """특정 페이지 관리 권한 확인 (leader > admin > managed_pages)"""
+    role = session.get('role','')
+    if role == 'leader':
+        return True
+    if role == 'admin':
+        return True
+    uid = session.get('user_id')
+    if uid:
+        user = User.query.get(uid)
+        if user and user.managed_pages:
+            pages = user.managed_pages.split(',')
+            if page in pages:
+                return True
+    return False
+
 # --- [공개 경로] 인트로 및 대시보드 ---
 def register_routes(app):
     # React SPA 폴백

@@ -57,6 +57,7 @@ class User(db.Model):
     email_verification_sent_at = db.Column(db.DateTime, nullable=True)
     reset_token = db.Column(db.String(100), nullable=True)
     reset_token_expiry = db.Column(db.DateTime, nullable=True)
+    managed_pages = db.Column(db.String(500), default='')
 
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
