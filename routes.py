@@ -1940,6 +1940,10 @@ def register_routes(app):
         # 정렬
         posts.sort(key=lambda x: x['date'], reverse=True)
         curr_location = ''
+        # 통벗 정보
+        bot = TongBot.query.filter_by(user_id=user.id).first()
+        bot_memory = (bot.memory or '')[-500:] if bot else ''
+        bot_drafts = TongBotDraft.query.filter_by(user_id=user.id).order_by(TongBotDraft.updated_at.desc()).limit(5).all()
         if is_own or is_admin:
             if user.curr_address:
                 curr_location = user.curr_address
@@ -2033,6 +2037,8 @@ def register_routes(app):
             bot_name=bot_name,
             posts=posts,
             share_images=share_images,
+            bot_memory=bot_memory,
+            bot_drafts=bot_drafts,
             curr_location=curr_location,
             recent_friends=recent_friends,
             bot_message=bot_message

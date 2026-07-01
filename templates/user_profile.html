@@ -60,8 +60,27 @@
                     {% else %}
                     <div class="text-muted py-4">
                         {% if is_own %}<small>통벗 생성 중...</small>{% else %}<small>통벗 정보 없음</small>{% endif %}
-                    </div>
-                    {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- 통벗 활동 -->
+    {% if is_own and (bot_memory or bot_drafts) %}
+    <div class="card border-0 shadow-sm mb-3" style="border-radius: 18px;">
+        <div class="card-header bg-white fw-bold" style="border-radius: 18px 18px 0 0;">🤖 통벗 활동 (30일 보관)</div>
+        <div class="card-body p-0">
+            {% if bot_drafts %}
+            <div class="px-3 pt-2 small fw-bold text-success">✍️ 글쓰기 초안</div>
+            {% for d in bot_drafts %}
+            <a href="/user/my?popup=1&tab=write" class="list-group-item list-group-item-action small ps-4">{{ d.title or '제목없음' }} <span class="badge bg-{{ 'success' if d.status=='reviewed' else 'secondary' }}">{{ d.status }}</span><small class="text-muted float-end">{{ d.updated_at.strftime('%m/%d') if d.updated_at else '' }}</small></a>
+            {% endfor %}
+            {% endif %}
+            {% if bot_memory %}
+            <div class="px-3 pt-2 small fw-bold text-success">💬 최근 대화</div>
+            <div class="p-2 px-3 small text-muted" style="white-space:pre-wrap; max-height:120px; overflow-y:auto;">{{ bot_memory }}</div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
                 </div>
             </div>
         </div>
