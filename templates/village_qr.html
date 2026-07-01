@@ -13,7 +13,7 @@
             <select id="pageSelect" class="form-select mb-2" onchange="updateQR()">
                 <option value="join">👥 마을 등록 페이지</option>
                 {% for p in pages %}
-                <option value="page_{{ p.id }}">📝 {{ p.title or (p.ri+' 봉사페이지') }}</option>
+                <option value="page_{{ p.id }}">📝 {{ p.title or (p.ri+' 홍보') }}</option>
                 {% endfor %}
             </select>
         </div>
