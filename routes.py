@@ -17,11 +17,9 @@ from services.geocode import haversine, gps_to_town_village, get_nearby_reports,
 
 # --- [페이지 관리 권한] ---
 def has_page_access(page):
-    """특정 페이지 관리 권한 확인 (leader > admin > managed_pages)"""
+    """특정 페이지 관리 권한 확인 (leader:전체, admin:지정페이지만)"""
     role = session.get('role','')
     if role == 'leader':
-        return True
-    if role == 'admin':
         return True
     uid = session.get('user_id')
     if uid:
