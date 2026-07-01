@@ -991,7 +991,7 @@ def register_routes(app):
             },
             {
                 'title': '관리',
-                'pages': {'admin_proposals':'누구의꿈(관리)', 'admin_users':'회원관리', 'admin_news':'소식(관리)', 'admin_share':'공유(관리)', 'admin_stores':'동네가게(관리)', 'admin_alerts':'알림(관리)'}
+                'pages': {'admin_proposals':'누구의꿈(관리)', 'admin_users':'회원관리', 'admin_news':'소식(관리)', 'admin_share':'공유(관리)', 'admin_stores':'동네가게(관리)', 'admin_alerts':'알림(관리)', 'admin_ai_train':'양평AI 가르치기'}
             },
             {
                 'title': '기타',
