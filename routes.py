@@ -382,6 +382,8 @@ def register_routes(app):
                 if u.last_payout:
                     if (now - u.last_payout).days >= 30:
                         add_points(u.id, 1000, 'monthly', '30일 주기 물맑은머니 지급')
+                        if 'village' in (u.managed_pages or ''):
+                            add_points(u.id, 10000, 'village_monthly', '마을지기 활동지원금')
                         u.last_payout = now
                         db.session.commit()
                 else:
@@ -498,6 +500,8 @@ def register_routes(app):
         user.last_login = now
         if user.last_payout and (now - user.last_payout).days >= 30:
             add_points(user.id, 1000, 'monthly', '30일 주기 물맑은머니 지급')
+            if 'village' in (user.managed_pages or ''):
+                add_points(user.id, 10000, 'village_monthly', '마을지기 활동지원금')
             user.last_payout = now
         elif not user.last_payout:
             user.last_payout = now
@@ -827,12 +831,18 @@ def register_routes(app):
             user = User.query.get(uid)
             if user:
                 pages = (user.managed_pages or '').split(',')
+                had_village = 'village' in pages
                 if action == 'toggle':
                     if page in pages:
                         pages.remove(page)
                     else:
                         pages.append(page)
                     user.managed_pages = ','.join(filter(None, pages))
+                # 마을지기 임명 시 5만닢 일회성 지급
+                if page == 'village' and page in pages and not had_village:
+                    already_got = PointHistory.query.filter_by(user_id=uid, change_type='village_appointment').first()
+                    if not already_got:
+                        add_points(uid, 50000, 'village_appointment', '마을지기 임명 축하금')
             db.session.commit()
             return redirect(url_for('admin_page_managers', user_id=uid))
         target_uid = request.args.get('user_id', type=int)
