@@ -3772,29 +3772,26 @@ def register_routes(app):
                 conditions.append((User.town == vr['myeon']) & (User.village == vr['ri']))
             from sqlalchemy import or_
             village_users = User.query.filter(or_(*conditions)).all() if conditions else []
-            # QR 등록 회원 추가
+        else:
+            village_users = []
+        # QR 등록 회원 추가
         qr_member_ids = [int(p.split('_')[1]) for p in mp if p.startswith('member_')]
         qr_users = User.query.filter(User.id.in_(qr_member_ids)).all() if qr_member_ids else []
-        # 중복 제거
+        # 중복 제거 후 통합
         all_users = {u.id: u for u in village_users + qr_users}
         village_users = list(all_users.values())
         # 마을의 게시글 (제안)
-            village_posts = Post.query.filter(
-                Post.user_id.in_([u.id for u in village_users])
-            ).order_by(Post.created_at.desc()).limit(20).all()
-            # 마을의 공유마당
-            village_shares = ShareReport.query.filter(
-                ShareReport.user_id.in_([u.id for u in village_users])
-            ).order_by(ShareReport.created_at.desc()).limit(20).all()
-            # 마을의 뉴스
-            village_news = NewsArticle.query.filter(
-                NewsArticle.author_id.in_([u.id for u in village_users])
-            ).order_by(NewsArticle.created_at.desc()).limit(10).all()
-        else:
-            village_users = []
-            village_posts = []
-            village_shares = []
-            village_news = []
+        village_posts = Post.query.filter(
+            Post.user_id.in_([u.id for u in village_users])
+        ).order_by(Post.created_at.desc()).limit(20).all()
+        # 마을의 공유마당
+        village_shares = ShareReport.query.filter(
+            ShareReport.user_id.in_([u.id for u in village_users])
+        ).order_by(ShareReport.created_at.desc()).limit(20).all()
+        # 마을의 뉴스
+        village_news = NewsArticle.query.filter(
+            NewsArticle.author_id.in_([u.id for u in village_users])
+        ).order_by(NewsArticle.created_at.desc()).limit(10).all()
         # 마을 전체 회원 (쪽지 발송용)
         member_count = len(village_users)
         # 진 인증 회원 목록
