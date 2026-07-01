@@ -29,7 +29,7 @@
     <nav class="navbar navbar-expand-lg sticky-top mb-1">
         <div class="container">
             <a class="navbar-brand d-flex align-items-center" href="/intro">
-                <img src="/static/images/logo.png" alt="양평" height="36" class="me-2">
+                <img src="/static/images/logo.png" alt="양평" height="36" class="me-2" title="{{ '함께사는로컬' if 'localhost' in request.host or '127.0.0.1' in request.host else ('함께사는테스트' if 'test.unocum.kr' in request.host else '함께사는양평') }}">
                 <span class="fw-bold text-success d-none d-lg-inline" style="font-size: 1.2rem;">{{ '함께사는로컬' if 'localhost' in request.host or '127.0.0.1' in request.host else ('함께사는테스트' if 'test.unocum.kr' in request.host else '함께사는양평') }}</span>
                 <div class="d-inline-flex align-items-center ms-2 position-relative" id="navQuick">
                     <button class="btn btn-sm btn-outline-warning px-2 py-0" style="font-size:0.9rem;" onclick="document.getElementById('quickMenu').classList.toggle('d-none')" onmouseenter="document.getElementById('quickMenu').classList.remove('d-none')">⭐</button>
