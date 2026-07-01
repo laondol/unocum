@@ -3261,6 +3261,9 @@ def register_routes(app):
             post = LegalPost(title=title, content=content, password=password, email=email, author_name=author_name, user_id=uid)
             db.session.add(post)
             db.session.commit()
+            from services.email_service import EmailService
+            EmailService.send('daerilee@gmail.com', f'[법률상담] {title}',
+                f'작성자: {author_name}\n이메일: {email}\n제목: {title}\n내용: {content[:500]}')
             session.pop('email_verified_for_legal', None)
             session.pop('verify_email', None)
             return "<script>alert('상담 글이 등록되었습니다.'); location.href='/legal/list';</script>"
@@ -3441,7 +3444,7 @@ def register_routes(app):
         db.session.commit()
         # 담당자에게 이메일 발송
         from services.email_service import EmailService
-        EmailService.send('eou@kakao.com', f'[법률상담] {title}',
+        EmailService.send('daerilee@gmail.com', f'[법률상담] {title}',
             f'신청자: {name}\n이메일: {email}\n연락처: {phone}\n날짜: {date_str} {time_slot}\n장소: {location}\n내용: {content}')
         return "<script>alert('예약이 신청되었습니다. 승인 후 이메일로 안내드립니다.'); location.href='/service/legal';</script>"
 
@@ -3507,6 +3510,9 @@ def register_routes(app):
         comments += f'\n[{name}] {content} ({datetime.now().strftime("%m/%d %H:%M")})'
         post.comments = comments
         db.session.commit()
+        from services.email_service import EmailService
+        EmailService.send('daerilee@gmail.com', f'[노동이슈 댓글] {post.title}',
+            f'작성자: {name}\n내용: {content}\n게시글: {post.title}')
         return redirect(url_for('legal_issue_detail', post_id=post_id))
 
     # --- [심리상담소] ---
