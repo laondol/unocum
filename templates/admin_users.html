@@ -44,7 +44,7 @@
                             {% if u.is_verified_resident %}<span class="text-success">✅</span>{% endif %}
                         </td>
                         <td>
-                            {% if u.role == 'leader' %}<span class="badge bg-primary">책</span>
+                            {% if u.role == 'leader' %}<a href="/admin/page-managers?user_id={{ u.id }}" class="badge bg-primary text-decoration-none">책</a>
                             {% elif 'village' in (u.managed_pages or '') or ((u.managed_pages or '')[:3] == 'vi_') %}<a href="/admin/page-managers?user_id={{ u.id }}" class="badge bg-success text-decoration-none">마</a>
                             {% elif u.role == 'admin' %}<a href="/admin/page-managers?user_id={{ u.id }}" class="badge bg-danger text-decoration-none">관</a>
                             {% else %}<a href="/admin/page-managers?user_id={{ u.id }}" class="text-muted text-decoration-none small">+역할</a>{% endif %}
