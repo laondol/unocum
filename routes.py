@@ -925,6 +925,9 @@ def register_routes(app):
             if user:
                 pages = (user.managed_pages or '').split(',')
                 had_village = 'village' in pages
+                # 마을지기 임명은 이웃인증 필수
+                if page == 'village' and page not in pages and not user.is_verified_resident:
+                    return redirect(url_for('admin_page_managers', user_id=uid))
                 if action == 'toggle':
                     if page in pages:
                         pages.remove(page)
