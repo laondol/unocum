@@ -3788,13 +3788,12 @@ def register_routes(app):
         village_shares = ShareReport.query.filter(
             ShareReport.user_id.in_([u.id for u in village_users])
         ).order_by(ShareReport.created_at.desc()).limit(20).all()
-        # 마을의 뉴스 (작성자 이름으로 매칭)
+        # 마을의 뉴스
         village_news = []
         if village_users:
-            user_names = [u.real_name or u.username for u in village_users]
             village_news = NewsArticle.query.filter(
-                NewsArticle.author_name.in_(user_names)
-            ).order_by(NewsArticle.updated_at.desc()).limit(10).all()
+                NewsArticle.created_by.in_([u.id for u in village_users])
+            ).order_by(NewsArticle.created_at.desc()).limit(10).all()
         # 마을 전체 회원 (쪽지 발송용)
         member_count = len(village_users)
         # 진 인증 회원 목록
