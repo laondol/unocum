@@ -3582,8 +3582,23 @@ def register_routes(app):
                 pw_hash = generate_password_hash(request.form.get('password',''))
             author_name = request.form.get('author_name', '익명') or '익명'
             post = LegalPost(title=title, content=content, password=pw_hash, email=email, author_name=author_name, user_id=uid)
+            ai_res = call_ai_judge(title, content)
+            post.ai_score = ai_res.get('score', 0)
+            post.ai_reason = ai_res.get('reason', '')
+            if ai_res.get('flag', False) or post.ai_score < -20:
+                post.status = 'flagged'
+            if uid:
+                user_obj = User.query.get(uid)
+                if user_obj and (user_obj.points or 0) >= 100:
+                    add_points(uid, -100, 'legal_consult', f'법률상담: {title[:30]}')
+                elif user_obj:
+                    return "<script>alert('닢이 부족합니다 (100닢 필요).'); history.back();</script>"
             db.session.add(post)
             db.session.commit()
+            if not uid and post.status == 'flagged':
+                from services.email_service import EmailService
+                EmailService.send(email, '[양평마을] 상담글 검토 필요',
+                    f'{author_name}님의 상담글에 부적절한 내용이 감지되었습니다.\n24시간 내에 수정하지 않으면 글이 삭제되며, 이후 이 이메일로는 상담이 불가능합니다.')
             from services.email_service import EmailService
             EmailService.send('daerilee@gmail.com', f'[법률상담] {title}',
                 f'작성자: {author_name}\n이메일: {email}\n제목: {title}\n내용: {content[:500]}')

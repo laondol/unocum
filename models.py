@@ -391,6 +391,9 @@ class LegalPost(db.Model):
     fee = db.Column(db.Integer)
     travel_allowance = db.Column(db.Integer)
     is_public = db.Column(db.Boolean, default=False)
+    ai_score = db.Column(db.Integer, default=0)
+    ai_reason = db.Column(db.Text)
+    status = db.Column(db.String(20), default='pending')
     created_at = db.Column(db.DateTime, default=datetime.now)
 
 class LegalAppointment(db.Model):
@@ -440,6 +443,9 @@ class PsychoPost(db.Model):
     fee = db.Column(db.Integer)
     travel_allowance = db.Column(db.Integer)
     is_public = db.Column(db.Boolean, default=False)
+    ai_score = db.Column(db.Integer, default=0)
+    ai_reason = db.Column(db.Text)
+    status = db.Column(db.String(20), default='pending')
     created_at = db.Column(db.DateTime, default=datetime.now)
 
 class PsychoAppointment(db.Model):
