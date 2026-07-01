@@ -813,6 +813,29 @@ def register_routes(app):
             return jsonify({"status":"success","msg":f"{amount}닢 조정 완료"})
         return jsonify({"id":user.id,"email":user.email,"username":user.username,"points":user.points})
 
+    @app.route('/admin/page-managers', methods=['GET','POST'])
+    def admin_page_managers():
+        if session.get('role') != 'leader':
+            return "최고책임자만 접근 가능", 403
+        if request.method == 'POST':
+            uid = request.form.get('user_id', type=int)
+            page = request.form.get('page','')
+            action = request.form.get('action','toggle')
+            user = User.query.get(uid)
+            if user:
+                pages = (user.managed_pages or '').split(',')
+                if action == 'toggle':
+                    if page in pages:
+                        pages.remove(page)
+                    else:
+                        pages.append(page)
+                    user.managed_pages = ','.join(filter(None, pages))
+            db.session.commit()
+            return redirect(url_for('admin_page_managers'))
+        admins = User.query.filter(User.managed_pages.isnot(None), User.managed_pages != '').all()
+        all_pages = ['legal','psycho','village','ramp']
+        return render_template('admin_page_managers.html', admins=admins, all_pages=all_pages)
+
     @app.route('/admin/users')
     def admin_users():
         if session.get('role') not in ['admin', 'leader']: return "권한 부족", 403

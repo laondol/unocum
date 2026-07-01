@@ -13,7 +13,8 @@ class Config:
     if DB_MODE == 'postgresql':
         SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', 'postgresql://yp_user:yp_pass@localhost:5432/yp_db')
     else:
-        SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(INSTANCE_PATH, 'yangpyeong_v10.db')
+        db_name = os.getenv('DB_NAME', 'yangpyeong_v10.db')
+        SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(INSTANCE_PATH, db_name)
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SESSION_COOKIE_SAMESITE = 'Lax'
     SESSION_COOKIE_SECURE = True
