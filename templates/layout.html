@@ -34,6 +34,28 @@
                 <div class="d-inline-flex align-items-center ms-2 position-relative" id="navQuick">
                     <button class="btn btn-sm btn-outline-warning px-2 py-0" style="font-size:0.9rem;" onclick="document.getElementById('quickMenu').classList.toggle('d-none')" onmouseenter="document.getElementById('quickMenu').classList.remove('d-none')">⭐</button>
                     <a href="/share-report" class="btn btn-sm btn-outline-success px-2 py-0 ms-1" style="font-size:0.9rem;">📸</a>
+                    {% if session.get('user_id') %}
+                    {% if 'village' in (session.get('managed_pages','')) or session.get('role') == 'leader' %}
+                    {% set mp = session.get('managed_pages','') %}
+                    {% set tooltip_text = '주민봉사' %}
+                    {% for vp in mp.split(',') %}
+                        {% if vp.startswith('vi_') %}
+                            {% set parts = vp[3:].split('_') %}
+                            {% set tooltip_text = parts[1] + ' 봉사' %}
+                        {% endif %}
+                    {% endfor %}
+                    <div class="d-inline-flex align-items-center ms-1 position-relative" id="villageIconWrap">
+                        <a href="/village" class="text-decoration-none" title="{{ tooltip_text }}" style="font-size:1.2rem;" onmouseenter="document.getElementById('villageMenu').classList.remove('d-none')">🏘️</a>
+                        <div class="position-absolute bg-white border rounded shadow-sm p-2 d-none" id="villageMenu" style="z-index:1000;min-width:130px;top:100%;left:0;" onmouseleave="this.classList.add('d-none')">
+                            <a class="d-block small py-1 px-2 text-dark text-decoration-none rounded" href="/village">📝 봉사페이지</a>
+                            {% set mp2 = session.get('managed_pages','') %}
+                            {% set myeon = '' %}{% set ri2 = '' %}
+                            {% for vp in mp2.split(',') %}{% if vp.startswith('vi_') %}{% set parts = vp[3:].split('_') %}{% set myeon = parts[0] %}{% set ri2 = parts[1] %}{% endif %}{% endfor %}
+                            <a class="d-block small py-1 px-2 text-dark text-decoration-none rounded" href="/village/view/{{ myeon }}/{{ ri2 }}">📖 마을소개</a>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endif %}
                     <div class="position-absolute bg-white border rounded shadow-sm p-2 d-none" id="quickMenu" style="z-index:1000;min-width:140px;top:100%;left:0;" onmouseleave="this.classList.add('d-none')">
                         <a class="d-block small py-1 px-2 text-dark text-decoration-none rounded" href="/main">💭 꿈꾸기</a>
                         <a class="d-block small py-1 px-2 text-dark text-decoration-none rounded" href="/construction">📍 위치기반안내</a>
@@ -134,26 +156,6 @@
             </div>
             <a href="/ai/chat" class="btn btn-sm btn-outline-success px-2 py-0 ms-2" style="font-size:1.1rem; border-radius:50%; width:34px; height:34px; line-height:1;" title="양평AI">🤖</a>
             {% if session.get('user_id') %}
-            {% if 'village' in (session.get('managed_pages','')) or session.get('role') == 'leader' %}
-            {% set mp = session.get('managed_pages','') %}
-            {% set tooltip_text = '주민봉사' %}
-            {% for vp in mp.split(',') %}
-                {% if vp.startswith('vi_') %}
-                    {% set parts = vp[3:].split('_') %}
-                    {% set tooltip_text = parts[1] + ' 봉사' %}
-                {% endif %}
-            {% endfor %}
-            <div class="d-inline-flex align-items-center ms-2 position-relative" id="villageIconWrap">
-                <a href="/village" class="text-decoration-none" title="{{ tooltip_text }}" style="font-size:1.2rem;" onmouseenter="document.getElementById('villageMenu').classList.remove('d-none')">🏘️</a>
-                <div class="position-absolute bg-white border rounded shadow-sm p-2 d-none" id="villageMenu" style="z-index:1000;min-width:130px;top:100%;left:0;" onmouseleave="this.classList.add('d-none')">
-                    <a class="d-block small py-1 px-2 text-dark text-decoration-none rounded" href="/village">📝 봉사페이지</a>
-                    {% set mp2 = session.get('managed_pages','') %}
-                    {% set myeon = '' %}{% set ri2 = '' %}
-                    {% for vp in mp2.split(',') %}{% if vp.startswith('vi_') %}{% set parts = vp[3:].split('_') %}{% set myeon = parts[0] %}{% set ri2 = parts[1] %}{% endif %}{% endfor %}
-                    <a class="d-block small py-1 px-2 text-dark text-decoration-none rounded" href="/village/view/{{ myeon }}/{{ ri2 }}">📖 마을소개</a>
-                </div>
-            </div>
-            {% endif %}
             <a href="/friends" class="text-decoration-none ms-2 d-none d-lg-inline" title="벗" id="friendIcon">👥</a>
             <a href="/message/inbox" class="text-decoration-none ms-2 position-relative d-none d-lg-inline" title="쪽지" id="msgIcon" style="display:none;">
                 💬
