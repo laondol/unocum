@@ -145,7 +145,7 @@
             {% for vp in mp.split(',') %}
                 {% if vp.startswith('vi_') %}
                     {% set parts = vp[3:].split('_') %}
-                    {% set tooltip_text = parts[1] + '봉사' %}
+                    {% set tooltip_text = parts[1] + ' 봉사' %}
                 {% endif %}
             {% endfor %}
             <a href="/village" class="text-decoration-none ms-2" title="{{ tooltip_text }}" style="font-size:1.2rem;">🏘️</a>
