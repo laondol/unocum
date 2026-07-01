@@ -680,13 +680,28 @@ def create_app():
             inspector = inspect(db.engine)
             user_cols = [c['name'] for c in inspector.get_columns('user')]
             with db.engine.connect() as conn:
-                for col in ['social_id', 'social_provider', 'social_email', 'email_verification_token', 'email_verification_sent_at', 'is_neighbor', 'jin_verified_at']:
+                for col in ['social_id', 'social_provider', 'social_email', 'email_verification_token', 'email_verification_sent_at', 'is_neighbor']:
                     if col not in user_cols:
                         col_type = 'VARCHAR(200)' if col in ('social_id', 'email_verification_token') else 'VARCHAR(100)' if col in ('social_email',) else 'VARCHAR(20)' if col in ('social_provider',) else 'BOOLEAN DEFAULT 0' if col in ('is_neighbor',) else 'DATETIME'
                         conn.execute(db.text(f'ALTER TABLE user ADD COLUMN {col} {col_type}'))
                         print(f'[OK] user.{col} column added')
     except Exception as e:
         print(f'[SKIP] social column migration: {e}')
+
+    # PostgreSQL: jin_verified_at 컬럼 추가
+    if DB_MODE == 'postgresql':
+        try:
+            with app.app_context():
+                from sqlalchemy import inspect as sa_inspect
+                inspector = sa_inspect(db.engine)
+                user_cols = [c['name'] for c in inspector.get_columns('user')]
+                with db.engine.connect() as conn:
+                    if 'jin_verified_at' not in user_cols:
+                        conn.execute(db.text('ALTER TABLE "user" ADD COLUMN jin_verified_at TIMESTAMP'))
+                        conn.commit()
+                        print('[OK] user.jin_verified_at column added')
+        except Exception as e:
+            print(f'[SKIP] jin_verified_at migration: {e}')
 
     # gunicorn에서도 실행되도록 초기화 보장
     with app.app_context():
