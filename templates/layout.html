@@ -94,8 +94,8 @@
                         </ul>
                     </li>
 
-                    <!-- 관리 (관리자/리더 전용) -->
-                    {% if session.get('username') and session.get('role') in ['admin', 'leader'] %}
+                    <!-- 관리 -->
+                    {% if session.get('role') in ['admin','leader'] or 'village' in (session.get('managed_pages','')) %}
                     <li class="nav-item dropdown mx-1">
                         <a class="nav-link dropdown-toggle px-2" href="#" data-bs-toggle="dropdown">관리</a>
                         <ul class="dropdown-menu border-0 shadow">
