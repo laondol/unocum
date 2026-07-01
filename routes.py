@@ -3571,9 +3571,12 @@ def register_routes(app):
                     return "<script>alert('인증된 이메일과 일치하지 않습니다.'); history.back();</script>"
             title = request.form['title']
             content = request.form['content']
-            password = generate_password_hash(request.form['password'])
+            if uid:
+                pw_hash = generate_password_hash('')
+            else:
+                pw_hash = generate_password_hash(request.form.get('password',''))
             author_name = request.form.get('author_name', '익명') or '익명'
-            post = LegalPost(title=title, content=content, password=password, email=email, author_name=author_name, user_id=uid)
+            post = LegalPost(title=title, content=content, password=pw_hash, email=email, author_name=author_name, user_id=uid)
             db.session.add(post)
             db.session.commit()
             from services.email_service import EmailService
@@ -3592,7 +3595,7 @@ def register_routes(app):
         is_author = uid and post.user_id == uid
         is_admin = role in ('admin','leader')
         if request.method == 'POST':
-            if check_password_hash(post.password, request.form['password']):
+            if is_author or is_admin or check_password_hash(post.password, request.form.get('password','')):
                 return render_template('legal_post.html', post=post, need_password=False, error=False)
             return render_template('legal_post.html', post=post, need_password=True, error=True)
         if is_author or is_admin:
@@ -4396,6 +4399,8 @@ def register_routes(app):
                 db.session.commit()
             return "<script>alert('마을 등록이 완료되었습니다!'); location.href='/user/%d';</script>" % uid
         return render_template('village_join.html', code=code, caretaker=caretaker, ris=ris)
+
+    @app.route('/legal/issues')
     def legal_issues():
         posts = LegalPost.query.order_by(LegalPost.created_at.desc()).limit(20).all()
         return render_template('labor_board.html', posts=posts)
@@ -4463,9 +4468,12 @@ def register_routes(app):
                     return "<script>alert('인증된 이메일과 일치하지 않습니다.'); history.back();</script>"
             title = request.form['title']
             content = request.form['content']
-            password = generate_password_hash(request.form['password'])
+            if uid:
+                pw_hash = generate_password_hash('')
+            else:
+                pw_hash = generate_password_hash(request.form.get('password',''))
             author_name = request.form.get('author_name', '익명') or '익명'
-            post = PsychoPost(title=title, content=content, password=password, email=email, author_name=author_name, user_id=uid)
+            post = PsychoPost(title=title, content=content, password=pw_hash, email=email, author_name=author_name, user_id=uid)
             db.session.add(post)
             db.session.commit()
             session.pop('email_verified_for_psycho', None)
@@ -4481,7 +4489,7 @@ def register_routes(app):
         is_author = uid and post.user_id == uid
         is_admin = role in ('admin','leader')
         if request.method == 'POST':
-            if check_password_hash(post.password, request.form['password']):
+            if is_author or is_admin or check_password_hash(post.password, request.form.get('password','')):
                 return render_template('psycho_post.html', post=post, need_password=False, error=False)
             return render_template('psycho_post.html', post=post, need_password=True, error=True)
         if is_author or is_admin:

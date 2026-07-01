@@ -24,9 +24,10 @@
                 <div class="col-4">
                     <label class="form-label small fw-bold">비밀번호 <span class="text-danger">*</span></label>
                     <div class="input-group">
-                        <input type="password" name="password" id="pwInput" class="form-control" required>
+                        <input type="password" name="password" id="pwInput" class="form-control" {% if not session.get('user_id') %}required{% endif %}>
                         <button type="button" class="btn btn-outline-secondary" onclick="togglePw()">👁</button>
                     </div>
+                    {% if session.get('user_id') %}<small class="text-muted">회원은 비밀번호 불필요</small>{% endif %}
                 </div>
             </div>
             <div class="form-text mb-2">작성하신 비밀번호는 글 조회 시 필요합니다. 답변 등록 시 이메일로 알림이 발송됩니다.</div>
