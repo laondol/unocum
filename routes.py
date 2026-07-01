@@ -3460,7 +3460,11 @@ def register_routes(app):
         except Exception as e:
             return jsonify({"error": str(e)})
 
-    @app.route('/legal/issues')
+    @app.route('/village')
+    def village_admin():
+        if not has_page_access('village'):
+            return "권한 없음", 403
+        return render_template('village_admin.html')
     def legal_issues():
         posts = LegalPost.query.order_by(LegalPost.created_at.desc()).limit(20).all()
         return render_template('labor_board.html', posts=posts)

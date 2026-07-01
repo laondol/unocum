@@ -1,0 +1,40 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container py-4" style="max-width: 800px;">
+    <h4 class="fw-bold mb-3">🏘️ 마을지기</h4>
+    <div class="row g-3">
+        <div class="col-md-6">
+            <a href="/admin/alerts" class="text-decoration-none">
+                <div class="card border-0 shadow-sm p-4 h-100" style="border-radius:16px;border-top:5px solid #dc3545;">
+                    <h5 class="fw-bold mb-1">🚨 마을 알림</h5>
+                    <p class="text-muted small">긴급 알림 발송 및 관리</p>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-6">
+            <a href="/admin/users" class="text-decoration-none">
+                <div class="card border-0 shadow-sm p-4 h-100" style="border-radius:16px;border-top:5px solid #0d6efd;">
+                    <h5 class="fw-bold mb-1">👥 회원 관리</h5>
+                    <p class="text-muted small">회원 목록 확인 및 쪽지 발송</p>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-6">
+            <a href="/admin/news" class="text-decoration-none">
+                <div class="card border-0 shadow-sm p-4 h-100" style="border-radius:16px;border-top:5px solid #198754;">
+                    <h5 class="fw-bold mb-1">📰 동네소식</h5>
+                    <p class="text-muted small">마을 소식 작성 및 관리</p>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-6">
+            <a href="/schedule" onclick="window.open('/schedule','sched','width=700,height=700');return false;" class="text-decoration-none">
+                <div class="card border-0 shadow-sm p-4 h-100" style="border-radius:16px;border-top:5px solid #fd7e14;">
+                    <h5 class="fw-bold mb-1">📅 오프모임</h5>
+                    <p class="text-muted small">일정 등록 및 이웃 초대</p>
+                </div>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
