@@ -3871,16 +3871,6 @@ def register_routes(app):
         db.session.commit()
         return jsonify({"status":"success","msg":f"{count}명에게 쪽지 발송 완료"})
 
-    @app.route('/village/jin-verify/<int:member_id>', methods=['POST'])
-    def village_jin_verify(member_id):
-        if not has_page_access('village'):
-            return jsonify({"error":"권한 없음"}), 403
-        member = User.query.get_or_404(member_id)
-        member.is_verified_resident = True
-        member.jin_verified_at = datetime.now()
-        db.session.commit()
-        return jsonify({"status":"success","msg":f"{member.real_name or member.username}님 진 인증 완료"})
-
     @app.route('/village/qr')
     def village_qr():
         if not has_page_access('village'):
@@ -3888,9 +3878,8 @@ def register_routes(app):
         import secrets, time
         uid = session.get('user_id')
         code = secrets.token_urlsafe(12)
-        expiry = int(time.time()) + 600  # 10분 유효
+        expiry = int(time.time()) + 600
         user = User.query.get(uid)
-        # 마을지기의 담당 리 목록
         mp = (user.managed_pages or '').split(',') if user else []
         ris = []
         for p in mp:
@@ -3898,7 +3887,6 @@ def register_routes(app):
                 parts = p[3:].split('_')
                 if len(parts) >= 2:
                     ris.append(parts[1])
-        # 캐시에 QR 코드 정보 저장
         from models import VillageCache
         vc = VillageCache.query.filter_by(key=f'qr_{uid}').first()
         if not vc:
@@ -3909,6 +3897,64 @@ def register_routes(app):
         site_url = current_app.config.get('SITE_URL', request.host_url.rstrip('/'))
         qr_url = f'{site_url}/village/join?code={code}'
         return render_template('village_qr.html', qr_url=qr_url, code=code, expiry=expiry, ris=ris)
+
+    @app.route('/village/jin-verify/<int:member_id>', methods=['POST'])
+    def village_jin_verify(member_id):
+        if not has_page_access('village'):
+            return jsonify({"error":"권한 없음"}), 403
+        member = User.query.get_or_404(member_id)
+        member.is_verified_resident = True
+        member.jin_verified_at = datetime.now()
+        db.session.commit()
+        return jsonify({"status":"success","msg":f"{member.real_name or member.username}님 진 인증 완료"})
+
+    @app.route('/village/register-member', methods=['POST'])
+    def village_register_member():
+        if not has_page_access('village'):
+            return jsonify({"error":"권한 없음"}), 403
+        name = request.form.get('name','').strip()
+        phone = request.form.get('phone','').strip()
+        if not name:
+            return jsonify({"error":"이름은 필수입니다."})
+        uid = session.get('user_id')
+        caretaker = User.query.get(uid)
+        # 중복 확인 (이름+전화번호)
+        member = None
+        if phone:
+            member = User.query.filter_by(phone=phone).first()
+        if not member:
+            # 신규 회원 생성 (이메일 없이)
+            from werkzeug.security import generate_password_hash
+            import random, string
+            username = f'마을{random.randint(10000,99999)}'
+            member = User(
+                username=username,
+                real_name=name,
+                phone=phone or '',
+                role='user',
+                password=generate_password_hash(''.join(random.choices(string.digits, k=6))),
+                is_verified_resident=True
+            )
+            db.session.add(member)
+            db.session.flush()
+        # 사진 처리
+        photo = request.files.get('photo')
+        if photo and photo.filename:
+            import os as _os
+            upload_dir = _os.path.join(current_app.config['UPLOAD_FOLDER'], 'village_members')
+            _os.makedirs(upload_dir, exist_ok=True)
+            fname = f'{member.id}_{datetime.now().strftime("%Y%m%d%H%M%S")}.jpg'
+            fpath = _os.path.join(upload_dir, fname)
+            photo.save(fpath)
+            member.photo_path = '/static/uploads/village_members/' + fname
+        # 마을지기의 managed_pages에 등록
+        cp = (caretaker.managed_pages or '').split(',')
+        member_key = f'member_{member.id}'
+        if member_key not in cp:
+            cp.append(member_key)
+            caretaker.managed_pages = ','.join(filter(None, cp))
+        db.session.commit()
+        return jsonify({"status":"success","msg":f"{name}님 등록 완료"})
 
     @app.route('/village/join', methods=['GET','POST'])
     def village_join():
