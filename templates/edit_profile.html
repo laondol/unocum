@@ -1,0 +1,28 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container py-4" style="max-width: 500px;">
+    <div class="card border-0 shadow-sm" style="border-radius: 18px;">
+        <div class="card-body p-4">
+            <h4 class="fw-bold mb-4">✏️ 회원정보 수정</h4>
+            <form method="post">
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">이름 (실명)</label>
+                    <input type="text" name="real_name" value="{{ user.real_name or '' }}" class="form-control" placeholder="이름">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">이메일</label>
+                    <input type="email" name="email" value="{{ user.email or '' }}" class="form-control" placeholder="이메일" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">전화번호</label>
+                    <input type="tel" name="phone" value="{{ user.phone or '' }}" class="form-control" placeholder="010-1234-5678">
+                </div>
+                <button type="submit" class="btn btn-success w-100 py-2 fw-bold">저장</button>
+            </form>
+            <div class="text-center mt-3">
+                <a href="/user/{{ user.id }}" class="text-muted small text-decoration-none">&larr; 돌아가기</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

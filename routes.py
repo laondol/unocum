@@ -565,6 +565,25 @@ def register_routes(app):
         db.session.commit()
         return jsonify({'status':'success','msg':'주소가 수정되었습니다.'})
 
+    @app.route('/user/edit-profile', methods=['GET','POST'])
+    def user_edit_profile():
+        uid = session.get('user_id')
+        if not uid: return redirect(url_for('login'))
+        user = User.query.get(uid)
+        if not user: return "사용자 없음", 404
+        if request.method == 'POST':
+            user.real_name = request.form.get('real_name', '').strip() or user.real_name
+            user.phone = request.form.get('phone', '').strip() or user.phone
+            email_val = request.form.get('email', '').strip()
+            if email_val and email_val != user.email:
+                check = User.query.filter_by(email=email_val).first()
+                if check and check.id != uid:
+                    return "<script>alert('이미 사용 중인 이메일입니다.'); history.back();</script>"
+                user.email = email_val
+            db.session.commit()
+            return "<script>alert('회원정보가 수정되었습니다.'); location.href='/user/%d';</script>" % uid
+        return render_template('edit_profile.html', user=user)
+
     # --- [이웃주민 위치인증] ---
     @app.route('/neighbor/verify', methods=['POST'])
     def neighbor_verify():
