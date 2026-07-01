@@ -83,6 +83,8 @@
                         <option value="news">소식</option>
                         <option value="legal">법률상담</option>
                         <option value="psycho">심리상담</option>
+                        {% set user_village = user.village or '우리 마을' %}
+                        <option value="village_wish">{{ user_village }}에 바란다</option>
                     </select>
                     <span id="boardRule" class="small text-muted align-self-center"></span>
                 </div>
