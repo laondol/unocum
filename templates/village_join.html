@@ -1,0 +1,40 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container py-4" style="max-width: 500px;">
+    <div class="card border-0 shadow-lg" style="border-radius:20px;">
+        <div class="card-body p-4 text-center">
+            <div class="fs-1 mb-2">🏘️</div>
+            <h4 class="fw-bold mb-3">마을 등록</h4>
+            {% if caretaker %}
+            <p class="text-muted mb-3"><strong>{{ caretaker.real_name or caretaker.username }}</strong> 마을지기의 초대입니다.</p>
+            <div class="d-flex flex-wrap gap-1 justify-content-center mb-3">
+                {% for r in ris %}<span class="badge bg-success">{{ r }}</span>{% endfor %}
+            </div>
+            {% endif %}
+            {% if not session.get('user_id') %}
+            <p class="mb-3">마을 등록을 위해 로그인이 필요합니다.</p>
+            <a href="/login?next=/village/join?code={{ code }}" class="btn btn-success px-4">로그인하고 동의하기</a>
+            {% else %}
+            <form method="post" enctype="multipart/form-data">
+                <input type="hidden" name="code" value="{{ code }}">
+                <div class="mb-3 text-start">
+                    <label class="form-label small fw-bold">📸 회원 사진 (선택)</label>
+                    <input type="file" name="photo" class="form-control" accept="image/*" capture="environment">
+                    <div class="form-text">마을지기가 회원님을 확인할 수 있도록 사진을 등록해 주세요.</div>
+                </div>
+                <div class="card p-3 mb-3" style="background:#e8f5e9;border-radius:12px;">
+                    <div class="form-check text-start">
+                        <input type="checkbox" class="form-check-input" id="agree" required>
+                        <label class="form-check-label small" for="agree">
+                            마을지기에게 <strong>이름·이메일·사진</strong> 정보 제공에 동의하며,<br>
+                            마을 주민으로 등록되는 것에 동의합니다.
+                        </label>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-success w-100 py-2 fw-bold">동의하고 등록하기</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

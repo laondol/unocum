@@ -34,6 +34,7 @@ class User(db.Model):
     is_verified_resident = db.Column(db.Boolean, default=False) # 주민 자치인증 완료 여부
     verified_method = db.Column(db.String(30), default='none')  # gps, bill, none
     jin_verified_at = db.Column(db.DateTime)  # 마을지기 진 인증 시각
+    photo_path = db.Column(db.String(300))  # 마을지기 촬영 사진
     bill_image_path = db.Column(db.String(300))                  # 고지서 사진 경로 (인증 후 즉시 파기)
     
     points = db.Column(db.Integer, default=1000)         # 물맑은머니 닢

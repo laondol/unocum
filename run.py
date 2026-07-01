@@ -701,6 +701,10 @@ def create_app():
                         conn.execute(db.text('ALTER TABLE "user" ADD COLUMN jin_verified_at TIMESTAMP'))
                         conn.commit()
                         print('[OK] user.jin_verified_at column added')
+                    if 'photo_path' not in user_cols:
+                        conn.execute(db.text('ALTER TABLE "user" ADD COLUMN photo_path VARCHAR(300)'))
+                        conn.commit()
+                        print('[OK] user.photo_path column added')
                     if 'attachment' not in msg_cols:
                         conn.execute(db.text('ALTER TABLE message ADD COLUMN attachment VARCHAR(500)'))
                         conn.commit()

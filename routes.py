@@ -3772,7 +3772,13 @@ def register_routes(app):
                 conditions.append((User.town == vr['myeon']) & (User.village == vr['ri']))
             from sqlalchemy import or_
             village_users = User.query.filter(or_(*conditions)).all() if conditions else []
-            # 마을의 게시글 (제안)
+            # QR 등록 회원 추가
+        qr_member_ids = [int(p.split('_')[1]) for p in mp if p.startswith('member_')]
+        qr_users = User.query.filter(User.id.in_(qr_member_ids)).all() if qr_member_ids else []
+        # 중복 제거
+        all_users = {u.id: u for u in village_users + qr_users}
+        village_users = list(all_users.values())
+        # 마을의 게시글 (제안)
             village_posts = Post.query.filter(
                 Post.user_id.in_([u.id for u in village_users])
             ).order_by(Post.created_at.desc()).limit(20).all()
@@ -3877,6 +3883,84 @@ def register_routes(app):
         member.jin_verified_at = datetime.now()
         db.session.commit()
         return jsonify({"status":"success","msg":f"{member.real_name or member.username}님 진 인증 완료"})
+
+    @app.route('/village/qr')
+    def village_qr():
+        if not has_page_access('village'):
+            return "권한 없음", 403
+        import secrets, time
+        uid = session.get('user_id')
+        code = secrets.token_urlsafe(12)
+        expiry = int(time.time()) + 600  # 10분 유효
+        user = User.query.get(uid)
+        # 마을지기의 담당 리 목록
+        mp = (user.managed_pages or '').split(',') if user else []
+        ris = []
+        for p in mp:
+            if p.startswith('vi_'):
+                parts = p[3:].split('_')
+                if len(parts) >= 2:
+                    ris.append(parts[1])
+        # 캐시에 QR 코드 정보 저장
+        from models import VillageCache
+        vc = VillageCache.query.filter_by(key=f'qr_{uid}').first()
+        if not vc:
+            vc = VillageCache(key=f'qr_{uid}')
+        vc.value = f'{code}|{expiry}|{",".join(ris)}'
+        db.session.add(vc)
+        db.session.commit()
+        site_url = current_app.config.get('SITE_URL', request.host_url.rstrip('/'))
+        qr_url = f'{site_url}/village/join?code={code}'
+        return render_template('village_qr.html', qr_url=qr_url, code=code, expiry=expiry, ris=ris)
+
+    @app.route('/village/join', methods=['GET','POST'])
+    def village_join():
+        code = request.args.get('code') or request.form.get('code')
+        if not code:
+            return "<script>alert('QR 코드가 필요합니다.'); location.href='/intro';</script>"
+        # 캐시에서 정보 조회
+        from models import VillageCache
+        vc = VillageCache.query.filter(VillageCache.value.like(f'{code}|%')).first()
+        if not vc:
+            return "<script>alert('만료되었거나 잘못된 QR입니다.'); location.href='/intro';</script>"
+        parts = vc.value.split('|')
+        if len(parts) < 3:
+            return "<script>alert('잘못된 QR 정보입니다.'); location.href='/intro';</script>"
+        expiry = int(parts[1])
+        import time
+        if time.time() > expiry:
+            return "<script>alert('QR 코드가 만료되었습니다. (10분 유효)'); location.href='/intro';</script>"
+        ris = parts[2].split(',') if parts[2] else []
+        caretaker_uid = int(vc.key.split('_')[1]) if vc.key.startswith('qr_') else None
+        caretaker = User.query.get(caretaker_uid) if caretaker_uid else None
+
+        if request.method == 'POST':
+            uid = session.get('user_id')
+            if not uid:
+                return "<script>alert('로그인이 필요합니다.'); location.href='/login';</script>"
+            member = User.query.get(uid)
+            if not member:
+                return "<script>alert('회원 정보를 찾을 수 없습니다.'); location.href='/intro';</script>"
+            # 동의 처리: 마을지기의 managed_pages에 회원 등록
+            if caretaker:
+                cp = (caretaker.managed_pages or '').split(',')
+                member_key = f'member_{uid}'
+                if member_key not in cp:
+                    cp.append(member_key)
+                    caretaker.managed_pages = ','.join(filter(None, cp))
+                # 회원 사진 처리
+                photo = request.files.get('photo')
+                if photo and photo.filename:
+                    import os as _os
+                    upload_dir = _os.path.join(current_app.config['UPLOAD_FOLDER'], 'village_members')
+                    _os.makedirs(upload_dir, exist_ok=True)
+                    fname = f'{uid}_{datetime.now().strftime("%Y%m%d%H%M%S")}.jpg'
+                    fpath = _os.path.join(upload_dir, fname)
+                    photo.save(fpath)
+                    member.photo_path = '/static/uploads/village_members/' + fname
+                db.session.commit()
+            return "<script>alert('마을 등록이 완료되었습니다!'); location.href='/user/%d';</script>" % uid
+        return render_template('village_join.html', code=code, caretaker=caretaker, ris=ris)
     def legal_issues():
         posts = LegalPost.query.order_by(LegalPost.created_at.desc()).limit(20).all()
         return render_template('labor_board.html', posts=posts)
