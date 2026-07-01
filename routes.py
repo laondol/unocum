@@ -813,43 +813,43 @@ def register_routes(app):
             return jsonify({"status":"success","msg":f"{amount}닢 조정 완료"})
         return jsonify({"id":user.id,"email":user.email,"username":user.username,"points":user.points})
 
-     @app.route('/admin/page-managers', methods=['GET','POST'])
-     def admin_page_managers():
-         if session.get('role') != 'leader':
-             return "최고책임자만 접근 가능", 403
-         if request.method == 'POST':
-             uid = request.form.get('user_id', type=int)
-             page = request.form.get('page','')
-             action = request.form.get('action','toggle')
-             user = User.query.get(uid)
-             if user:
-                 pages = (user.managed_pages or '').split(',')
-                 if action == 'toggle':
-                     if page in pages:
-                         pages.remove(page)
-                     else:
-                         pages.append(page)
-                     user.managed_pages = ','.join(filter(None, pages))
-             db.session.commit()
-             return redirect(url_for('admin_page_managers', user_id=uid))
-         target_uid = request.args.get('user_id', type=int)
-         if target_uid:
-             admins = User.query.filter(User.id == target_uid).all()
-         else:
-             admins = User.query.filter(User.managed_pages.isnot(None), User.managed_pages != '').all()
-         all_pages = {
-             'legal':'⚖️ 법률상담',
-             'psycho':'🫂 심리상담',
-             'village':'🏘️ 마을지기',
-             'ramp':'♿ 경사로',
-             'share':'📦 공유마당',
-             'news':'📰 소식',
-             'schedule':'📅 일정',
-             'stores':'🏪 동네가게',
-             'construction':'📍 위치기반안내',
-             'proposals':'💭 꿈꾸기',
-         }
-         return render_template('admin_page_managers.html', admins=admins, all_pages=all_pages, target_uid=target_uid)
+    @app.route('/admin/page-managers', methods=['GET','POST'])
+    def admin_page_managers():
+        if session.get('role') != 'leader':
+            return "최고책임자만 접근 가능", 403
+        if request.method == 'POST':
+            uid = request.form.get('user_id', type=int)
+            page = request.form.get('page','')
+            action = request.form.get('action','toggle')
+            user = User.query.get(uid)
+            if user:
+                pages = (user.managed_pages or '').split(',')
+                if action == 'toggle':
+                    if page in pages:
+                        pages.remove(page)
+                    else:
+                        pages.append(page)
+                    user.managed_pages = ','.join(filter(None, pages))
+            db.session.commit()
+            return redirect(url_for('admin_page_managers', user_id=uid))
+        target_uid = request.args.get('user_id', type=int)
+        if target_uid:
+            admins = User.query.filter(User.id == target_uid).all()
+        else:
+            admins = User.query.filter(User.managed_pages.isnot(None), User.managed_pages != '').all()
+        all_pages = {
+            'legal':'⚖️ 법률상담',
+            'psycho':'🫂 심리상담',
+            'village':'🏘️ 마을지기',
+            'ramp':'♿ 경사로',
+            'share':'📦 공유마당',
+            'news':'📰 소식',
+            'schedule':'📅 일정',
+            'stores':'🏪 동네가게',
+            'construction':'📍 위치기반안내',
+            'proposals':'💭 꿈꾸기',
+        }
+        return render_template('admin_page_managers.html', admins=admins, all_pages=all_pages, target_uid=target_uid)
 
     @app.route('/admin/users')
     def admin_users():
