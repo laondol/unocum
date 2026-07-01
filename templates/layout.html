@@ -140,7 +140,7 @@
             </div>
             {% if session.get('user_id') %}
             {% if 'village' in (session.get('managed_pages','')) or session.get('role') == 'leader' %}
-            <a href="/village" class="text-decoration-none ms-2" title="마을지기"><span class="badge bg-warning text-dark">마</span></a>
+            <a href="/village" class="text-decoration-none ms-2" title="마을지기"><span class="badge bg-success">마</span></a>
             {% endif %}
             <a href="/user/{{ session.get('user_id') }}" class="text-decoration-none ms-2" title="회원정보">👤</a>
             {% else %}

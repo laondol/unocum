@@ -22,7 +22,7 @@
                     </div>
                 </div>
                 <div class="col">
-                    <h5 class="fw-bold mb-0">{{ u.real_name or u.username or '이름없음' }} <span class="badge {% if 'village' in (u.managed_pages or '') %}bg-warning text-dark{% else %}bg-danger{% endif %} fs-6 ms-1">{{ '마' if 'village' in (u.managed_pages or '') else '관' }}</span></h5>
+                    <h5 class="fw-bold mb-0">{{ u.real_name or u.username or '이름없음' }} <span class="badge {% if 'village' in (u.managed_pages or '') %}bg-success{% else %}bg-danger{% endif %} fs-6 ms-1">{{ '마' if 'village' in (u.managed_pages or '') else '관' }}</span></h5>
                     <div class="text-muted small">
                         <span class="me-3">ID: {{ u.id }}</span>
                         <span>{{ u.email }}</span>
