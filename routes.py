@@ -3705,7 +3705,7 @@ def register_routes(app):
         db.session.add(appt)
         db.session.commit()
         from services.email_service import EmailService
-        EmailService.send('eou@kakao.com', f'[심리상담] {title}',
+        EmailService.send('herb2727@naver.com', f'[심리상담] {title}',
             f'신청자: {name}\n이메일: {email}\n연락처: {phone}\n날짜: {date_str} {time_slot}\n장소: {location}\n내용: {content}')
         return "<script>alert('예약이 신청되었습니다. 승인 후 이메일로 안내드립니다.'); location.href='/service/psycho';</script>"
 
