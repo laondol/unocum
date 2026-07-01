@@ -1617,14 +1617,15 @@ def register_routes(app):
         post.member_score = max(-30, min(30, post.member_score))
         post.total_score = post.ai_score + post.admin_score + post.leader_score + post.member_score
         voter = User.query.get(uid)
-        voter_history = PointHistory(user_id=uid, change_type='like', amount=-5, balance_after=voter.points - 5, description='좋아요 투표', related_id=post_id)
-        db.session.add(voter_history)
-        voter.points -= 5
-        if post.user_id and post.user_id != uid:
-            author = User.query.get(post.user_id)
-            author_history = PointHistory(user_id=post.user_id, change_type='like_reward', amount=1, balance_after=author.points + 1, description='좋아요 받음', related_id=post_id)
-            db.session.add(author_history)
-            author.points += 1
+        if voter.is_verified_resident:
+            voter_history = PointHistory(user_id=uid, change_type='like', amount=-5, balance_after=voter.points - 5, description='좋아요 투표', related_id=post_id)
+            db.session.add(voter_history)
+            voter.points -= 5
+            if post.user_id and post.user_id != uid:
+                author = User.query.get(post.user_id)
+                author_history = PointHistory(user_id=post.user_id, change_type='like_reward', amount=1, balance_after=author.points + 1, description='좋아요 받음', related_id=post_id)
+                db.session.add(author_history)
+                author.points += 1
         status_changed = False
         if post.status == '제안' and post.total_score >= 80:
             post.status = '현실화'
@@ -1664,14 +1665,15 @@ def register_routes(app):
         post.member_score = max(-30, min(30, post.member_score))
         post.total_score = post.ai_score + post.admin_score + post.leader_score + post.member_score
         voter = User.query.get(uid)
-        voter_history = PointHistory(user_id=uid, change_type='dislike', amount=-5, balance_after=voter.points - 5, description='나빠요 투표', related_id=post_id)
-        db.session.add(voter_history)
-        voter.points -= 5
-        if post.user_id and post.user_id != uid:
-            author = User.query.get(post.user_id)
-            author_history = PointHistory(user_id=post.user_id, change_type='dislike_penalty', amount=-1, balance_after=author.points - 1, description='나빠요 받음', related_id=post_id)
-            db.session.add(author_history)
-            author.points -= 1
+        if voter.is_verified_resident:
+            voter_history = PointHistory(user_id=uid, change_type='dislike', amount=-5, balance_after=voter.points - 5, description='나빠요 투표', related_id=post_id)
+            db.session.add(voter_history)
+            voter.points -= 5
+            if post.user_id and post.user_id != uid:
+                author = User.query.get(post.user_id)
+                author_history = PointHistory(user_id=post.user_id, change_type='dislike_penalty', amount=-1, balance_after=author.points - 1, description='나빠요 받음', related_id=post_id)
+                db.session.add(author_history)
+                author.points -= 1
         db.session.commit()
         return jsonify({'status':'success', 'likes':post.like_count, 'dislikes':post.dislike_count, 'total_score':post.total_score})
 
