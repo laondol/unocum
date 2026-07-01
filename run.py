@@ -709,7 +709,7 @@ def create_app():
                     for tbl_name in ['legal_post', 'psycho_post']:
                         try:
                             tbl_cols = [c['name'] for c in sa_insp(db.engine).get_columns(tbl_name)]
-                            for col, col_type in [('ai_score','INTEGER DEFAULT 0'),('ai_reason','TEXT'),('status',\"VARCHAR(20) DEFAULT 'pending'\")]:
+                            for col, col_type in [('ai_score','INTEGER DEFAULT 0'),('ai_reason','TEXT'),('status',"VARCHAR(20) DEFAULT 'pending'")]:
                                 if col not in tbl_cols:
                                     conn.execute(db.text(f'ALTER TABLE {tbl_name} ADD COLUMN {col} {col_type}'))
                                     conn.commit()
