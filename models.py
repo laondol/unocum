@@ -520,3 +520,15 @@ class AiKnowledge(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+
+class VillagePage(db.Model):
+    __tablename__ = 'village_page'
+    id = db.Column(db.Integer, primary_key=True)
+    myeon = db.Column(db.String(20), nullable=False)
+    ri = db.Column(db.String(20), nullable=False)
+    title = db.Column(db.String(200))
+    content = db.Column(db.Text)
+    visibility = db.Column(db.String(20), default='members')  # off, members, public
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)

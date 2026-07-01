@@ -1,0 +1,30 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container py-4" style="max-width: 800px;">
+    <h4 class="fw-bold mb-3"><span class="badge bg-success me-2">마</span>{{ page.ri }} 마을 페이지</h4>
+    <div class="card border-0 shadow-sm mb-3" style="border-radius:16px;">
+        <div class="card-body p-4">
+            <form method="post">
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">페이지 제목</label>
+                    <input type="text" name="title" class="form-control" value="{{ page.title or '' }}">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">페이지 내용 (Summernote)</label>
+                    <textarea name="content" class="summernote-editor" placeholder="마을 소식, 공지, 행사 등을 작성하세요...">{{ page.content or '' }}</textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">공개 설정</label>
+                    <select name="visibility" class="form-select">
+                        <option value="off" {% if page.visibility=='off' %}selected{% endif %}>🔒 비공개 (끄기)</option>
+                        <option value="members" {% if page.visibility=='members' %}selected{% endif %}>👥 마을주민만</option>
+                        <option value="public" {% if page.visibility=='public' %}selected{% endif %}>🌐 마을 방문자 모두</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-success">저장</button>
+                <a href="/village" class="btn btn-outline-secondary">&larr; 마을지기</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

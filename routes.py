@@ -6,7 +6,7 @@ from sqlalchemy import or_
 from urllib.parse import quote
 import json, base64, os, threading, requests
 
-from models import db, User, Post, Comment, NewsArticle, NewsComment, NewsRecommendation, NewsVote, PointHistory, ShareReport, Message, ShareComment, ConstructionNotice, VillageAlert, HeritageStamp, TongBot, TongBotDraft, TongBotSchedule, ChatRoom, ChatMessage, VillageCache, LegalPost, LegalAppointment, LawyerSchedule, GoogleCalendarConfig, PsychoPost, PsychoAppointment, PsychoDoctorSchedule, PsychoGoogleCalendarConfig, RampApplication, Friend, FriendGroup, PostVote, StoreInfo, AiKnowledge
+from models import db, User, Post, Comment, NewsArticle, NewsComment, NewsRecommendation, NewsVote, PointHistory, ShareReport, Message, ShareComment, ConstructionNotice, VillageAlert, HeritageStamp, TongBot, TongBotDraft, TongBotSchedule, ChatRoom, ChatMessage, VillageCache, LegalPost, LegalAppointment, LawyerSchedule, GoogleCalendarConfig, PsychoPost, PsychoAppointment, PsychoDoctorSchedule, PsychoGoogleCalendarConfig, RampApplication, Friend, FriendGroup, PostVote, StoreInfo, AiKnowledge, VillagePage
 from services.oauth import oauth
 from services.security import save_village_file
 from services.ai_service import call_ai_judge, call_ai_debate, background_ai_judge, moderate_image, background_process_share
@@ -3955,6 +3955,81 @@ def register_routes(app):
             caretaker.managed_pages = ','.join(filter(None, cp))
         db.session.commit()
         return jsonify({"status":"success","msg":f"{name}님 등록 완료"})
+
+    @app.route('/village/page', methods=['GET','POST'])
+    def village_page_edit():
+        if not has_page_access('village'):
+            return "권한 없음", 403
+        uid = session.get('user_id')
+        user = User.query.get(uid)
+        mp = (user.managed_pages or '').split(',') if user else []
+        # 첫 번째 담당 리 찾기
+        myeon = ri = None
+        for p in mp:
+            if p.startswith('vi_'):
+                parts = p[3:].split('_')
+                if len(parts) >= 2:
+                    myeon, ri = parts[0], parts[1]
+                    break
+        if not myeon:
+            return "담당 마을이 지정되지 않았습니다.", 400
+        page = VillagePage.query.filter_by(myeon=myeon, ri=ri).first()
+        if not page:
+            page = VillagePage(myeon=myeon, ri=ri, title=ri+' 마을', content='', visibility='members', created_by=uid)
+            db.session.add(page)
+            db.session.flush()
+        if request.method == 'POST':
+            page.title = request.form.get('title', page.title)
+            page.content = request.form.get('content', page.content)
+            page.visibility = request.form.get('visibility', page.visibility)
+            db.session.commit()
+            return "<script>alert('저장되었습니다.'); location.reload();</script>"
+        return render_template('village_page_edit.html', page=page)
+
+    @app.route('/village/view/<string:tmyeon>/<string:tri>')
+    def village_page_view(tmyeon, tri):
+        page = VillagePage.query.filter_by(myeon=tmyeon, ri=tri).first()
+        if not page or page.visibility == 'off':
+            return "<script>alert('마을 페이지가 준비되지 않았습니다.'); history.back();</script>"
+        uid = session.get('user_id')
+        is_member = False
+        if uid:
+            mp_users = []
+            # 마을지기 찾기
+            all_u = User.query.filter(User.managed_pages.contains('village')).all()
+            for u in all_u:
+                if any(p.startswith(f'vi_{tmyeon}_{tri}') for p in (u.managed_pages or '').split(',')):
+                    member_ids = [int(p.split('_')[1]) for p in (u.managed_pages or '').split(',') if p.startswith('member_')]
+                    mp_users.extend(member_ids)
+                if uid in mp_users:
+                    is_member = True
+                    break
+        if page.visibility == 'members' and not is_member:
+            return "<script>alert('마을 주민만 볼 수 있습니다.'); history.back();</script>"
+        return render_template('village_page_view.html', page=page, is_member=is_member)
+
+    @app.route('/village/page/toggle', methods=['POST'])
+    def village_page_toggle():
+        if not has_page_access('village'):
+            return jsonify({"error":"권한 없음"}), 403
+        uid = session.get('user_id')
+        user = User.query.get(uid)
+        mp = (user.managed_pages or '').split(',') if user else []
+        myeon = ri = None
+        for p in mp:
+            if p.startswith('vi_'):
+                parts = p[3:].split('_')
+                if len(parts) >= 2:
+                    myeon, ri = parts[0], parts[1]
+                    break
+        if not myeon:
+            return jsonify({"error":"담당 마을 없음"})
+        page = VillagePage.query.filter_by(myeon=myeon, ri=ri).first()
+        if not page:
+            return jsonify({"error":"페이지 없음"})
+        page.visibility = 'off' if page.visibility != 'off' else 'public'
+        db.session.commit()
+        return jsonify({"status":"success","visibility":page.visibility})
 
     @app.route('/village/join', methods=['GET','POST'])
     def village_join():

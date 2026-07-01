@@ -705,6 +705,12 @@ def create_app():
                         conn.execute(db.text('ALTER TABLE "user" ADD COLUMN photo_path VARCHAR(300)'))
                         conn.commit()
                         print('[OK] user.photo_path column added')
+                    # village_page 테이블 생성
+                    from sqlalchemy import inspect as sa_insp
+                    tables = sa_insp(db.engine).get_table_names()
+                    if 'village_page' not in tables:
+                        db.create_all()
+                        print('[OK] village_page table created')
                     if 'attachment' not in msg_cols:
                         conn.execute(db.text('ALTER TABLE message ADD COLUMN attachment VARCHAR(500)'))
                         conn.commit()
