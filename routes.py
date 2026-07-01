@@ -1933,6 +1933,10 @@ def register_routes(app):
         legal_posts = LegalPost.query.filter_by(user_id=user.id).order_by(LegalPost.created_at.desc()).all() if hasattr(LegalPost, 'user_id') else []
         for l in legal_posts:
             posts.append({'title': l.title, 'date': l.created_at.strftime('%Y-%m-%d %H:%M') if l.created_at else '', 'type': '법률', 'url': f'/legal/post/{l.id}', 'id': l.id})
+        # 통벗 초안
+        drafts = TongBotDraft.query.filter_by(user_id=user.id).order_by(TongBotDraft.updated_at.desc()).all()
+        for d in drafts:
+            posts.append({'title': d.title or '초안', 'date': d.updated_at.strftime('%Y-%m-%d %H:%M') if d.updated_at else '', 'type': '통벗', 'url': f'/user/my?popup=1', 'id': d.id})
         # 정렬
         posts.sort(key=lambda x: x['date'], reverse=True)
         curr_location = ''
