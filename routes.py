@@ -1007,8 +1007,18 @@ def register_routes(app):
     @app.route('/admin/users')
     def admin_users():
         if session.get('role') not in ['admin', 'leader']: return "권한 부족", 403
-        users = User.query.order_by(User.id.desc()).all()
-        return render_template('admin_users.html', users=users)
+        sort = request.args.get('sort', 'id')
+        order = request.args.get('order', 'desc')
+        sort_map = {
+            'email': User.email, 'village': User.village, 'points': User.points,
+            'verified': User.is_verified_resident, 'role': User.role, 'id': User.id
+        }
+        col = sort_map.get(sort, User.id)
+        if order == 'asc':
+            users = User.query.order_by(col.asc()).all()
+        else:
+            users = User.query.order_by(col.desc()).all()
+        return render_template('admin_users.html', users=users, sort=sort, order=order)
 
     @app.route('/admin/users/verify/<int:user_id>/<string:action>')
     def verify_user(user_id, action):

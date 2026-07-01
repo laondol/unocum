@@ -15,30 +15,37 @@
                 <thead class="table-light">
                     <tr>
                         <th style="width:40px;"><input type="checkbox" id="selectAll" onchange="toggleAll()"></th>
-                        <th>이메일</th>
-                        <th>동/리</th>
-                        <th>{{ nip() }}</th>
-                        <th>인증</th>
-                        <th>역할</th>
+                        <th class="sortable" onclick="sortBy('email')" style="cursor:pointer;">
+                            이메일 {% if sort=='email' %}{{ '▲' if order=='asc' else '▼' }}{% endif %}
+                        </th>
+                        <th class="sortable" onclick="sortBy('village')" style="cursor:pointer;">
+                            동/리 {% if sort=='village' %}{{ '▲' if order=='asc' else '▼' }}{% endif %}
+                        </th>
+                        <th class="sortable" onclick="sortBy('points')" style="cursor:pointer;">
+                            {{ nip() }} {% if sort=='points' %}{{ '▲' if order=='asc' else '▼' }}{% endif %}
+                        </th>
+                        <th class="sortable" onclick="sortBy('verified')" style="cursor:pointer;">
+                            인증 {% if sort=='verified' %}{{ '▲' if order=='asc' else '▼' }}{% endif %}
+                        </th>
+                        <th class="sortable" onclick="sortBy('role')" style="cursor:pointer;">
+                            역할 {% if sort=='role' %}{{ '▲' if order=='asc' else '▼' }}{% endif %}
+                        </th>
                         <th>관리</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for u in users %}
-                    <tr class="user-row">
+                    <tr class="user-row" data-name="{{ u.email or '' }} {{ u.real_name or '' }}">
                         <td><input type="checkbox" class="user-check" value="{{ u.id }}"></td>
                         <td><a href="/user/{{ u.id }}" class="fw-bold text-decoration-none">{{ u.email or '-' }}</a></td>
                         <td>{{ u.village or '-' }}</td>
-                        <td><a href="/user/{{ u.id }}" class="fw-bold text-success text-decoration-none">{{ "{:,}".format(u.points or 0) }}</a></td>
+                        <td><a href="/user/{{ u.id }}" class="fw-bold text-success text-decoration-none">{{ u.points | comma }}</a></td>
                         <td>
                             {% if u.is_verified_resident %}<span class="text-success">✅</span>{% endif %}
                         </td>
                         <td>
                             {% if u.role == 'leader' %}<span class="badge bg-primary">책</span>
                             {% elif u.role == 'admin' %}<a href="/admin/page-managers?user_id={{ u.id }}" class="badge bg-danger text-decoration-none">관</a>{% endif %}
-                        </td>
-                        <td>
-                            {% if u.is_verified_resident %}<span class="text-success">✅</span>{% endif %}
                         </td>
                         <td>
                             <a href="/message/send/{{ u.id }}" class="btn btn-sm btn-outline-success" title="쪽지">✉️</a>
@@ -55,22 +62,31 @@
 </div>
 
 <script>
+function sortBy(col) {
+    var params = new URLSearchParams(window.location.search);
+    var current = '{{ sort }}';
+    var currentOrder = '{{ order }}';
+    if (current === col) {
+        params.set('order', currentOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+        params.set('sort', col);
+        params.set('order', 'asc');
+    }
+    window.location.search = params.toString();
+}
 function filterUsers() {
     const q = document.getElementById('searchInput').value.toLowerCase();
     document.querySelectorAll('.user-row').forEach(el => {
         el.style.display = el.getAttribute('data-name').toLowerCase().includes(q) ? '' : 'none';
     });
 }
-
 function toggleAll() {
     const checked = document.getElementById('selectAll').checked;
     document.querySelectorAll('.user-check').forEach(cb => cb.checked = checked);
 }
-
 function getSelectedUserIds() {
     return [...document.querySelectorAll('.user-check:checked')].map(cb => parseInt(cb.value));
 }
-
 function createGroupFromSelected() {
     const ids = getSelectedUserIds();
     if (ids.length === 0) { alert('선택된 회원이 없습니다.'); return; }
@@ -85,7 +101,6 @@ function createGroupFromSelected() {
         else alert('❌ ' + d.msg);
     }).catch(e=>alert('오류: '+e));
 }
-
 function deleteUser(id, name) {
     if (!confirm(name + ' 회원을 정말 삭제하시겠습니까? 복구할 수 없습니다.')) return;
     fetch('/admin/users/delete/' + id, {method:'POST'})
