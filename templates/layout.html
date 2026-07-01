@@ -27,7 +27,7 @@
 
     {% set page_name = {'/intro':'사업소개','/presentation':'운영계획','/terms':'회원약관','/charter':'정관','/world-news':'세계와양평','/kr-yp-news':'대한민국과양평','/main':'꿈꾸기','/all-proposals':'누구의꿈','/share-report':'공유하기','/share':'공유마당','/share/map':'지도로보기','/construction':'위치기반안내','/user/my':'내 통벗','/mypage/points/charge':'닢 충전','/admin':'누구의꿈(관리)','/admin/news':'소식(관리)','/admin/share-reports':'공유마당(관리)','/admin/alerts':'알림(관리)','/service/ramp':'휠체어경사로','/service/legal':'법률상담','/service/psycho':'심리상담소','/legal/list':'법률상담','/legal/write':'상담글쓰기','/legal/schedule':'상담예약','/legal/admin':'법률상담관리','/psycho/list':'심리상담','/psycho/write':'심리글쓰기','/psycho/schedule':'심리예약','/psycho/admin':'심리상담관리','/login':'로그인','/register':'회원가입','/user':'내 프로필','/mypage/points':'닢내역'}.get(request.path.rstrip('/') or '/', '') %}
     <nav class="navbar navbar-expand-lg sticky-top mb-1">
-        <div class="container flex-nowrap">
+        <div class="container">
             <!-- 왼쪽: 로고 + 아이콘 -->
             <div class="d-flex align-items-center flex-shrink-0">
             <a class="navbar-brand d-flex align-items-center me-1" href="/intro">
@@ -68,7 +68,7 @@
             </div>
 
             <!-- 메뉴 (collapse) -->
-            <div class="collapse navbar-collapse" id="navbarNav">
+            <div class="collapse navbar-collapse" id="navbarNav" style="background:white;z-index:1020;">
                 <ul class="navbar-nav mx-auto align-items-center">
                     <li class="nav-item dropdown mx-1"><a class="nav-link dropdown-toggle px-2" href="#" data-bs-toggle="dropdown">소개</a>
                         <ul class="dropdown-menu border-0 shadow"><li class="dropdown-header-custom">소개</li><li><a class="dropdown-item" href="/presentation">사업소개</a></li><li><a class="dropdown-item" href="/presentation">운영계획</a></li><li><hr class="dropdown-divider"></li><li><a class="dropdown-item" href="/terms">회원약관</a></li><li><a class="dropdown-item" href="/charter">정관</a></li></ul></li>
@@ -88,7 +88,7 @@
             </div>
 
             <!-- 오른쪽: AI + 회원정보 + 삼선 -->
-            <div class="d-flex align-items-center flex-shrink-0">
+            <div class="d-flex align-items-center flex-shrink-0 position-relative">
             <a href="/ai/chat" class="btn btn-sm btn-outline-success px-2 py-0" style="font-size:1.1rem; border-radius:50%; width:34px; height:34px; line-height:1;" title="양평AI">🤖</a>
             {% if session.get('user_id') %}
             <a href="/friends" class="text-decoration-none ms-2 d-none d-lg-inline" title="벗" id="friendIcon">👥</a>
