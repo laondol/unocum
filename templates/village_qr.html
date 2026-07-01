@@ -4,41 +4,66 @@
 {% endblock %}
 {% block content %}
 <div class="container py-4" style="max-width: 500px;">
-    <h4 class="fw-bold mb-3"><span class="badge bg-success me-2">마</span>주민 초대 QR</h4>
+    <h4 class="fw-bold mb-3"><span class="badge bg-success me-2">마</span>QR 초대</h4>
+
+    <!-- 페이지 선택 -->
+    <div class="card border-0 shadow-sm mb-3" style="border-radius:16px;">
+        <div class="card-body p-3">
+            <h6 class="fw-bold mb-2">📄 초대할 페이지 선택</h6>
+            <select id="pageSelect" class="form-select mb-2" onchange="updateQR()">
+                <option value="join">👥 마을 등록 페이지</option>
+                {% for p in pages %}
+                <option value="page_{{ p.id }}">📝 {{ p.title or (p.ri+' 마을') }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
     <div class="card border-0 shadow-sm mb-3" style="border-radius:16px;">
         <div class="card-body text-center p-4">
             <div id="qrcode" class="d-inline-block"></div>
-            <p class="text-muted small mt-3">회원님이 이 QR을 스캔하면 마을 등록 페이지로 이동합니다.</p>
-            <p class="text-danger small">유효시간: 10분</p>
+            <p class="text-muted small mt-3">스캔하면 선택한 페이지로 이동합니다.</p>
+            <p class="text-muted small">
+                <span id="qrUrlDisplay" class="text-break"></span>
+            </p>
+            <p class="text-danger small">유효시간: <span id="timer">600초</span></p>
         </div>
     </div>
-    <div class="card border-0 shadow-sm mb-3" style="border-radius:16px;background:#e8f5e9;">
+
+    <!-- 진 인증 안내 -->
+    <div class="card border-0 shadow-sm mb-3" style="border-radius:16px;background:#fff8e1;">
         <div class="card-body p-3">
-            <h6 class="fw-bold">📋 담당 마을</h6>
-            <div class="d-flex flex-wrap gap-1">
-                {% for r in ris %}<span class="badge bg-success">{{ r }}</span>{% endfor %}
-            </div>
+            <h6 class="fw-bold mb-1">🔐 진 인증 안내</h6>
+            <small class="text-muted">QR로 들어오는 분은 로그인 후 진 인증(6개월 유효)이 필요합니다. 미인증 시 진 인증 동의 후 페이지가 열립니다.</small>
         </div>
     </div>
+
     <div class="text-center">
-        <button class="btn btn-sm btn-outline-success" onclick="location.reload()">🔄 새 QR 생성</button>
-        <a href="/village" class="btn btn-sm btn-outline-secondary">&larr; 마을지기</a>
+        <button class="btn btn-sm btn-outline-success" onclick="location.reload()">🔄 새 QR</button>
+        <a href="/village" class="btn btn-sm btn-outline-secondary">&larr; 돌아가기</a>
     </div>
 </div>
+
 <script>
-new QRCode(document.getElementById('qrcode'), {
-    text: '{{ qr_url }}',
-    width: 250,
-    height: 250,
-    colorDark: '#27ae60',
-    colorLight: '#ffffff'
+var qrCode = new QRCode(document.getElementById('qrcode'), {
+    width: 250, height: 250, colorDark: '#27ae60', colorLight: '#ffffff'
 });
-var expiry = {{ expiry }} * 1000;
+var baseUrl = '{{ qr_url_base }}';
+var expiry = {{ expiry }};
+
+function updateQR() {
+    var val = document.getElementById('pageSelect').value;
+    var url = baseUrl + '/' + val;
+    document.getElementById('qrUrlDisplay').textContent = url;
+    qrCode.clear();
+    qrCode.makeCode(url);
+}
+updateQR();
+
 setInterval(function() {
-    var left = Math.max(0, Math.ceil((expiry - Date.now()) / 1000));
-    var el = document.querySelector('.text-danger.small');
-    if (el) el.textContent = '유효시간: ' + left + '초';
-    if (left <= 0) { el.textContent = '만료됨 - 새로고침 필요'; el.style.color = '#dc3545'; }
+    var left = Math.max(0, expiry - Math.floor(Date.now()/1000));
+    document.getElementById('timer').textContent = left + '초';
+    if (left <= 0) location.reload();
 }, 1000);
 </script>
 {% endblock %}

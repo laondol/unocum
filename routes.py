@@ -3899,8 +3899,11 @@ def register_routes(app):
         db.session.add(vc)
         db.session.commit()
         site_url = current_app.config.get('SITE_URL', request.host_url.rstrip('/'))
-        qr_url = f'{site_url}/village/join?code={code}'
-        return render_template('village_qr.html', qr_url=qr_url, code=code, expiry=expiry, ris=ris)
+        qr_url_base = f'{site_url}/village/invite'
+        # 마을지기가 만든 페이지 목록
+        myeon = ris[0] if ris else ''
+        pages = VillagePage.query.filter_by(myeon=myeon, created_by=uid).all()
+        return render_template('village_qr.html', qr_url_base=qr_url_base, code=code, expiry=expiry, ris=ris, pages=pages)
 
     @app.route('/village/jin-verify/<int:member_id>', methods=['POST'])
     def village_jin_verify(member_id):
@@ -4230,6 +4233,43 @@ def register_routes(app):
             if a.last_ping and (now - a.last_ping).total_seconds() > 30:
                 away.append({'id':a.id,'name':a.name or a.email or '익명','seconds':int((now - a.last_ping).total_seconds())})
         return jsonify({"status":"ok","away":away})
+
+    @app.route('/village/invite/<path:target>')
+    def village_invite(target):
+        uid = session.get('user_id')
+        if not uid:
+            return redirect(url_for('login', next=request.path))
+        user = User.query.get(uid)
+        # 진 인증 체크 (6개월)
+        if not user.jin_verified_at or (datetime.now() - user.jin_verified_at).days > 150:
+            return render_template('village_jin_consent.html', target=target)
+        # target에 따라 이동
+        if target == 'join':
+            return redirect(url_for('village_join', code=request.args.get('code','')))
+        elif target.startswith('page_'):
+            page_id = int(target.split('_')[1])
+            page = VillagePage.query.get(page_id)
+            if page:
+                return redirect(url_for('village_page_view', tmyeon=page.myeon, tri=page.ri))
+        return "<script>alert('페이지를 찾을 수 없습니다.'); history.back();</script>"
+
+    @app.route('/village/invite-jin', methods=['POST'])
+    def village_invite_jin():
+        uid = session.get('user_id')
+        if not uid:
+            return jsonify({"error":"로그인 필요"})
+        user = User.query.get(uid)
+        user.jin_verified_at = datetime.now()
+        user.is_verified_resident = True
+        db.session.commit()
+        target = request.json.get('target','')
+        redirect = '/village/join' if target == 'join' else '/intro'
+        if target.startswith('page_'):
+            page_id = int(target.split('_')[1])
+            page = VillagePage.query.get(page_id)
+            if page:
+                redirect = url_for('village_page_view', tmyeon=page.myeon, tri=page.ri)
+        return jsonify({"status":"success","redirect":redirect})
 
     @app.route('/api/village/images')
     def village_images():

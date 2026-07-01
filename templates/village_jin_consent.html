@@ -1,0 +1,41 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container py-4" style="max-width: 500px;">
+    <div class="card border-0 shadow-lg" style="border-radius:20px;">
+        <div class="card-body p-4 text-center">
+            <div class="fs-1 mb-2">🔐</div>
+            <h4 class="fw-bold mb-3">진 인증이 필요합니다</h4>
+            <p class="text-muted small mb-3">
+                {% if not session.get('jin_verified_at') %}
+                아직 진 인증을 받지 않으셨습니다.
+                {% else %}
+                진 인증 후 5개월이 지나 재인증이 필요합니다.
+                {% endif %}
+            </p>
+            <div class="card p-3 mb-3" style="background:#e8f5e9;border-radius:12px;">
+                <div class="form-check text-start">
+                    <input type="checkbox" class="form-check-input" id="agree" onchange="document.getElementById('btnGo').disabled=!this.checked">
+                    <label class="form-check-label small" for="agree">
+                        마을지기에게 <strong>이름·이메일·주소</strong> 정보 제공에 동의하며,<br>
+                        진 인증을 진행합니다. (6개월 유효)
+                    </label>
+                </div>
+            </div>
+            <form method="post" id="jinForm">
+                <button type="submit" id="btnGo" class="btn btn-success w-100 py-2 fw-bold" disabled>동의하고 계속하기</button>
+            </form>
+            <p class="text-muted small mt-2">동의하지 않으면 페이지 이용이 제한됩니다.</p>
+        </div>
+    </div>
+</div>
+<script>
+document.getElementById('jinForm').addEventListener('submit', function(e){
+    e.preventDefault();
+    fetch('/village/invite-jin', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:'{{ target }}'})})
+    .then(r=>r.json()).then(d=>{
+        if(d.status==='success') location.href = d.redirect;
+        else alert(d.msg||'오류');
+    });
+});
+</script>
+{% endblock %}
