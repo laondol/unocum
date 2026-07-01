@@ -109,6 +109,9 @@
                             <li><div class="dropdown-divider"></div></li>
                             <li><a class="dropdown-item" href="/admin/ai-chat">🤖 관리자 AI</a></li>
                             <li><a class="dropdown-item" href="/admin/ai-feedback">📋 AI 피드백</a></li>
+                            {% if session.get('role') == 'leader' %}
+                            <li><a class="dropdown-item" href="/admin/ai-train">📚 양평AI 가르치기</a></li>
+                            {% endif %}
                             <li><div class="dropdown-divider"></div></li>
                             {% if 'test.unocum.kr' in request.host or 'localhost' in request.host %}
                             <li><a class="dropdown-item" href="/admin/page-managers">🔑 페이지관리자</a></li>

@@ -6,7 +6,7 @@ from sqlalchemy import or_
 from urllib.parse import quote
 import json, base64, os, threading, requests
 
-from models import db, User, Post, Comment, NewsArticle, NewsComment, NewsRecommendation, NewsVote, PointHistory, ShareReport, Message, ShareComment, ConstructionNotice, VillageAlert, HeritageStamp, TongBot, TongBotDraft, TongBotSchedule, ChatRoom, ChatMessage, VillageCache, LegalPost, LegalAppointment, LawyerSchedule, GoogleCalendarConfig, PsychoPost, PsychoAppointment, PsychoDoctorSchedule, PsychoGoogleCalendarConfig, RampApplication, Friend, FriendGroup, PostVote, StoreInfo
+from models import db, User, Post, Comment, NewsArticle, NewsComment, NewsRecommendation, NewsVote, PointHistory, ShareReport, Message, ShareComment, ConstructionNotice, VillageAlert, HeritageStamp, TongBot, TongBotDraft, TongBotSchedule, ChatRoom, ChatMessage, VillageCache, LegalPost, LegalAppointment, LawyerSchedule, GoogleCalendarConfig, PsychoPost, PsychoAppointment, PsychoDoctorSchedule, PsychoGoogleCalendarConfig, RampApplication, Friend, FriendGroup, PostVote, StoreInfo, AiKnowledge
 from services.oauth import oauth
 from services.security import save_village_file
 from services.ai_service import call_ai_judge, call_ai_debate, background_ai_judge, moderate_image, background_process_share
@@ -79,11 +79,17 @@ def register_routes(app):
             if u:
                 user_info = f'현재 대화중인 사용자: {u.real_name or u.username} (이웃인증: {"O" if u.is_verified_resident else "X"})'
         context = f"함께사는양평 현황: 회원 {user_count}명, 꿈꾸기 제안 {post_count}건. {user_info}"
+        # 최고책임자가 등록한 지식베이스
+        knowledges = AiKnowledge.query.order_by(AiKnowledge.id.desc()).limit(30).all()
+        kb_text = ''
+        if knowledges:
+            kb_text = '\n[최고책임자가 가르친 정보]\n' + '\n'.join([f'Q: {k.question}\nA: {k.answer}' for k in knowledges])
         try:
             from openai import OpenAI
             client = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=current_app.config.get('GROQ_API_KEY',''))
             system_prompt = f"""너는 함께사는양평의 '양평AI'야. 네 존재 목적은 회원과 비회원이 함께사는양평 플랫폼을 편리하게 이용하도록 돕는 거야.
 {context}
+{kb_text}
 주요 역할:
 1. 함께사는양평 이용 방법, 메뉴 위치, 기능 설명 (최우선)
    - 꿈꾸기(/main): 공동체 제안 등록
@@ -1082,6 +1088,35 @@ def register_routes(app):
             return "권한 부족", 403
         feedbacks = VillageAlert.query.filter_by(alert_type='ai_feedback').order_by(VillageAlert.created_at.desc()).limit(50).all()
         return render_template('admin_ai_feedback.html', feedbacks=feedbacks)
+
+    @app.route('/admin/ai-train')
+    def admin_ai_train():
+        if session.get('role') != 'leader':
+            return "최고책임자만 접근 가능", 403
+        knowledges = AiKnowledge.query.order_by(AiKnowledge.id.desc()).limit(100).all()
+        return render_template('admin_ai_train.html', knowledges=knowledges)
+
+    @app.route('/admin/ai-train/save', methods=['POST'])
+    def admin_ai_train_save():
+        if session.get('role') != 'leader':
+            return jsonify({"error":"권한 부족"}), 403
+        q = request.form.get('question','').strip()
+        a = request.form.get('answer','').strip()
+        if not q or not a:
+            return jsonify({"error":"질문과 답변을 모두 입력하세요."})
+        k = AiKnowledge(question=q, answer=a, created_by=session.get('user_id'))
+        db.session.add(k)
+        db.session.commit()
+        return jsonify({"status":"success","msg":"저장되었습니다."})
+
+    @app.route('/admin/ai-train/delete/<int:kid>', methods=['POST'])
+    def admin_ai_train_delete(kid):
+        if session.get('role') != 'leader':
+            return jsonify({"error":"권한 부족"}), 403
+        k = AiKnowledge.query.get_or_404(kid)
+        db.session.delete(k)
+        db.session.commit()
+        return jsonify({"status":"success","msg":"삭제되었습니다."})
 
     @app.route('/comment/<int:post_id>', methods=['POST'])
     def add_comment(post_id):
