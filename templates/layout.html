@@ -150,8 +150,8 @@
             {% endfor %}
             <a href="/village" class="text-decoration-none ms-2" title="{{ tooltip_text }}" style="font-size:1.2rem;">🏘️</a>
             {% endif %}
-            <a href="/friends" class="text-decoration-none ms-2" title="벗">👥</a>
-            <a href="/message/inbox" class="text-decoration-none ms-2 position-relative" title="쪽지">
+            <a href="/friends" class="text-decoration-none ms-2" title="벗" id="friendIcon">👥</a>
+            <a href="/message/inbox" class="text-decoration-none ms-2 position-relative" title="쪽지" id="msgIcon" style="display:none;">
                 💬
                 <span id="msgBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;font-size:0.6rem;">0</span>
             </a>
@@ -202,10 +202,22 @@
     <script>
     document.addEventListener('DOMContentLoaded', () => {
         [...document.querySelectorAll('[data-bs-toggle="tooltip"]')].forEach(el => new bootstrap.Tooltip(el));
-        // 안 읽은 쪽지 개수
+        // 안 읽은 쪽지 개수 + 쪽지 아이콘 표시/숨김
         fetch('/message/count').then(r=>r.json()).then(d=>{
             const badge = document.getElementById('msgBadge');
-            if(d.count > 0) { badge.textContent = d.count; badge.style.display = ''; }
+            const icon = document.getElementById('msgIcon');
+            if(d.count > 0) {
+                badge.textContent = d.count;
+                badge.style.display = '';
+                icon.style.display = '';
+            }
+        }).catch(()=>{});
+        // 벗 아이콘 표시/숨김
+        fetch('/friends/list').then(r=>r.json()).then(d=>{
+            const icon = document.getElementById('friendIcon');
+            if(!d.friends || d.friends.length === 0) {
+                icon.style.display = 'none';
+            }
         }).catch(()=>{});
         // Summernote 에디터 초기화
         document.querySelectorAll('.summernote-editor').forEach(el => {
