@@ -114,8 +114,11 @@
                         <div class="mb-2">
                             <input type="text" name="subject" class="form-control" placeholder="제목" required>
                         </div>
+                        <div class="mb-2">
+                            <textarea id="msgContent" name="content" class="summernote-editor" placeholder="내용을 입력하세요..."></textarea>
+                        </div>
                         <div class="mb-3">
-                            <textarea name="content" class="form-control" rows="4" placeholder="내용" required></textarea>
+                            <input type="file" name="attachment" class="form-control form-control-sm">
                         </div>
                         <button type="submit" class="btn btn-success">발송 ({{ member_count }}명)</button>
                     </form>
@@ -196,7 +199,11 @@ function jinVerify(memberId) {
 }
 function sendVillageMessage(e) {
     e.preventDefault();
-    var fd = new FormData(e.target);
+    var fd = new FormData();
+    fd.append('subject', e.target.subject.value);
+    fd.append('content', $('#msgContent').summernote('code'));
+    var file = e.target.attachment.files[0];
+    if (file) fd.append('attachment', file);
     fetch('/village/message-all', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
         document.getElementById('msgResult').innerHTML = '<span class="text-success">'+d.msg+'</span>';
     });

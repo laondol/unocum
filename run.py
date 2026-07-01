@@ -695,13 +695,18 @@ def create_app():
                 from sqlalchemy import inspect as sa_inspect
                 inspector = sa_inspect(db.engine)
                 user_cols = [c['name'] for c in inspector.get_columns('user')]
+                msg_cols = [c['name'] for c in inspector.get_columns('message')]
                 with db.engine.connect() as conn:
                     if 'jin_verified_at' not in user_cols:
                         conn.execute(db.text('ALTER TABLE "user" ADD COLUMN jin_verified_at TIMESTAMP'))
                         conn.commit()
                         print('[OK] user.jin_verified_at column added')
+                    if 'attachment' not in msg_cols:
+                        conn.execute(db.text('ALTER TABLE message ADD COLUMN attachment VARCHAR(500)'))
+                        conn.commit()
+                        print('[OK] message.attachment column added')
         except Exception as e:
-            print(f'[SKIP] jin_verified_at migration: {e}')
+            print(f'[SKIP] pg migration: {e}')
 
     # gunicorn에서도 실행되도록 초기화 보장
     with app.app_context():

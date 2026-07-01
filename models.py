@@ -194,6 +194,7 @@ class Message(db.Model):
     subject = db.Column(db.String(200))
     content = db.Column(db.Text)
     is_read = db.Column(db.Boolean, default=False)
+    attachment = db.Column(db.String(500))
     created_at = db.Column(db.DateTime, default=datetime.now)
 
 class ShareReport(db.Model):

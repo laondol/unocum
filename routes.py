@@ -3841,6 +3841,17 @@ def register_routes(app):
         content = request.form.get('content','')
         if not subject or not content:
             return jsonify({"error":"제목과 내용을 입력하세요."})
+        # 파일 첨부 처리
+        attachment_path = None
+        file = request.files.get('attachment')
+        if file and file.filename:
+            import os as _os
+            upload_dir = _os.path.join(current_app.config['UPLOAD_FOLDER'], 'village_msg')
+            _os.makedirs(upload_dir, exist_ok=True)
+            fname = f"{uid}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{file.filename}"
+            fpath = _os.path.join(upload_dir, fname)
+            file.save(fpath)
+            attachment_path = '/static/uploads/village_msg/' + fname
         from sqlalchemy import or_
         conditions = [User.village == ri for ri in village_ris]
         receivers = User.query.filter(User.id != uid, or_(*conditions)).all() if conditions else []
@@ -3848,7 +3859,8 @@ def register_routes(app):
         for r in receivers:
             try:
                 msg = Message(sender_id=uid, sender_name=user.real_name or user.username,
-                    receiver_id=r.id, subject=subject, content=content)
+                    receiver_id=r.id, subject=subject, content=content,
+                    attachment=attachment_path)
                 db.session.add(msg)
                 count += 1
             except:
