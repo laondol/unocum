@@ -17,7 +17,7 @@ class Config:
         SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(INSTANCE_PATH, db_name)
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SESSION_COOKIE_SAMESITE = 'Lax'
-    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = bool(os.getenv('SESSION_COOKIE_SECURE', os.getenv('SITE_URL','').startswith('https')))
     UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
     MAX_CONTENT_LENGTH = 10 * 1024 * 1024
     JUSO_API_KEY = os.getenv('JUSO_API_KEY', '')
