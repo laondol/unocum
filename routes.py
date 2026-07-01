@@ -857,8 +857,8 @@ def register_routes(app):
                         'pages': {'legal':'법률상담', 'legal_issues':'노동이슈', 'legal_visit':'방문상담'}
                     },
                     {
-                        'label': '🫂 심리상담소',
-                        'pages': {'psycho':'심리상담'}
+                        'label': '🫂 숨상담심리연구소',
+                        'pages': {'psycho':'심리상담', 'psycho_board':'심리상담게시판', 'psycho_visit':'방문상담게시판'}
                     },
                     {
                         'label': '♿ 휠체어경사로보급사업',
