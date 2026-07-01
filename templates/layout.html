@@ -41,9 +41,6 @@
                     </div>
                 </div>
             </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <!-- 가운데: 주 메뉴 -->
                 <ul class="navbar-nav mx-auto align-items-center">
@@ -170,6 +167,9 @@
             {% else %}
             <a href="/login" class="text-decoration-none text-muted ms-2" title="회원정보">👤</a>
             {% endif %}
+            <button class="navbar-toggler ms-2" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" style="border:none; padding:0;">
+                <span class="navbar-toggler-icon"></span>
+            </button>
         </div>
     </nav>
 
