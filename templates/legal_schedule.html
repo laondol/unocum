@@ -94,6 +94,21 @@
     <div class="text-center mt-3">
         <a href="/service/legal" class="btn btn-sm btn-outline-secondary">← 법률사무소</a>
     </div>
+
+    {% if my_appointments %}
+    <div class="card border-0 shadow-sm p-4 mt-4" style="border-radius:16px;">
+        <h5 class="fw-bold mb-3">📋 내 상담 예약</h5>
+        {% for a in my_appointments %}
+        <div class="p-2 mb-2 border rounded small">
+            <div class="d-flex justify-content-between">
+                <strong>{{ a.title }}</strong>
+                <span class="badge bg-{{ 'success' if a.status=='approved' else 'warning' if a.status=='pending' else 'secondary' }}">{{ {'pending':'대기','approved':'승인','rejected':'거절'}.get(a.status,a.status) }}</span>
+            </div>
+            <div class="text-muted">{{ a.date }} {{ a.time_slot }} | {{ a.location or '미정' }}</div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
 </div>
 <script>
 var verified = {{ 'true' if session.user_id else 'false' }};

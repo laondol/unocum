@@ -3725,8 +3725,12 @@ def register_routes(app):
         for s in schedule_rows:
             for h in range(s.start_hour, s.end_hour, s.slot_hours):
                 all_slots.append(f"{h:02d}:00-{h+s.slot_hours:02d}:00")
-
-        return render_template('legal_schedule.html', available_dates=available_dates, time_slots=all_slots)
+        # 사용자의 예약 목록
+        uid = session.get('user_id')
+        my_appointments = []
+        if uid:
+            my_appointments = LegalAppointment.query.filter_by(user_id=uid).order_by(LegalAppointment.date.desc()).limit(10).all()
+        return render_template('legal_schedule.html', available_dates=available_dates, time_slots=all_slots, my_appointments=my_appointments)
 
     @app.route('/legal/appointment/book', methods=['POST'])
     def legal_appointment_book():
@@ -3760,6 +3764,13 @@ def register_routes(app):
         )
         db.session.add(appt)
         db.session.commit()
+        # 통벗 일정에도 등록
+        if uid:
+            hour = int(time_slot.split(':')[0]) if ':' in time_slot else 10
+            event_dt = datetime.combine(appt_date, datetime.min.time()).replace(hour=hour)
+            sched = TongBotSchedule(user_id=uid, title=f'법률상담: {title}', description=content, event_date=event_dt)
+            db.session.add(sched)
+            db.session.commit()
         # 담당자에게 이메일 발송
         from services.email_service import EmailService
         EmailService.send('daerilee@gmail.com', f'[법률상담] {title}',
