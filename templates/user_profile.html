@@ -173,13 +173,35 @@
     <div class="card border-0 shadow-sm mb-3" style="border-radius: 18px;">
         <div class="card-header bg-white fw-bold" style="border-radius: 18px 18px 0 0;">📝 작성한 글</div>
         <div class="card-body p-0">
-            <div class="list-group list-group-flush" style="max-height:300px;overflow-y:auto;">
-                {% for p in posts %}
-                <a href="{{ p.url }}" class="list-group-item list-group-item-action small">
-                    <span class="badge bg-info me-1">{{ p.type }}</span>
-                    {{ p.title[:60] }}{% if p.title|length > 60 %}...{% endif %}
-                    <small class="text-muted float-end">{{ p.date }}</small>
-                </a>
+            {% set types = {'꿈꾸기':'💭 꿈꾸기','공유':'📸 공유','바람':'💨 마을바람','법률':'⚖️ 법률'} %}
+            {% for tkey, tlabel in types.items() %}
+            {% set tposts = posts|selectattr('type','equalto',tkey)|list %}
+            {% if tposts %}
+            <div class="px-3 pt-2 small fw-bold text-success">{{ tlabel }} ({{ tposts|length }})</div>
+            <div class="list-group list-group-flush">
+                {% for p in tposts %}
+                <a href="{{ p.url }}" class="list-group-item list-group-item-action small ps-4">{{ p.title[:50] }}{% if p.title|length > 50 %}...{% endif %}<small class="text-muted float-end">{{ p.date }}</small></a>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 사진첩 -->
+    {% if share_images %}
+    <div class="card border-0 shadow-sm mb-3" style="border-radius: 18px;">
+        <div class="card-header bg-white fw-bold" style="border-radius: 18px 18px 0 0;">🖼️ 공유한 사진</div>
+        <div class="card-body p-2">
+            <div class="row g-2">
+                {% for img in share_images %}
+                <div class="col-4 col-md-3">
+                    <a href="{{ img.url }}" class="d-block position-relative">
+                        <img src="{{ img.path }}" class="img-fluid rounded" style="height:120px;object-fit:cover;width:100%;" onerror="this.style.display='none'">
+                        <small class="d-block text-truncate text-muted">{{ img.title or '사진' }}</small>
+                    </a>
+                </div>
                 {% endfor %}
             </div>
         </div>

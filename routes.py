@@ -1994,6 +1994,12 @@ def register_routes(app):
         # 게시글 모음 (위에서 이미 통합됨)
         posts.sort(key=lambda x: x["date"], reverse=True)
         posts = posts[:15]
+        # 공유한 사진
+        share_images = []
+        img_shares = ShareReport.query.filter(ShareReport.user_id == user.id, ShareReport.image_path.isnot(None), ShareReport.image_path != '').order_by(ShareReport.created_at.desc()).limit(12).all()
+        for s in img_shares:
+            if hasattr(s, 'image_path') and s.image_path:
+                share_images.append({'path': s.image_path, 'title': s.title, 'url': f'/share/detail/{s.id}'})
         
         recent_friends = []
         if is_own:
@@ -2022,6 +2028,7 @@ def register_routes(app):
             is_friend=is_friend,
             bot_name=bot_name,
             posts=posts,
+            share_images=share_images,
             curr_location=curr_location,
             recent_friends=recent_friends,
             bot_message=bot_message
