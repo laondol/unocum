@@ -4142,10 +4142,48 @@ def register_routes(app):
         if not msg:
             return jsonify({"error":"메시지 입력"})
         user = User.query.get(uid)
+        # AI 프로텍터: 욕설/비방 필터링
+        blocked = False
+        try:
+            from openai import OpenAI
+            client = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=current_app.config.get('GROQ_API_KEY',''))
+            resp = client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[{"role":"system","content":"다음 채팅 메시지가 욕설,비방,광고성인지 'clean'또는'block'으로만 답변"},{"role":"user","content":msg}],
+                temperature=0, max_tokens=10
+            )
+            if 'block' in resp.choices[0].message.content.lower():
+                blocked = True
+        except:
+            pass
+        if blocked:
+            return jsonify({"status":"blocked","msg":"AI가 부적절한 메시지로 판단했습니다."})
         chat = VillageEventChat(event_id=event_id, user_id=uid, author=user.real_name or user.username, message=msg)
         db.session.add(chat)
         db.session.commit()
         return jsonify({"status":"success"})
+
+    @app.route('/village/event/<int:event_id>/ai-summary', methods=['POST'])
+    def village_event_ai_summary(event_id):
+        if not has_page_access('village'):
+            return jsonify({"error":"권한 없음"}), 403
+        chat = VillageEventChat.query.filter_by(event_id=event_id).order_by(VillageEventChat.created_at.asc()).all()
+        if not chat:
+            return jsonify({"summary":"대화 내용이 없습니다."})
+        messages = '\n'.join([f'{c.author}: {c.message}' for c in chat])
+        try:
+            from openai import OpenAI
+            client = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=current_app.config.get('GROQ_API_KEY',''))
+            resp = client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[{"role":"system","content":"회의 채팅 내용을 주제별로 묶어서 정리해줘. 비슷한 질문은 그룹화하고, 주요 논의사항과 결정사항을 구분해. 마크다운으로."},
+                          {"role":"user","content":messages[:3000]}],
+                temperature=0.5, max_tokens=800
+            )
+            summary = resp.choices[0].message.content
+        except Exception as e:
+            summary = f"요약 실패: {e}"
+        return jsonify({"summary":summary})
 
     @app.route('/village/event/<int:event_id>/role', methods=['POST'])
     def village_event_role(event_id):
