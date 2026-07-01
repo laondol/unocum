@@ -932,6 +932,8 @@ def register_routes(app):
                     source_url=real.get('url', ''),
                     is_ai_generated=False,
                     is_selected=True,
+                    world_admin_approved=False,  # 관리자 승인 대기
+                    world_ai_approved=False,     # AI 검토 대기
                     ai_reason=ai_reason,
                     created_by=session.get('user_id'),
                     source_name=news_source
