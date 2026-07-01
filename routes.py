@@ -1915,7 +1915,26 @@ def register_routes(app):
         is_own = (session.get('user_id') == user.id)
         is_admin = session.get('role') == 'leader'
         bot_name = ''
+        # 회원의 모든 게시글 통합
         posts = []
+        # 꿈꾸기
+        user_posts = Post.query.filter_by(user_id=user.id).order_by(Post.created_at.desc()).all()
+        for p in user_posts:
+            posts.append({'title': p.title, 'date': p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '', 'type': '꿈꾸기', 'url': f'/post/{p.id}', 'id': p.id})
+        # 공유마당
+        user_shares = ShareReport.query.filter_by(user_id=user.id).order_by(ShareReport.created_at.desc()).all()
+        for s in user_shares:
+            posts.append({'title': s.title, 'date': s.created_at.strftime('%Y-%m-%d %H:%M') if s.created_at else '', 'type': '공유', 'url': f'/share/detail/{s.id}', 'id': s.id})
+        # 마을에 바란다
+        user_wishes = VillageWish.query.filter_by(user_id=user.id).order_by(VillageWish.created_at.desc()).all()
+        for w in user_wishes:
+            posts.append({'title': w.content[:50], 'date': w.created_at.strftime('%Y-%m-%d %H:%M') if w.created_at else '', 'type': '바람', 'url': f'/village/my-wishes', 'id': w.id})
+        # 법률/심리 상담
+        legal_posts = LegalPost.query.filter_by(user_id=user.id).order_by(LegalPost.created_at.desc()).all() if hasattr(LegalPost, 'user_id') else []
+        for l in legal_posts:
+            posts.append({'title': l.title, 'date': l.created_at.strftime('%Y-%m-%d %H:%M') if l.created_at else '', 'type': '법률', 'url': f'/legal/post/{l.id}', 'id': l.id})
+        # 정렬
+        posts.sort(key=lambda x: x['date'], reverse=True)
         curr_location = ''
         if is_own or is_admin:
             if user.curr_address:
