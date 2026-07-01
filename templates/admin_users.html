@@ -35,7 +35,7 @@
                         </td>
                         <td>
                             {% if u.role == 'leader' %}<span class="badge bg-primary">책</span>
-                            {% elif u.role == 'admin' %}<span class="badge bg-danger">관</span>{% endif %}
+                            {% elif u.role == 'admin' %}<a href="/admin/page-managers" class="badge bg-danger text-decoration-none">관</a>{% endif %}
                         </td>
                         <td>
                             {% if u.is_verified_resident %}<span class="text-success">✅</span>{% endif %}
