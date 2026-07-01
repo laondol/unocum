@@ -33,6 +33,7 @@ def create_app():
     # Jinja2 커스텀 필터 등록
     import json as _json
     app.jinja_env.filters['fromjson'] = lambda s: _json.loads(s) if s else []
+    app.jinja_env.filters['comma'] = lambda v: f'{int(v or 0):,}'
     from markupsafe import Markup
     app.jinja_env.globals['nip'] = lambda: '닢'
 
