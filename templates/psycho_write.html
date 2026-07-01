@@ -15,11 +15,11 @@
             <div class="row g-2 mb-3">
                 <div class="col-4">
                     <label class="form-label small fw-bold">작성자</label>
-                    <input type="text" name="author_name" class="form-control" placeholder="익명">
+                    <input type="text" name="author_name" class="form-control" value="{{ session.get('real_name','') }}" {{ 'readonly' if session.get('real_name') else '' }} required>
                 </div>
                 <div class="col-4">
                     <label class="form-label small fw-bold">이메일 <span class="text-danger">*</span></label>
-                    <input type="email" name="email" class="form-control" required placeholder="answer@email.com">
+                    <input type="email" name="email" class="form-control" value="{{ session.get('email','') }}" {{ 'readonly' if session.get('email') else '' }} required>
                 </div>
                 <div class="col-4">
                     <label class="form-label small fw-bold">비밀번호 <span class="text-danger">*</span></label>
