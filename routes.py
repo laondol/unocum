@@ -964,6 +964,50 @@ def register_routes(app):
         db.session.commit()
         return redirect(url_for('admin_users'))
 
+    @app.route('/admin/ai-chat')
+    def admin_ai_chat():
+        if session.get('role') not in ['admin', 'leader']:
+            return "권한 부족", 403
+        return render_template('admin_ai_chat.html')
+
+    @app.route('/admin/ai-chat/send', methods=['POST'])
+    def admin_ai_chat_send():
+        if session.get('role') not in ['admin', 'leader']:
+            return jsonify({"error":"권한 부족"}), 403
+        msg = request.json.get('message','').strip()
+        if not msg:
+            return jsonify({"reply":"메시지를 입력하세요."})
+        # 통계 수집
+        user_count = User.query.count()
+        post_count = Post.query.count()
+        report_count = ShareReport.query.count()
+        village_count = User.query.filter(User.managed_pages.contains('village')).count()
+        context = f"현재 함께사는양평 현황: 총 회원 {user_count}명, 꿈꾸기 제안 {post_count}건, 공유마당 신고 {report_count}건, 마을지기 {village_count}명"
+        try:
+            from openai import OpenAI
+            client = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=current_app.config.get('GROQ_API_KEY',''))
+            system_prompt = f"""너는 함께사는양평 커뮤니티 플랫폼의 관리자 AI야. 최고책임자와 관리자를 도와 플랫폼 운영을 지원해.
+{context}
+네 역할:
+1. 회원·게시글·신고·닢 관련 통계 분석 및 조언
+2. 문제 상황 감지 시 해결 방안 제안
+3. 회원이나 통벗에게 전달할 공지·제안 초안 작성
+4. 플랫폼 개선 아이디어 제안
+5. 관리자 질문에 친절하고 전문적으로 답변
+답변은 한국어로, 필요시 마크다운 형식으로 구조화해서 제공해."""
+            resp = client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[
+                    {"role":"system","content":system_prompt},
+                    {"role":"user","content":msg}
+                ],
+                temperature=0.7, max_tokens=1024
+            )
+            reply = resp.choices[0].message.content
+        except Exception as e:
+            reply = f"AI 응답 오류: {str(e)}"
+        return jsonify({"reply": reply})
+
     @app.route('/comment/<int:post_id>', methods=['POST'])
     def add_comment(post_id):
         content = request.form.get('content')
