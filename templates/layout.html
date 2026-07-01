@@ -30,7 +30,7 @@
         <div class="container">
             <a class="navbar-brand d-flex align-items-center" href="/intro">
                 <img src="/static/images/logo.png" alt="양평" height="36" class="me-2">
-                <span class="fw-bold text-success" style="font-size: 1.2rem;">{{ '함께사는로컬' if 'localhost' in request.host or '127.0.0.1' in request.host else ('함께사는테스트' if 'test.unocum.kr' in request.host else '함께사는양평') }}</span>
+                <span class="fw-bold text-success d-none d-lg-inline" style="font-size: 1.2rem;">{{ '함께사는로컬' if 'localhost' in request.host or '127.0.0.1' in request.host else ('함께사는테스트' if 'test.unocum.kr' in request.host else '함께사는양평') }}</span>
                 <div class="d-inline-flex align-items-center ms-2 position-relative" id="navQuick">
                     <button class="btn btn-sm btn-outline-warning px-2 py-0" style="font-size:0.9rem;" onclick="document.getElementById('quickMenu').classList.toggle('d-none')" onmouseenter="document.getElementById('quickMenu').classList.remove('d-none')">⭐</button>
                     <div class="position-absolute bg-white border rounded shadow-sm p-2 d-none" id="quickMenu" style="z-index:1000;min-width:140px;top:100%;left:0;" onmouseleave="this.classList.add('d-none')">
@@ -150,8 +150,8 @@
             {% endfor %}
             <a href="/village" class="text-decoration-none ms-2" title="{{ tooltip_text }}" style="font-size:1.2rem;">🏘️</a>
             {% endif %}
-            <a href="/friends" class="text-decoration-none ms-2" title="벗" id="friendIcon">👥</a>
-            <a href="/message/inbox" class="text-decoration-none ms-2 position-relative" title="쪽지" id="msgIcon" style="display:none;">
+            <a href="/friends" class="text-decoration-none ms-2 d-none d-lg-inline" title="벗" id="friendIcon">👥</a>
+            <a href="/message/inbox" class="text-decoration-none ms-2 position-relative d-none d-lg-inline" title="쪽지" id="msgIcon" style="display:none;">
                 💬
                 <span id="msgBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;font-size:0.6rem;">0</span>
             </a>
