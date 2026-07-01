@@ -3889,11 +3889,13 @@ def register_routes(app):
                 parts = p[3:].split('_')
                 if len(parts) >= 2:
                     ris.append(parts[1])
-        from models import VillageCache
-        vc = VillageCache.query.filter_by(key=f'qr_{uid}').first()
+        # 캐시에 QR 코드 정보 저장
+        vc = VillageCache.query.filter_by(data_type='qr_code').first()
         if not vc:
-            vc = VillageCache(key=f'qr_{uid}')
-        vc.value = f'{code}|{expiry}|{",".join(ris)}'
+            vc = VillageCache(data_type='qr_code')
+        vc.town = str(uid)
+        vc.village = code
+        vc.data_json = f'{{"expiry":{expiry},"ris":{",".join(ris)}}}'
         db.session.add(vc)
         db.session.commit()
         site_url = current_app.config.get('SITE_URL', request.host_url.rstrip('/'))
@@ -4068,19 +4070,20 @@ def register_routes(app):
         if not code:
             return "<script>alert('QR 코드가 필요합니다.'); location.href='/intro';</script>"
         # 캐시에서 정보 조회
-        from models import VillageCache
-        vc = VillageCache.query.filter(VillageCache.value.like(f'{code}|%')).first()
+        vc = VillageCache.query.filter_by(village=code).first()
         if not vc:
             return "<script>alert('만료되었거나 잘못된 QR입니다.'); location.href='/intro';</script>"
-        parts = vc.value.split('|')
-        if len(parts) < 3:
+        import json as _json
+        try:
+            data = _json.loads(vc.data_json or '{}')
+        except:
             return "<script>alert('잘못된 QR 정보입니다.'); location.href='/intro';</script>"
-        expiry = int(parts[1])
+        expiry = data.get('expiry', 0)
         import time
         if time.time() > expiry:
             return "<script>alert('QR 코드가 만료되었습니다. (10분 유효)'); location.href='/intro';</script>"
-        ris = parts[2].split(',') if parts[2] else []
-        caretaker_uid = int(vc.key.split('_')[1]) if vc.key.startswith('qr_') else None
+        ris = data.get('ris','').split(',') if data.get('ris') else []
+        caretaker_uid = int(vc.town) if vc.town and vc.town.isdigit() else None
         caretaker = User.query.get(caretaker_uid) if caretaker_uid else None
 
         if request.method == 'POST':
