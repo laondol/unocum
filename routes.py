@@ -3584,11 +3584,16 @@ def register_routes(app):
                 pw_hash = generate_password_hash(request.form.get('password',''))
             author_name = request.form.get('author_name', '익명') or '익명'
             post = LegalPost(title=title, content=content, password=pw_hash, email=email, author_name=author_name, user_id=uid)
-            ai_res = call_ai_judge(title, content)
-            post.ai_score = ai_res.get('score', 0)
-            post.ai_reason = ai_res.get('reason', '')
-            if ai_res.get('flag', False) or post.ai_score < -20:
-                post.status = 'flagged'
+            try:
+                ai_res = call_ai_judge(title, content)
+                post.ai_score = ai_res.get('score', 0)
+                post.ai_reason = ai_res.get('reason', '')
+                if ai_res.get('flag', False) or post.ai_score < -20:
+                    post.status = 'flagged'
+            except Exception as e:
+                print(f'[AI] legal_write error: {e}')
+                post.ai_score = 0
+                post.status = 'pending'
             if uid:
                 user_obj = User.query.get(uid)
                 if user_obj and (user_obj.points or 0) >= 100:
