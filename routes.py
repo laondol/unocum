@@ -851,7 +851,7 @@ def register_routes(app):
             },
             {
                 'title': '하는일',
-                'pages': {'legal':'법률상담', 'psycho':'심리상담', 'ramp':'경사로'}
+                'pages': {'legal':'법률상담', 'psycho':'심리상담', 'ramp':'휠체어경사로사업'}
             },
             {
                 'title': '제안',
