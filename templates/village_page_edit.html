@@ -1,7 +1,27 @@
 {% extends 'layout.html' %}
 {% block content %}
-<div class="container py-4" style="max-width: 800px;">
-    <h4 class="fw-bold mb-3"><span class="badge bg-success me-2">마</span>{{ page.ri }} 마을 페이지</h4>
+<div class="container py-4" style="max-width: 900px;">
+    <h4 class="fw-bold mb-3"><span class="badge bg-success me-2">마</span>{{ page.ri }} 마을 페이지 편집</h4>
+
+    <!-- 템플릿 선택 -->
+    <div class="card border-0 shadow-sm mb-3" style="border-radius:16px;">
+        <div class="card-body p-3">
+            <h6 class="fw-bold mb-2">🎨 템플릿 선택</h6>
+            <div class="d-flex gap-2 flex-wrap">
+                {% set templates = [
+                    ('basic','📄 기본','<h2>안녕하세요!</h2><p>우리 마을에 오신 것을 환영합니다.</p><p>[gallery]</p><p>[stores]</p><p>[posts]</p>'),
+                    ('gallery','🖼️ 갤러리','<h2>우리 마을 갤러리</h2><p>마을의 아름다운 모습을 공유해 주세요.</p><p>[gallery]</p>'),
+                    ('news','📰 소식','<h2>마을 소식</h2><p>[posts]</p><p>[gallery]</p><p>[stores]</p>'),
+                    ('store','🏪 동네가게','<h2>우리 동네 가게</h2><p>마을의 맛집과 가게들을 소개합니다.</p><p>[stores]</p><p>[gallery]</p>')
+                ] %}
+                {% for tid, tname, tcontent in templates %}
+                <button class="btn btn-sm btn-outline-success" onclick="applyTemplate(`{{ tcontent|e }}`)">{{ tname }}</button>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 편집 폼 -->
     <div class="card border-0 shadow-sm mb-3" style="border-radius:16px;">
         <div class="card-body p-4">
             <form method="post">
@@ -9,16 +29,25 @@
                     <label class="form-label small fw-bold">페이지 제목</label>
                     <input type="text" name="title" class="form-control" value="{{ page.title or '' }}">
                 </div>
-                <div class="mb-3">
-                    <label class="form-label small fw-bold">페이지 내용 (Summernote)</label>
-                    <textarea name="content" class="summernote-editor" placeholder="마을 소식, 공지, 행사 등을 작성하세요...">{{ page.content or '' }}</textarea>
+
+                <!-- 미디어 툴바 -->
+                <div class="d-flex gap-1 mb-2 flex-wrap">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="showGallery()">🖼️ 사진첩</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="insertShortcode('gallery')">📸 [갤러리]</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="insertShortcode('stores')">🏪 [동네가게]</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="insertShortcode('posts')">📝 [마을글]</button>
                 </div>
+
+                <div class="mb-3">
+                    <textarea name="content" id="pageEditor" class="summernote-editor" placeholder="마을 소식, 공지, 행사 등을 작성하세요...">{{ page.content or '' }}</textarea>
+                </div>
+
                 <div class="mb-3">
                     <label class="form-label small fw-bold">공개 설정</label>
-                    <select name="visibility" class="form-select">
-                        <option value="off" {% if page.visibility=='off' %}selected{% endif %}>🔒 비공개 (끄기)</option>
+                    <select name="visibility" class="form-select" style="width:auto;">
+                        <option value="off" {% if page.visibility=='off' %}selected{% endif %}>🔒 비공개</option>
                         <option value="members" {% if page.visibility=='members' %}selected{% endif %}>👥 마을주민만</option>
-                        <option value="public" {% if page.visibility=='public' %}selected{% endif %}>🌐 마을 방문자 모두</option>
+                        <option value="public" {% if page.visibility=='public' %}selected{% endif %}>🌐 전체공개</option>
                     </select>
                 </div>
                 <button type="submit" class="btn btn-success">저장</button>
@@ -26,5 +55,94 @@
             </form>
         </div>
     </div>
+
+    <!-- 사진첩 모달 -->
+    <div class="modal fade" id="galleryModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5>🖼️ 사진첩</h5>
+                    <button class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <ul class="nav nav-tabs mb-2">
+                        <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#galShare">공유마당</a></li>
+                        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#galUpload">📤 업로드</a></li>
+                    </ul>
+                    <div class="tab-content">
+                        <div class="tab-pane fade show active" id="galShare" style="max-height:400px;overflow-y:auto;">
+                            <div class="row g-2" id="shareImages">로딩 중...</div>
+                        </div>
+                        <div class="tab-pane fade" id="galUpload">
+                            <input type="file" id="pageImageUpload" class="form-control" accept="image/*" multiple>
+                            <div class="row g-2 mt-2" id="uploadedImages"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
+                    <button class="btn btn-success" onclick="insertSelectedImages()">선택 삽입</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<script>
+function applyTemplate(html) {
+    if(!confirm('템플릿을 적용하면 현재 내용이 지워집니다. 계속할까요?')) return;
+    $('#pageEditor').summernote('code', html);
+}
+function insertShortcode(type) {
+    $('#pageEditor').summernote('editor.restoreRange');
+    $('#pageEditor').summernote('editor.focus');
+    $('#pageEditor').summernote('editor.insertText', '['+type+']');
+}
+var selectedImages = [];
+function showGallery() {
+    selectedImages = [];
+    document.querySelectorAll('#shareImages .img-select').forEach(e => e.classList.remove('border-success','border-3'));
+    // 공유마당 이미지 로드
+    fetch('/api/village/images?myeon={{ page.myeon }}&ri={{ page.ri }}')
+    .then(r=>r.json()).then(d=>{
+        var html = '';
+        d.images.forEach(function(img,i){
+            html += '<div class="col-3"><img src="'+img+'" class="img-thumbnail img-select" style="cursor:pointer;height:100px;object-fit:cover;width:100%;" onclick="toggleImage(this,\''+img+'\')"></div>';
+        });
+        document.getElementById('shareImages').innerHTML = html || '<div class="col-12 text-muted">이미지 없음</div>';
+    });
+    new bootstrap.Modal(document.getElementById('galleryModal')).show();
+}
+function toggleImage(el, url) {
+    el.classList.toggle('border-success');
+    el.classList.toggle('border-3');
+    if (el.classList.contains('border-success')) {
+        if (!selectedImages.includes(url)) selectedImages.push(url);
+    } else {
+        selectedImages = selectedImages.filter(i => i !== url);
+    }
+}
+function insertSelectedImages() {
+    selectedImages.forEach(function(url){
+        $('#pageEditor').summernote('editor.restoreRange');
+        $('#pageEditor').summernote('editor.focus');
+        $('#pageEditor').summernote('insertImage', url);
+    });
+    bootstrap.Modal.getInstance(document.getElementById('galleryModal')).hide();
+}
+// 업로드 이미지 처리
+document.getElementById('pageImageUpload').addEventListener('change', function(e){
+    var files = e.target.files;
+    var container = document.getElementById('uploadedImages');
+    for (var f of files) {
+        var reader = new FileReader();
+        reader.onload = function(ev){
+            var url = ev.target.result;
+            selectedImages.push(url);
+            container.innerHTML += '<div class="col-3"><img src="'+url+'" class="img-thumbnail border-success border-3" style="height:100px;object-fit:cover;width:100%;"></div>';
+        };
+        reader.readAsDataURL(f);
+    }
+});
+</script>
 {% endblock %}

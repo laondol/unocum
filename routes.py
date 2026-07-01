@@ -4008,7 +4008,27 @@ def register_routes(app):
                     break
         if page.visibility == 'members' and not is_member:
             return "<script>alert('마을 주민만 볼 수 있습니다.'); history.back();</script>"
-        return render_template('village_page_view.html', page=page, is_member=is_member)
+        # 쇼트코드 처리
+        content = page.content or ''
+        # [gallery] → 공유마당 사진
+        if '[gallery]' in content:
+            shares = ShareReport.query.filter(ShareReport.image_path.isnot(None), ShareReport.image_path != '').order_by(ShareReport.created_at.desc()).limit(12).all()
+            imgs = ''.join([f'<div class="col-4 col-md-3 mb-2"><img src="{s.image_path}" class="img-fluid rounded" style="height:150px;object-fit:cover;width:100%;"></div>' for s in shares if s.image_path])
+            gallery_html = f'<div class="row g-2 my-3">{imgs}</div>' if imgs else '<p class="text-muted">갤러리 이미지가 없습니다.</p>'
+            content = content.replace('[gallery]', gallery_html)
+        # [stores] → 동네가게 목록
+        if '[stores]' in content:
+            stores = StoreInfo.query.filter(StoreInfo.is_active == True).order_by(StoreInfo.created_at.desc()).limit(10).all()
+            store_items = ''.join([f'<div class="col-6 mb-2"><div class="card p-2"><strong>{s.name}</strong><br><small>{s.address or ""}</small></div></div>' for s in stores])
+            stores_html = f'<div class="row g-2 my-3">{store_items}</div>' if store_items else '<p class="text-muted">등록된 가게가 없습니다.</p>'
+            content = content.replace('[stores]', stores_html)
+        # [posts] → 마을 게시글
+        if '[posts]' in content:
+            recent_posts = Post.query.filter(Post.total_score > -50).order_by(Post.created_at.desc()).limit(10).all()
+            post_items = ''.join([f'<div class="mb-2"><a href="/post/{p.id}" class="text-decoration-none"><strong>{p.title}</strong></a><br><small class="text-muted">{p.created_at.strftime("%m/%d") if p.created_at else ""} | 👍 {p.like_count or 0}</small></div>' for p in recent_posts])
+            posts_html = f'<div class="my-3">{post_items}</div>' if post_items else '<p class="text-muted">게시글이 없습니다.</p>'
+            content = content.replace('[posts]', posts_html)
+        return render_template('village_page_view.html', page=page, is_member=is_member, content=content)
 
     @app.route('/village/page/toggle', methods=['POST'])
     def village_page_toggle():
@@ -4032,6 +4052,15 @@ def register_routes(app):
         page.visibility = 'off' if page.visibility != 'off' else 'public'
         db.session.commit()
         return jsonify({"status":"success","visibility":page.visibility})
+
+    @app.route('/api/village/images')
+    def village_images():
+        myeon = request.args.get('myeon','')
+        ri = request.args.get('ri','')
+        images = []
+        shares = ShareReport.query.filter(ShareReport.image_path.isnot(None), ShareReport.image_path != '').order_by(ShareReport.created_at.desc()).limit(20).all()
+        images = [s.image_path for s in shares if s.image_path]
+        return jsonify({"images": images})
 
     @app.route('/village/join', methods=['GET','POST'])
     def village_join():
