@@ -3755,7 +3755,116 @@ def register_routes(app):
     def village_admin():
         if not has_page_access('village'):
             return "권한 없음", 403
-        return render_template('village_admin.html')
+        uid = session.get('user_id')
+        user = User.query.get(uid)
+        # 마을지기의 담당 리 목록 추출
+        mp = (user.managed_pages or '').split(',') if user else []
+        village_ris = []
+        for p in mp:
+            if p.startswith('vi_'):
+                parts = p[3:].split('_')
+                if len(parts) >= 2:
+                    village_ris.append({'myeon': parts[0], 'ri': parts[1]})
+        # 리가 없으면 전체 village 쿼리
+        if village_ris:
+            conditions = []
+            for vr in village_ris:
+                conditions.append((User.town == vr['myeon']) & (User.village == vr['ri']))
+            from sqlalchemy import or_
+            village_users = User.query.filter(or_(*conditions)).all() if conditions else []
+            # 마을의 게시글 (제안)
+            village_posts = Post.query.filter(
+                Post.user_id.in_([u.id for u in village_users])
+            ).order_by(Post.created_at.desc()).limit(20).all()
+            # 마을의 공유마당
+            village_shares = ShareReport.query.filter(
+                ShareReport.user_id.in_([u.id for u in village_users])
+            ).order_by(ShareReport.created_at.desc()).limit(20).all()
+            # 마을의 뉴스
+            village_news = NewsArticle.query.filter(
+                NewsArticle.author_id.in_([u.id for u in village_users])
+            ).order_by(NewsArticle.created_at.desc()).limit(10).all()
+        else:
+            village_users = []
+            village_posts = []
+            village_shares = []
+            village_news = []
+        # 마을 전체 회원 (쪽지 발송용)
+        member_count = len(village_users)
+        # 진 인증 회원 목록
+        jin_users = [u for u in village_users if u.is_verified_resident]
+        return render_template('village_admin.html',
+            village_ris=village_ris, village_posts=village_posts,
+            village_shares=village_shares, village_news=village_news,
+            village_users=village_users, jin_users=jin_users,
+            member_count=member_count)
+
+    @app.route('/village/ai-categorize', methods=['POST'])
+    def village_ai_categorize():
+        if not has_page_access('village'):
+            return jsonify({"error":"권한 없음"}), 403
+        content = request.json.get('content','')[:1000]
+        try:
+            from openai import OpenAI
+            client = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=current_app.config.get('GROQ_API_KEY',''))
+            resp = client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[{"role":"system","content":"다음 글을 분석해서 '개인' 또는 '공공'으로 분류하고 한줄 요약해줘. JSON: {\"category\":\"개인\" or \"공공\",\"summary\":\"한줄요약\"}"},
+                          {"role":"user","content":content}],
+                temperature=0.3, max_tokens=200
+            )
+            import json as _json
+            result = _json.loads(resp.choices[0].message.content)
+        except:
+            result = {"category":"공공","summary":content[:50]}
+        return jsonify(result)
+
+    @app.route('/village/edit-post/<int:post_id>', methods=['POST'])
+    def village_edit_post(post_id):
+        if not has_page_access('village'):
+            return jsonify({"error":"권한 없음"}), 403
+        post = Post.query.get_or_404(post_id)
+        post.title = request.form.get('title', post.title)
+        post.content = request.form.get('content', post.content)
+        db.session.commit()
+        return jsonify({"status":"success"})
+
+    @app.route('/village/message-all', methods=['POST'])
+    def village_message_all():
+        if not has_page_access('village'):
+            return jsonify({"error":"권한 없음"}), 403
+        uid = session.get('user_id')
+        user = User.query.get(uid)
+        mp = (user.managed_pages or '').split(',') if user else []
+        village_ris = [p[3:].split('_')[1] for p in mp if p.startswith('vi_') and '_' in p[3:]]
+        subject = request.form.get('subject','')
+        content = request.form.get('content','')
+        if not subject or not content:
+            return jsonify({"error":"제목과 내용을 입력하세요."})
+        from sqlalchemy import or_
+        conditions = [User.village == ri for ri in village_ris]
+        receivers = User.query.filter(User.id != uid, or_(*conditions)).all() if conditions else []
+        count = 0
+        for r in receivers:
+            try:
+                msg = Message(sender_id=uid, sender_name=user.real_name or user.username,
+                    receiver_id=r.id, subject=subject, content=content)
+                db.session.add(msg)
+                count += 1
+            except:
+                pass
+        db.session.commit()
+        return jsonify({"status":"success","msg":f"{count}명에게 쪽지 발송 완료"})
+
+    @app.route('/village/jin-verify/<int:member_id>', methods=['POST'])
+    def village_jin_verify(member_id):
+        if not has_page_access('village'):
+            return jsonify({"error":"권한 없음"}), 403
+        member = User.query.get_or_404(member_id)
+        member.is_verified_resident = True
+        member.jin_verified_at = datetime.now()
+        db.session.commit()
+        return jsonify({"status":"success","msg":f"{member.real_name or member.username}님 진 인증 완료"})
     def legal_issues():
         posts = LegalPost.query.order_by(LegalPost.created_at.desc()).limit(20).all()
         return render_template('labor_board.html', posts=posts)
