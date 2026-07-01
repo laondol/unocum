@@ -70,8 +70,19 @@
         <div class="card-body p-0">
             {% if bot_drafts %}
             <div class="px-3 pt-2 small fw-bold text-success">✍️ 글쓰기 초안</div>
-            {% for d in bot_drafts %}
-            <a href="/user/my?popup=1&tab=write" class="list-group-item list-group-item-action small ps-4">{{ d.title or '제목없음' }} <span class="badge bg-{{ 'success' if d.status=='reviewed' else 'secondary' }}">{{ d.status }}</span><small class="text-muted float-end">{{ d.updated_at.strftime('%m/%d') if d.updated_at else '' }}</small></a>
+            {% set cats = {'share':'공유마당','dream':'꿈꾸기','news':'소식','legal':'법률상담','psycho':'심리상담','village_wish':'마을바람'} %}
+            {% for cat_key, cat_label in cats.items() %}
+            {% set cat_drafts = bot_drafts|selectattr('category','equalto',cat_key)|list %}
+            {% if cat_drafts %}
+            <div class="px-3 small text-muted mt-1">{{ cat_label }} ({{ cat_drafts|length }})</div>
+            {% for d in cat_drafts %}
+            <a href="#" onclick="window.open('/user/my?popup=1&tab=write&draft={{ d.id }}','tongbotPopup','width=700,height=700,left=100,top=50');return false;" class="list-group-item list-group-item-action small ps-4">
+                {{ d.title or '제목없음' }}
+                <span class="badge bg-{{ 'success' if d.status=='reviewed' else 'secondary' }} ms-1">{{ '교정완료' if d.status=='reviewed' else '작성중' }}</span>
+                <small class="text-muted float-end">{{ d.updated_at.strftime('%m/%d') if d.updated_at else '' }}</small>
+            </a>
+            {% endfor %}
+            {% endif %}
             {% endfor %}
             {% endif %}
             {% if bot_memory %}

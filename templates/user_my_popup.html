@@ -436,6 +436,20 @@ document.addEventListener('DOMContentLoaded', function() {
         var tab = document.querySelector('#botTabs .nav-link[data-tab=\"' + tabName + '\"]');
         if (tab) setTimeout(function() { tab.click(); }, 200);
     }
+    // draft 파라미터로 초안 불러오기
+    var draftId = new URLSearchParams(window.location.search).get('draft');
+    if (draftId) {
+        fetch('/api/bot/draft?id='+draftId).then(r=>r.json()).then(d=>{
+            if (d.id) {
+                currentDraftId = d.id;
+                document.getElementById('draftTitle').value = d.title || '';
+                document.getElementById('editor').innerHTML = d.content || '';
+                document.getElementById('draftCategory').value = d.category || '';
+                var tab = document.querySelector('#botTabs .nav-link[data-tab="write"]');
+                if (tab) tab.click();
+            }
+        });
+    }
 });
 </script>
 </body>
