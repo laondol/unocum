@@ -3570,10 +3570,12 @@ def register_routes(app):
             email = request.form['email']
             uid = session.get('user_id')
             if not uid:
-                if not session.get('email_verified_for_legal'):
-                    return "<script>alert('이메일 인증을 먼저 완료해 주세요.'); history.back();</script>"
-                if session.get('verify_email') != email:
-                    return "<script>alert('인증된 이메일과 일치하지 않습니다.'); history.back();</script>"
+                # 로컬 개발환경에서는 이메일 인증 우회
+                if 'localhost' not in request.host and '127.0.0.1' not in request.host:
+                    if not session.get('email_verified_for_legal'):
+                        return "<script>alert('이메일 인증을 먼저 완료해 주세요.'); history.back();</script>"
+                    if session.get('verify_email') != email:
+                        return "<script>alert('인증된 이메일과 일치하지 않습니다.'); history.back();</script>"
             title = request.form['title']
             content = request.form['content']
             if uid:
@@ -4498,10 +4500,11 @@ def register_routes(app):
             email = request.form['email']
             uid = session.get('user_id')
             if not uid:
-                if not session.get('email_verified_for_psycho'):
-                    return "<script>alert('이메일 인증을 먼저 완료해 주세요.'); history.back();</script>"
-                if session.get('verify_email') != email:
-                    return "<script>alert('인증된 이메일과 일치하지 않습니다.'); history.back();</script>"
+                if 'localhost' not in request.host and '127.0.0.1' not in request.host:
+                    if not session.get('email_verified_for_psycho'):
+                        return "<script>alert('이메일 인증을 먼저 완료해 주세요.'); history.back();</script>"
+                    if session.get('verify_email') != email:
+                        return "<script>alert('인증된 이메일과 일치하지 않습니다.'); history.back();</script>"
             title = request.form['title']
             content = request.form['content']
             if uid:
