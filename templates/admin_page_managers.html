@@ -22,14 +22,15 @@
                     </div>
                 </div>
                 <div class="col">
-                    <h5 class="fw-bold mb-0">{{ u.real_name or u.username or '이름없음' }}</h5>
+                    <h5 class="fw-bold mb-0">{{ u.real_name or u.username or '이름없음' }} <span class="badge bg-danger fs-6 ms-1">관</span></h5>
                     <div class="text-muted small">
                         <span class="me-3">ID: {{ u.id }}</span>
                         <span>{{ u.email }}</span>
                     </div>
-                </div>
-                <div class="col-auto">
-                    <span class="badge bg-danger fs-6">관</span>
+                    <div class="small mt-1">
+                        <span class="me-3">📍 {{ u.town or '-' }} {{ u.village or '' }}</span>
+                        {% if u.is_verified_resident %}<span class="badge bg-success">이웃인증</span>{% else %}<span class="badge bg-secondary">미인증</span>{% endif %}
+                    </div>
                 </div>
             </div>
         </div>
