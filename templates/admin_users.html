@@ -45,7 +45,8 @@
                         </td>
                         <td>
                             {% if u.role == 'leader' %}<span class="badge bg-primary">책</span>
-                            {% elif u.role == 'admin' %}<a href="/admin/page-managers?user_id={{ u.id }}" class="badge bg-danger text-decoration-none">관</a>{% endif %}
+                            {% elif u.role == 'admin' %}<a href="/admin/page-managers?user_id={{ u.id }}" class="badge bg-danger text-decoration-none">관</a>
+                            {% else %}<a href="/admin/page-managers?user_id={{ u.id }}" class="text-muted text-decoration-none small">+역할</a>{% endif %}
                         </td>
                         <td>
                             <a href="/message/send/{{ u.id }}" class="btn btn-sm btn-outline-success" title="쪽지">✉️</a>
