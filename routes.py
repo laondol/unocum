@@ -875,6 +875,10 @@ def register_routes(app):
                 'pages': {'village':'마을지기'}
             },
             {
+                'title': '관리',
+                'pages': {'admin_proposals':'누구의꿈(관리)', 'admin_users':'회원관리', 'admin_news':'소식(관리)', 'admin_share':'공유(관리)', 'admin_stores':'동네가게(관리)', 'admin_alerts':'알림(관리)', 'admin_page_managers':'페이지관리자'}
+            },
+            {
                 'title': '기타',
                 'pages': {'schedule':'일정', 'stores':'동네가게', 'news':'소식'}
             },
