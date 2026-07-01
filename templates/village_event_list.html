@@ -1,0 +1,35 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container py-4" style="max-width: 800px;">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="fw-bold mb-0"><span class="badge bg-success me-2">마</span>마을 행사·회의</h4>
+        <a href="/village/event/create" class="btn btn-sm btn-success">+ 새 행사</a>
+    </div>
+
+    {% for e in events %}
+    <a href="/village/event/{{ e.id }}" class="text-decoration-none">
+        <div class="card border-0 shadow-sm mb-2" style="border-radius:12px;">
+            <div class="card-body p-3">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <span class="badge {{ 'bg-info' if e.event_type=='meeting' else 'bg-warning' }} me-1">{{ '회의' if e.event_type=='meeting' else '행사' }}</span>
+                        <strong class="text-dark">{{ e.title }}</strong>
+                    </div>
+                    <small class="text-muted">{{ e.event_date.strftime('%m/%d %H:%M') if e.event_date else '' }}</small>
+                </div>
+                <div class="small text-muted mt-1">
+                    📍 {{ e.location or '미정' }} |
+                    {{ {'upcoming':'예정','ongoing':'진행중','completed':'완료','afterparty':'뒤풀이'}.get(e.status,'') }}
+                </div>
+            </div>
+        </div>
+    </a>
+    {% else %}
+    <div class="text-center py-4 text-muted">등록된 행사/회의가 없습니다.</div>
+    {% endfor %}
+
+    <div class="text-center mt-3">
+        <a href="/village" class="btn btn-sm btn-outline-secondary">&larr; 마을지기</a>
+    </div>
+</div>
+{% endblock %}

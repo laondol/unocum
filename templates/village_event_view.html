@@ -1,0 +1,146 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container py-4" style="max-width: 900px;">
+    <!-- 헤더 -->
+    <div class="card border-0 shadow-sm mb-3" style="border-radius:16px;">
+        <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <span class="badge {{ 'bg-info' if event.event_type=='meeting' else 'bg-warning' }} mb-2">{{ '회의' if event.event_type=='meeting' else '행사' }}</span>
+                    <h4 class="fw-bold">{{ event.title }}</h4>
+                </div>
+                <div class="text-end small text-muted">
+                    <div>{{ event.event_date.strftime('%Y-%m-%d %H:%M') if event.event_date else '' }}</div>
+                    <div>📍 {{ event.location or '미정' }}</div>
+                </div>
+            </div>
+            <p class="mt-2">{{ event.description or '' }}</p>
+            {% if has_page_access('village') %}
+            <div class="d-flex gap-1 mt-2">
+                <button class="btn btn-sm btn-outline-secondary" onclick="setStatus('upcoming')">예정</button>
+                <button class="btn btn-sm btn-outline-primary" onclick="setStatus('ongoing')">진행</button>
+                <button class="btn btn-sm btn-outline-success" onclick="setStatus('completed')">완료</button>
+                <button class="btn btn-sm btn-outline-warning" onclick="setStatus('afterparty')">뒤풀이</button>
+                <span class="ms-2 align-self-center small text-muted">현재: {{ event.status }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <!-- 왼쪽: 영상 + 채팅 -->
+        <div class="col-md-8">
+            {% if event.video_url %}
+            <div class="ratio ratio-16x9 mb-3" style="border-radius:12px;overflow:hidden;">
+                <iframe src="{{ event.video_url|replace('watch?v=','embed/') }}" allowfullscreen></iframe>
+            </div>
+            {% endif %}
+
+            <!-- 채팅 -->
+            <div class="card border-0 shadow-sm mb-3" style="border-radius:12px;">
+                <div class="card-header bg-white fw-bold small">💬 대화</div>
+                <div id="chatBox" class="card-body p-2" style="max-height:300px;overflow-y:auto;">
+                    {% for c in chat %}
+                    <div class="mb-1 small"><strong>{{ c.author }}</strong>: {{ c.message }}</div>
+                    {% endfor %}
+                </div>
+                <div class="card-footer bg-white p-2">
+                    <div class="input-group input-group-sm">
+                        <input type="text" id="chatInput" class="form-control" placeholder="메시지..." onkeypress="if(event.key==='Enter')sendChat()">
+                        <button class="btn btn-success" onclick="sendChat()">전송</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 오른쪽: 참석 + 동의 + 역할 -->
+        <div class="col-md-4">
+            <!-- 로그인/동의 -->
+            {% if not session.get('user_id') %}
+            <div class="card border-0 shadow-sm mb-3" style="border-radius:12px;">
+                <div class="card-body p-3">
+                    <p class="small mb-2">참석하려면 로그인이 필요합니다.</p>
+                    <a href="/login?next=/village/event/{{ event.id }}" class="btn btn-sm btn-success w-100">로그인</a>
+                </div>
+            </div>
+            {% elif not attendee or not attendee.consented %}
+            <div class="card border-0 shadow-sm mb-3" style="border-radius:12px;background:#fff8e1;">
+                <div class="card-body p-3">
+                    <h6 class="fw-bold mb-2">정보 제공 동의</h6>
+                    <p class="small text-muted">이메일·이름·주소를 마을지기에게 공유합니다.</p>
+                    <form id="consentForm">
+                        {% if not attendee %}
+                        <input type="email" name="email" class="form-control form-control-sm mb-1" placeholder="이메일" value="{{ session.get('email','') }}" required>
+                        <input type="text" name="name" class="form-control form-control-sm mb-2" placeholder="이름">
+                        {% endif %}
+                        <input type="hidden" name="consented" value="true">
+                        <button type="submit" class="btn btn-sm btn-success w-100">동의하고 참석하기</button>
+                    </form>
+                    <button class="btn btn-sm btn-outline-secondary w-100 mt-1" onclick="joinNoConsent()">동의 없이 참석만</button>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- 참석자 목록 -->
+            <div class="card border-0 shadow-sm" style="border-radius:12px;">
+                <div class="card-header bg-white fw-bold small">👥 참석자 ({{ attendees|length }})</div>
+                <div class="card-body p-0">
+                    <div style="max-height:300px;overflow-y:auto;">
+                        {% for a in attendees %}
+                        <div class="p-2 border-bottom small">
+                            <div class="d-flex justify-content-between">
+                                <strong>{{ a.name or a.email or '익명' }}</strong>
+                                <span>{{ {'pending':'대기','confirmed':'참석','attended':'출석','absent':'불참'}.get(a.status,'') }}</span>
+                            </div>
+                            {% if a.consented and a.email %}<div class="text-muted">{{ a.email }}</div>{% endif %}
+                            {% if has_page_access('village') %}
+                            <div class="d-flex gap-1 mt-1">
+                                <input type="text" class="form-control form-control-sm" placeholder="역할" value="{{ a.role or '' }}" onchange="setRole({{ a.id }},this.value)">
+                                <button class="btn btn-sm btn-outline-success py-0" onclick="markAttend({{ a.id }},'attended')">✅</button>
+                                <button class="btn btn-sm btn-outline-danger py-0" onclick="markAttend({{ a.id }},'absent')">❌</button>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function sendChat() {
+    var msg = document.getElementById('chatInput').value.trim();
+    if (!msg) return;
+    var fd = new FormData();
+    fd.append('message', msg);
+    fetch('/village/event/{{ event.id }}/chat', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+        if(d.status==='success') { document.getElementById('chatInput').value=''; location.reload(); }
+    });
+}
+document.getElementById('consentForm')?.addEventListener('submit', function(e){
+    e.preventDefault();
+    var fd = new FormData(this);
+    fetch('/village/event/{{ event.id }}/join', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{location.reload();});
+});
+function joinNoConsent() {
+    var fd = new FormData();
+    fd.append('consented','false');
+    fd.append('email', '{{ session.get("email","") }}');
+    fetch('/village/event/{{ event.id }}/join', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{location.reload();});
+}
+function setRole(aid, role) {
+    var fd = new FormData(); fd.append('attendee_id',aid); fd.append('role',role);
+    fetch('/village/event/{{ event.id }}/role', {method:'POST',body:fd});
+}
+function markAttend(aid, status) {
+    var fd = new FormData(); fd.append('status',status);
+    fetch('/village/event/{{ event.id }}/attend/'+aid, {method:'POST',body:fd}).then(r=>r.json()).then(d=>{location.reload();});
+}
+function setStatus(status) {
+    var fd = new FormData(); fd.append('status',status);
+    fetch('/village/event/{{ event.id }}/status', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{location.reload();});
+}
+</script>
+{% endblock %}

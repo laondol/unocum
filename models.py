@@ -521,6 +521,43 @@ class AiKnowledge(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
 
+class VillageEvent(db.Model):
+    __tablename__ = 'village_event'
+    id = db.Column(db.Integer, primary_key=True)
+    myeon = db.Column(db.String(20))
+    ri = db.Column(db.String(20))
+    title = db.Column(db.String(200), nullable=False)
+    event_type = db.Column(db.String(20), default='meeting')  # meeting, activity
+    description = db.Column(db.Text)
+    location = db.Column(db.String(200))
+    video_url = db.Column(db.String(500))
+    event_date = db.Column(db.DateTime)
+    status = db.Column(db.String(20), default='upcoming')  # upcoming, ongoing, completed, afterparty
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+
+class VillageEventAttendee(db.Model):
+    __tablename__ = 'village_event_attendee'
+    id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(db.Integer, db.ForeignKey('village_event.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    email = db.Column(db.String(100))
+    name = db.Column(db.String(50))
+    consented = db.Column(db.Boolean, default=False)
+    role = db.Column(db.String(50))
+    status = db.Column(db.String(20), default='pending')  # pending, confirmed, attended, absent
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+class VillageEventChat(db.Model):
+    __tablename__ = 'village_event_chat'
+    id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(db.Integer, db.ForeignKey('village_event.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    author = db.Column(db.String(50))
+    message = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
 class VillagePage(db.Model):
     __tablename__ = 'village_page'
     id = db.Column(db.Integer, primary_key=True)

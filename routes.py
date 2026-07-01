@@ -6,7 +6,7 @@ from sqlalchemy import or_
 from urllib.parse import quote
 import json, base64, os, threading, requests
 
-from models import db, User, Post, Comment, NewsArticle, NewsComment, NewsRecommendation, NewsVote, PointHistory, ShareReport, Message, ShareComment, ConstructionNotice, VillageAlert, HeritageStamp, TongBot, TongBotDraft, TongBotSchedule, ChatRoom, ChatMessage, VillageCache, LegalPost, LegalAppointment, LawyerSchedule, GoogleCalendarConfig, PsychoPost, PsychoAppointment, PsychoDoctorSchedule, PsychoGoogleCalendarConfig, RampApplication, Friend, FriendGroup, PostVote, StoreInfo, AiKnowledge, VillagePage
+from models import db, User, Post, Comment, NewsArticle, NewsComment, NewsRecommendation, NewsVote, PointHistory, ShareReport, Message, ShareComment, ConstructionNotice, VillageAlert, HeritageStamp, TongBot, TongBotDraft, TongBotSchedule, ChatRoom, ChatMessage, VillageCache, LegalPost, LegalAppointment, LawyerSchedule, GoogleCalendarConfig, PsychoPost, PsychoAppointment, PsychoDoctorSchedule, PsychoGoogleCalendarConfig, RampApplication, Friend, FriendGroup, PostVote, StoreInfo, AiKnowledge, VillagePage, VillageEvent, VillageEventAttendee, VillageEventChat
 from services.oauth import oauth
 from services.security import save_village_file
 from services.ai_service import call_ai_judge, call_ai_debate, background_ai_judge, moderate_image, background_process_share
@@ -4054,6 +4054,127 @@ def register_routes(app):
         page.visibility = 'off' if page.visibility != 'off' else 'public'
         db.session.commit()
         return jsonify({"status":"success","visibility":page.visibility})
+
+    @app.route('/village/events')
+    def village_events():
+        if not has_page_access('village'):
+            return "권한 없음", 403
+        uid = session.get('user_id')
+        user = User.query.get(uid)
+        mp = (user.managed_pages or '').split(',') if user else []
+        myeon = ri = None
+        for p in mp:
+            if p.startswith('vi_'):
+                parts = p[3:].split('_')
+                if len(parts) >= 2:
+                    myeon, ri = parts[0], parts[1]; break
+        events = VillageEvent.query.filter_by(myeon=myeon, ri=ri).order_by(VillageEvent.event_date.desc()).all()
+        return render_template('village_event_list.html', events=events, myeon=myeon, ri=ri)
+
+    @app.route('/village/event/create', methods=['GET','POST'])
+    def village_event_create():
+        if not has_page_access('village'):
+            return "권한 없음", 403
+        uid = session.get('user_id')
+        user = User.query.get(uid)
+        mp = (user.managed_pages or '').split(',') if user else []
+        myeon = ri = None
+        for p in mp:
+            if p.startswith('vi_'):
+                parts = p[3:].split('_')
+                if len(parts) >= 2:
+                    myeon, ri = parts[0], parts[1]; break
+        if request.method == 'POST':
+            ev = VillageEvent(
+                myeon=myeon, ri=ri,
+                title=request.form['title'],
+                event_type=request.form.get('event_type','meeting'),
+                description=request.form.get('description',''),
+                location=request.form.get('location',''),
+                video_url=request.form.get('video_url',''),
+                event_date=datetime.strptime(request.form['event_date'],'%Y-%m-%dT%H:%M') if request.form.get('event_date') else datetime.now(),
+                created_by=uid
+            )
+            db.session.add(ev)
+            db.session.commit()
+            return redirect(url_for('village_event_view', event_id=ev.id))
+        return render_template('village_event_create.html', myeon=myeon, ri=ri)
+
+    @app.route('/village/event/<int:event_id>')
+    def village_event_view(event_id):
+        ev = VillageEvent.query.get_or_404(event_id)
+        uid = session.get('user_id')
+        attendee = None
+        if uid:
+            attendee = VillageEventAttendee.query.filter_by(event_id=event_id, user_id=uid).first()
+        chat = VillageEventChat.query.filter_by(event_id=event_id).order_by(VillageEventChat.created_at.asc()).limit(50).all()
+        attendees = VillageEventAttendee.query.filter_by(event_id=event_id).all()
+        return render_template('village_event_view.html', event=ev, attendee=attendee, chat=chat, attendees=attendees)
+
+    @app.route('/village/event/<int:event_id>/join', methods=['POST'])
+    def village_event_join(event_id):
+        ev = VillageEvent.query.get_or_404(event_id)
+        uid = session.get('user_id')
+        consented = request.form.get('consented') == 'true'
+        email = request.form.get('email','').strip()
+        name = request.form.get('name','').strip()
+        attendee = None
+        if uid:
+            attendee = VillageEventAttendee.query.filter_by(event_id=event_id, user_id=uid).first()
+        elif email:
+            attendee = VillageEventAttendee.query.filter_by(event_id=event_id, email=email).first()
+        if not attendee:
+            attendee = VillageEventAttendee(event_id=event_id, user_id=uid, email=email, name=name, consented=consented)
+            db.session.add(attendee)
+        else:
+            attendee.consented = consented
+            attendee.email = email or attendee.email
+            attendee.name = name or attendee.name
+        db.session.commit()
+        return jsonify({"status":"success","consented":attendee.consented})
+
+    @app.route('/village/event/<int:event_id>/chat', methods=['POST'])
+    def village_event_chat(event_id):
+        uid = session.get('user_id')
+        if not uid:
+            return jsonify({"error":"로그인 필요"}), 401
+        msg = request.form.get('message','').strip()
+        if not msg:
+            return jsonify({"error":"메시지 입력"})
+        user = User.query.get(uid)
+        chat = VillageEventChat(event_id=event_id, user_id=uid, author=user.real_name or user.username, message=msg)
+        db.session.add(chat)
+        db.session.commit()
+        return jsonify({"status":"success"})
+
+    @app.route('/village/event/<int:event_id>/role', methods=['POST'])
+    def village_event_role(event_id):
+        if not has_page_access('village'):
+            return jsonify({"error":"권한 없음"}), 403
+        attendee_id = request.form.get('attendee_id', type=int)
+        role = request.form.get('role','').strip()
+        att = VillageEventAttendee.query.get_or_404(attendee_id)
+        att.role = role
+        db.session.commit()
+        return jsonify({"status":"success"})
+
+    @app.route('/village/event/<int:event_id>/status', methods=['POST'])
+    def village_event_status(event_id):
+        if not has_page_access('village'):
+            return jsonify({"error":"권한 없음"}), 403
+        ev = VillageEvent.query.get_or_404(event_id)
+        ev.status = request.form.get('status', ev.status)
+        db.session.commit()
+        return jsonify({"status":"success"})
+
+    @app.route('/village/event/<int:event_id>/attend/<int:attendee_id>', methods=['POST'])
+    def village_event_attend(event_id, attendee_id):
+        if not has_page_access('village'):
+            return jsonify({"error":"권한 없음"}), 403
+        att = VillageEventAttendee.query.get_or_404(attendee_id)
+        att.status = request.form.get('status', 'confirmed')
+        db.session.commit()
+        return jsonify({"status":"success"})
 
     @app.route('/api/village/images')
     def village_images():
