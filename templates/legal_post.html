@@ -21,7 +21,11 @@
             <div class="small text-muted mb-3">
                 {{ post.author_name or '익명' }} | {{ post.created_at.strftime('%Y-%m-%d %H:%M') }}
                 {% if post.is_public %}<span class="badge bg-info ms-2">공개</span>{% endif %}
+                {% if post.status == 'flagged' %}<span class="badge bg-warning ms-1">검토필요</span>{% endif %}
             </div>
+            {% if session.get('user_id') and (post.user_id == session.get('user_id') or session.get('role') in ('admin','leader')) %}
+            <a href="/legal/post/{{ post.id }}/edit" class="btn btn-sm btn-outline-secondary mb-2">✏️ 수정</a>
+            {% endif %}
             <hr>
             <div class="mb-4" style="line-height: 1.8;">{{ post.content|safe }}</div>
 
