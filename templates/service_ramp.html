@@ -43,104 +43,11 @@
     {% endif %}
 
     <!-- 경사로 신청 폼 -->
-    <div class="card border-0 shadow-sm mb-4" style="border-radius: 16px;">
-        <div class="card-body p-4">
-            <h5 class="fw-bold mb-3">📝 경사로 설치 신청</h5>
-
-            <!-- cum님의 경사로 소개 -->
-            <div class="alert alert-info py-3" style="border-left: 4px solid #0dcaf0;">
-                <h6 class="fw-bold">💡 cum님의 접이식 경사로 아이디어</h6>
-                <div class="small" style="line-height:1.7;">
-                골목상권에 경사로 놓기가 불편하시죠. 턱 앞에 바로 도로라서 경사로 놓으면 보행로나 차로에 불법설치물로 신고가 들어오고 참 어려우셨을 거라 생각합니다.<br><br>
-                그래서 <strong>접이식 경사로</strong>를 만들어서 설치해 드리려고 합니다. 위에 광고판도 들어가요 😊 펼쳤을 때도 광고는 들어갈 예정입니다. 그래도 휠체어 타신 분들이 편하게 가게에 들어오시면 좋잖아요. 함께사는 세상이 되는 거 같습니다.<br><br>
-                제작은 모두 <strong>맞춤 제작</strong>입니다. 신청하시면 설치 현장 가서 치수를 재고 제작해서 현장에서 시멘트 양생하고, 접히는 부분은 <strong>녹 안 쓰는 철</strong>로 제작해 조립해 드립니다.<br><br>
-                양생이 하루 걸려서 이틀 정도 불편하실 수 있습니다. 최소 하루는 영업이 어려우실 거예요. 바닥에 고정하는 방식이라 <strong>사고는 나지 않습니다.</strong> 그래서 철거가 어렵습니다. 감안해서 신청해 주세요. 위에 덮개는 성인 남자라면 누구나 쉽게 열고 닫을 수 있습니다.
-                </div>
-            </div>
-
-            <form method="post" action="/service/ramp/apply" enctype="multipart/form-data">
-                <div class="row g-2 mb-3">
-                    <div class="col-6">
-                        <label class="form-label small fw-bold">신청인 이름</label>
-                        <input type="text" name="name" class="form-control" required>
-                    </div>
-                    <div class="col-6">
-                        <label class="form-label small fw-bold">연락처</label>
-                        <input type="tel" name="phone" class="form-control" required placeholder="010-1234-5678">
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label small fw-bold">이메일 <span class="text-danger">*</span></label>
-                    <input type="email" name="email" id="rampEmail1" class="form-control" value="{{ session.get('email','') }}" required {{ 'readonly' if session.get('email') else '' }}>
-                    <div class="form-text">접수 확인 메일이 발송됩니다.</div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label small fw-bold">상점 위치 (주소)</label>
-                    <input type="text" name="location" class="form-control" required placeholder="경기도 양평군 ...">
-                </div>
-                <div class="mb-3">
-                    <label class="form-label small fw-bold">가게 정면 사진</label>
-                    <input type="file" name="photo" class="form-control form-control-sm" accept="image/*" capture="environment">
-                </div>
-                <div class="mb-3">
-                    <label class="form-label small fw-bold">턱 높이</label>
-                    <div class="row g-2">
-                        <div class="col-4">
-                            <select name="step_height" class="form-select" required>
-                                <option value="">선택</option>
-                                <option value="5cm 미만">5cm 미만</option>
-                                <option value="5~10cm">5~10cm</option>
-                                <option value="10~15cm">10~15cm</option>
-                                <option value="15~20cm">15~20cm</option>
-                                <option value="20cm 이상">20cm 이상</option>
-                            </select>
-                        </div>
-                        <div class="col-8">
-                            <input type="text" name="step_detail" class="form-control" placeholder="상세 설명 (선택)">
-                        </div>
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label small fw-bold">점포 구분</label>
-                    <div class="d-flex gap-3">
-                        <div class="form-check">
-                            <input type="radio" name="ownership" value="자가" class="form-check-input" id="own" required>
-                            <label class="form-check-label" for="own">자가 (내 상점)</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="radio" name="ownership" value="임대" class="form-check-input" id="rent" required>
-                            <label class="form-check-label" for="rent">임대</label>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 임대 시 주의사항 -->
-                <div class="alert alert-warning py-2 small" id="rentNotice" style="display:none;">
-                    <strong>⚠️ 임대 점포 주의사항</strong>
-                    <ul class="mb-0 mt-1">
-                        <li>임대 점포의 경우 경사로 철거가 <strong>불가</strong>할 수 있습니다.</li>
-                        <li>상품 손상 시 일정 부분 <strong>변상</strong>이 필요할 수 있습니다.</li>
-                        <li>철거 시 반드시 사전 연락해야 하며, 이에 <strong>서명</strong>하셔야 합니다.</li>
-                    </ul>
-                </div>
-
-                <div class="card p-3 mb-3 border-0" style="background-color: #fff8e1;">
-                    <div class="form-check mb-2">
-                        <input type="checkbox" name="agree_removal" class="form-check-input" id="agreeRemoval" required>
-                        <label class="form-check-label small" for="agreeRemoval">
-                            철거 시 사전 연락 후 진행하는 것에 동의하며, 철거가 불가할 수 있음을 인지합니다. <span class="text-danger">(서명 필수)</span>
-                        </label>
-                    </div>
-                    <div class="form-check">
-                        <input type="checkbox" name="agree_damage" class="form-check-input" id="agreeDamage" required>
-                        <label class="form-check-label small" for="agreeDamage">
-                            상품 손상 시 일정 부분 변상 규정을 이해하고 동의합니다.
-                        </label>
-                    </div>
-                </div>
-
-                <button type="submit" class="btn btn-success w-100 py-2 fw-bold">신청하기</button>
-            </form>
+    <div class="card border-0 shadow-sm mb-4" style="border-radius: 16px; background-color: #fff8e1;">
+        <div class="card-body p-4 text-center">
+            <div style="font-size: 48px;">📅</div>
+            <h5 class="fw-bold mt-3">한달 후부터 신청 받습니다</h5>
+            <p class="text-muted mb-0">준비 중이오니 잠시만 기다려 주세요.</p>
         </div>
     </div>
 
