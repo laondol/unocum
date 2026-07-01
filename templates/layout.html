@@ -45,7 +45,7 @@
                 <div class="d-inline-flex align-items-center ms-1 position-relative" id="villageIconWrap">
                     <a href="/village" class="text-decoration-none" title="{{ tooltip_text }}" style="font-size:1.2rem;" onclick="event.preventDefault();document.getElementById('villageMenu').classList.toggle('d-none')">🏘️</a>
                     <div class="position-absolute bg-white border rounded shadow-sm p-2 d-none" id="villageMenu" style="z-index:1050;min-width:130px;top:100%;left:0;">
-                        <a class="d-block small py-1 px-2 text-dark text-decoration-none rounded" href="/village">📝 봉사페이지</a>
+                        <a class="d-block small py-1 px-2 text-dark text-decoration-none rounded" href="/village">📝 홍보</a>
                         {% set mp2 = session.get('managed_pages','') %}{% set myeon = '' %}{% set ri2 = '' %}{% for vp in mp2.split(',') %}{% if vp.startswith('vi_') %}{% set parts = vp[3:].split('_') %}{% set myeon = parts[0] %}{% set ri2 = parts[1] %}{% endif %}{% endfor %}
                         <a class="d-block small py-1 px-2 text-dark text-decoration-none rounded" href="/village/view/{{ myeon }}/{{ ri2 }}">📖 마을소개</a>
                     </div>

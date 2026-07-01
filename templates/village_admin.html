@@ -2,7 +2,7 @@
 {% block content %}
 <div class="container py-4" style="max-width: 900px;">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="fw-bold mb-0"><span class="badge bg-success me-2">마</span>마을지기</h4>
+        <h4 class="fw-bold mb-0"><span class="badge bg-success me-2">마</span>봉사</h4>
         <div class="d-flex gap-2">
             <span class="text-muted small align-self-center">담당: {{ village_ris|map(attribute='ri')|join(', ') or '미지정' }}</span>
             <span class="text-muted small align-self-center">회원 {{ member_count }}명</span>
@@ -15,7 +15,7 @@
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabMembers">👥 마을회원</a></li>
         <li class="nav-item"><a class="nav-link" href="/village/events">📅 행사</a></li>
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabMessage">✉️ 전체쪽지</a></li>
-        <li class="nav-item"><a class="nav-link" href="/village/page">📝 봉사페이지</a></li>
+        <li class="nav-item"><a class="nav-link" href="/village/page">📝 홍보</a></li>
         <li class="nav-item"><a class="nav-link" href="/village/qr">📱 QR초대</a></li>
     </ul>
 
