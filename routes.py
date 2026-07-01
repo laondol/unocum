@@ -85,12 +85,18 @@ def register_routes(app):
             system_prompt = f"""너는 함께사는양평의 '양평AI'야. 경기도 양평군 주민 커뮤니티 플랫폼에 상주하는 AI 도우미로, 누구나 편하게 대화할 수 있어.
 {context}
 네 역할:
-1. 양평군 생활 정보·관공서·축제·날씨·교통 관련 질문에 답변
-2. 함께사는양평 플랫폼 이용 방법 안내 (꿈꾸기, 공유마당, 법률상담, 심리상담, 경사로사업, 마을지기 등)
+1. 양평군 생활 정보·관공서·축제·날씨·교통 관련 질문에 답변 (반드시 사실에 근거, 모르면 모른다고 솔직히 말하기)
+2. 함께사는양평 플랫폼 이용 방법 안내
 3. 일상 대화와 고민 상담 (친근하고 따뜻한 말투)
-4. 필요한 경우 적절한 게시판이나 서비스로 안내
-5. 비회원에게는 가입을 권유하고 플랫폼의 장점 소개
-말투는 반말 쓰지 말고 ~요, ~입니다 체로 자연스럽게 대화해. 이모지는 가끔만 써. 한국어로 답변해."""
+4. 대화 중 자연스럽게 "양평에서 좋았던 경험"이나 "불편했던 점"을 물어보기
+5. 불편·불만을 말하는 분께 "개선 아이디어가 있으면 꿈꾸기(/main)에 제안해 보세요"라고 권유
+6. 필요한 경우 적절한 게시판이나 서비스로 안내
+7. 비회원에게는 가입을 권유하고 플랫폼의 장점 소개
+절대 금지사항:
+- 모르는 정보를 지어내지 않기. 확실하지 않으면 "그 부분은 잘 모르겠어요. 관공서에 문의해 보시는 게 좋을 것 같아요"라고 말하기
+- 정치적·종교적 논쟁에 휘말리지 않기
+- 개인정보 수집하지 않기
+말투는 반말 쓰지 말고 ~요, ~입니다 체로 자연스럽게. 이모지는 가끔만 써. 한국어로 답변해."""
             resp = client.chat.completions.create(
                 model="llama-3.1-8b-instant",
                 messages=[
@@ -102,6 +108,21 @@ def register_routes(app):
             reply = resp.choices[0].message.content
         except Exception as e:
             reply = f"죄송합니다, 일시적인 오류가 발생했습니다: {str(e)}"
+        # 불편·불만 자동 감지 → 관리자 피드백 저장
+        complaint_kw = ['불편','불만','문제','고쳐','아쉽','힘들','짜증','화나','답답','민원','건의']
+        if any(kw in msg for kw in complaint_kw):
+            try:
+                alert = VillageAlert(
+                    title=f'AI대화 민원: {msg[:40]}',
+                    content=f'사용자: {msg}\n\nAI답변: {reply[:300]}',
+                    alert_type='ai_feedback',
+                    urgency='normal',
+                    author_name=session.get('real_name') or session.get('username') or '익명'
+                )
+                db.session.add(alert)
+                db.session.commit()
+            except:
+                pass
         return jsonify({"reply": reply})
 
     @app.route('/presentation')
@@ -1051,6 +1072,13 @@ def register_routes(app):
         except Exception as e:
             reply = f"AI 응답 오류: {str(e)}"
         return jsonify({"reply": reply})
+
+    @app.route('/admin/ai-feedback')
+    def admin_ai_feedback():
+        if session.get('role') not in ['admin', 'leader']:
+            return "권한 부족", 403
+        feedbacks = VillageAlert.query.filter_by(alert_type='ai_feedback').order_by(VillageAlert.created_at.desc()).limit(50).all()
+        return render_template('admin_ai_feedback.html', feedbacks=feedbacks)
 
     @app.route('/comment/<int:post_id>', methods=['POST'])
     def add_comment(post_id):

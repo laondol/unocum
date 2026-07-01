@@ -1,0 +1,33 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container py-4" style="max-width: 800px;">
+    <nav aria-label="breadcrumb" style="font-size: 12pt;">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/intro" class="text-decoration-none text-secondary">관리</a></li>
+            <li class="breadcrumb-item active fw-bold">AI 피드백</li>
+        </ol>
+    </nav>
+    <h5 class="fw-bold mb-3">🤖 양평AI 민원·피드백</h5>
+
+    {% for f in feedbacks %}
+    <div class="card border-0 shadow-sm mb-2" style="border-radius:12px;">
+        <div class="card-body p-3">
+            <div class="d-flex justify-content-between">
+                <strong>{{ f.title }}</strong>
+                <small class="text-muted">{{ f.created_at.strftime('%m/%d %H:%M') if f.created_at else '' }}</small>
+            </div>
+            <div class="small text-muted mt-1">
+                {{ f.author_name or '익명' }}
+            </div>
+            <div class="mt-2 small" style="white-space:pre-wrap;">{{ f.content or '' }}</div>
+        </div>
+    </div>
+    {% else %}
+    <div class="text-center py-4 text-muted">아직 수집된 피드백이 없습니다.</div>
+    {% endfor %}
+
+    <div class="text-center mt-3">
+        <a href="/admin" class="btn btn-sm btn-outline-secondary">&larr; 관리 메뉴</a>
+    </div>
+</div>
+{% endblock %}
