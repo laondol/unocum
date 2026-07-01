@@ -3583,12 +3583,20 @@ def register_routes(app):
             else:
                 pw_hash = generate_password_hash(request.form.get('password',''))
             author_name = request.form.get('author_name', '익명') or '익명'
+            # 중복글 방지 (같은 제목+내용 10분 이내)
+            dup = LegalPost.query.filter(
+                LegalPost.email == email,
+                LegalPost.title == title,
+                LegalPost.created_at >= datetime.now() - timedelta(minutes=10)
+            ).first()
+            if dup:
+                return "<script>alert('같은 내용의 글이 이미 등록되어 있습니다.'); history.back();</script>"
             post = LegalPost(title=title, content=content, password=pw_hash, email=email, author_name=author_name, user_id=uid)
             try:
                 ai_res = call_ai_judge(title, content)
                 post.ai_score = ai_res.get('score', 0)
                 post.ai_reason = ai_res.get('reason', '')
-                if ai_res.get('flag', False) or post.ai_score < -20:
+                if post.ai_score < -20:
                     post.status = 'flagged'
             except Exception as e:
                 print(f'[AI] legal_write error: {e}')
