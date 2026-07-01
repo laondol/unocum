@@ -3550,7 +3550,7 @@ def register_routes(app):
 
     # --- [법률상담 게시판] ---
     @app.route('/legal/list')
-     def legal_list():
+    def legal_list():
          uid = session.get('user_id')
          role = session.get('role','')
          if role in ('admin','leader'):
@@ -4479,18 +4479,18 @@ def register_routes(app):
 
     # --- [심리상담소] ---
     @app.route('/psycho/list')
-     def psycho_list():
-         uid = session.get('user_id')
-         role = session.get('role','')
-         if role in ('admin','leader'):
-             posts = PsychoPost.query.order_by(PsychoPost.created_at.desc()).all()
-         elif uid:
-             posts = PsychoPost.query.filter(
-                 (PsychoPost.user_id == uid) | (PsychoPost.user_id == None)
-             ).order_by(PsychoPost.created_at.desc()).all()
-         else:
-             posts = PsychoPost.query.filter(PsychoPost.user_id == None).order_by(PsychoPost.created_at.desc()).all()
-         return render_template('psycho_board.html', posts=posts)
+    def psycho_list():
+        uid = session.get('user_id')
+        role = session.get('role','')
+        if role in ('admin','leader'):
+            posts = PsychoPost.query.order_by(PsychoPost.created_at.desc()).all()
+        elif uid:
+            posts = PsychoPost.query.filter(
+                (PsychoPost.user_id == uid) | (PsychoPost.user_id == None)
+            ).order_by(PsychoPost.created_at.desc()).all()
+        else:
+            posts = PsychoPost.query.filter(PsychoPost.user_id == None).order_by(PsychoPost.created_at.desc()).all()
+        return render_template('psycho_board.html', posts=posts)
 
     @app.route('/psycho/write', methods=['GET', 'POST'])
     def psycho_write():
