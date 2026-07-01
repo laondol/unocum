@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: yp_postgres
+    environment:
+      POSTGRES_USER: yp_dev
+      POSTGRES_PASSWORD: yp_dev_pass_2026
+      POSTGRES_DB: yp_local
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: yp_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@unocum.kr
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+volumes:
+  pgdata:

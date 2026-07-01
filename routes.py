@@ -252,9 +252,12 @@ def register_routes(app):
         db.session.commit()
         reset_url = url_for('reset_password_confirm', token=token, _external=True)
         from services.email_service import EmailService
-        EmailService.send(email, '[양평마을] 비밀번호 재설정',
+        sent = EmailService.send(email, '[양평마을] 비밀번호 재설정',
             f'비밀번호 재설정 링크:\n{reset_url}\n\n1시간 내에 사용해 주세요.')
-        return jsonify({"status":"success","msg":"재설정 링크를 이메일로 발송했습니다."})
+        if sent:
+            return jsonify({"status":"success","msg":"재설정 링크를 이메일로 발송했습니다."})
+        else:
+            return jsonify({"status":"success","msg":"로컬모드: 메일발송 실패","debug_url":reset_url})
 
     @app.route('/reset-password/<token>')
     def reset_password_confirm(token):

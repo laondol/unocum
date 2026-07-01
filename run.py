@@ -689,14 +689,13 @@ def create_app():
 
     # gunicorn에서도 실행되도록 초기화 보장
     with app.app_context():
-        if DB_MODE != 'postgresql':
-            db.create_all()
+        db.create_all()
         if not User.query.first():
             hashed_pw = generate_password_hash('pw1234')
             demo_users = [
-                User(username='admin1', password=hashed_pw, role='admin', real_name="홍길동", phone="010-1111-2222", town="양평읍", village="양근리", is_verified_resident=True),
-                User(username='leader1', password=hashed_pw, role='leader', real_name="이순신", phone="010-3333-4444", town="강상면", village="병산리", is_verified_resident=True),
-                User(username='user1', password=hashed_pw, role='user', real_name="강감찬", phone="010-5555-6666", town="용문면", village="다문리", is_verified_resident=False)
+                User(username='admin1', email='admin@unocum.kr', password=hashed_pw, role='admin', real_name="홍길동", phone="010-1111-2222", town="양평읍", village="양근리", is_verified_resident=True),
+                User(username='leader1', email='eou@kakao.com', password=hashed_pw, role='leader', real_name="이순신", phone="010-3333-4444", town="강상면", village="병산리", is_verified_resident=True, managed_pages='legal,psycho,village,ramp'),
+                User(username='user1', email='user@test.com', password=hashed_pw, role='user', real_name="강감찬", phone="010-5555-6666", town="용문면", village="다문리", is_verified_resident=False)
             ]
             for u in demo_users:
                 db.session.add(u)
