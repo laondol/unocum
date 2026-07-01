@@ -32,7 +32,7 @@
         <div id="urlResult" class="mt-2 small"></div>
         <div class="mt-2">
             <button class="btn btn-outline-success btn-sm" onclick="aiSuggest('{{ tab }}')">🤖 AI 뉴스 추천</button>
-            <button class="btn btn-outline-warning btn-sm ms-1" onclick="cleanCjk('{{ tab }}')">🗣️ 한자/일본어 정리</button>
+            <button class="btn btn-outline-warning btn-sm ms-1" onclick="cleanCjk('{{ tab }}')">🗣️ 깨진 글자 정리</button>
             <small class="text-muted ms-2">{% if tab == 'world' %}🌐 영문 검색 → 해외 기사 중심{% else %}🇰🇷 국내 검색 → 한국 뉴스 중심{% endif %} (자동 가져오기)</small>
         </div>
     </div>
@@ -160,14 +160,14 @@ function aiSuggest(tab) {
     .finally(()=>{btn.disabled=false; btn.innerHTML='🤖 AI 뉴스 추천';});
 }
 function cleanCjk(tab) {
-    if (!confirm('선택한 탭의 모든 뉴스에서 한자/일본어를 정리하시겠습니까?\nGroq API를 사용하므로 시간이 소요될 수 있습니다.')) return;
+    if (!confirm('선택한 탭의 모든 뉴스에서 깨진 글자와 어색한 문장을 정리하시겠습니까?\nGroq API를 사용하므로 시간이 소요될 수 있습니다.')) return;
     const btn = event.target; btn.disabled = true; btn.innerHTML = '⏳ 정리 중...';
     fetch('/admin/news/clean-cjk', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'tab='+tab})
     .then(r=>r.json()).then(d=>{
         if(d.status==='success') { alert(d.msg); location.reload(); }
         else alert('❌ ' + d.msg);
     }).catch(e=>alert('❌ 오류: '+e))
-    .finally(()=>{btn.disabled=false; btn.innerHTML='🗣️ 한자/일본어 정리';});
+    .finally(()=>{btn.disabled=false; btn.innerHTML='🗣️ 깨진 글자 정리';});
 }
 function importUrl(e) {
     e.preventDefault();
