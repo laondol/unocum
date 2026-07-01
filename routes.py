@@ -1991,14 +1991,7 @@ def register_routes(app):
                     bot_message = random.choice(tips)
             except:
                 bot_message = '오늘도 행복한 하루 되세요! 💕'
-        # 게시글 모음
-        from models import Post, ShareReport
-        own_posts = Post.query.filter_by(user_id=user.id).order_by(Post.created_at.desc()).limit(10).all()
-        for p in own_posts:
-            posts.append({"type": "제안", "title": p.title, "url": f"/post/{p.id}", "date": p.created_at.strftime("%m/%d") if p.created_at else ""})
-        own_shares = ShareReport.query.filter_by(user_id=user.id).order_by(ShareReport.created_at.desc()).limit(10).all()
-        for s in own_shares:
-            posts.append({"type": "공유", "title": s.title or "제목없음", "url": f"/share/detail/{s.id}", "date": s.created_at.strftime("%m/%d") if s.created_at else ""})
+        # 게시글 모음 (위에서 이미 통합됨)
         posts.sort(key=lambda x: x["date"], reverse=True)
         posts = posts[:15]
         
