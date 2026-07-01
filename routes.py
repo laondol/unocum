@@ -837,18 +837,32 @@ def register_routes(app):
             admins = User.query.filter(User.id == target_uid).all()
         else:
             admins = User.query.filter(User.managed_pages.isnot(None), User.managed_pages != '').all()
-        all_pages = {
-            'legal':'⚖️ 법률상담',
-            'psycho':'🫂 심리상담',
-            'village':'🏘️ 마을지기',
-            'ramp':'♿ 경사로',
-            'share':'📦 공유마당',
-            'news':'📰 소식',
-            'schedule':'📅 일정',
-            'stores':'🏪 동네가게',
-            'construction':'📍 위치기반안내',
-            'proposals':'💭 꿈꾸기',
-        }
+        all_pages = [
+            {
+                'title': '소개',
+                'items': {'intro':'사업소개', 'operation':'운영계획', 'terms':'회원약관', 'charter':'정관'}
+            },
+            {
+                'title': '소식',
+                'items': {'kr_news':'대한민국과양평', 'world_news':'세계와양평', 'share':'공유마당', 'construction':'위치기반안내', 'heritage':'국가유산', 'scenery':'풍경', 'home':'집으로', 'building':'건축공사'}
+            },
+            {
+                'title': '하는일',
+                'items': {'legal':'법률상담', 'psycho':'심리상담', 'ramp':'경사로'}
+            },
+            {
+                'title': '제안',
+                'items': {'proposals':'꿈꾸기'}
+            },
+            {
+                'title': '마을',
+                'items': {'village':'마을지기'}
+            },
+            {
+                'title': '기타',
+                'items': {'schedule':'일정', 'stores':'동네가게', 'news':'소식'}
+            },
+        ]
         return render_template('admin_page_managers.html', admins=admins, all_pages=all_pages, target_uid=target_uid)
 
     @app.route('/admin/users')
