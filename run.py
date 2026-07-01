@@ -705,6 +705,17 @@ def create_app():
                         conn.execute(db.text('ALTER TABLE "user" ADD COLUMN photo_path VARCHAR(300)'))
                         conn.commit()
                         print('[OK] user.photo_path column added')
+                    # legal_post, psycho_post AI 컬럼
+                    for tbl_name in ['legal_post', 'psycho_post']:
+                        try:
+                            tbl_cols = [c['name'] for c in sa_insp(db.engine).get_columns(tbl_name)]
+                            for col, col_type in [('ai_score','INTEGER DEFAULT 0'),('ai_reason','TEXT'),('status',\"VARCHAR(20) DEFAULT 'pending'\")]:
+                                if col not in tbl_cols:
+                                    conn.execute(db.text(f'ALTER TABLE {tbl_name} ADD COLUMN {col} {col_type}'))
+                                    conn.commit()
+                                    print(f'[OK] {tbl_name}.{col} column added')
+                        except:
+                            pass
                     # village_page 테이블 생성
                     from sqlalchemy import inspect as sa_insp
                     tables = sa_insp(db.engine).get_table_names()
