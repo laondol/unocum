@@ -868,7 +868,7 @@ def register_routes(app):
             },
             {
                 'title': '제안',
-                'pages': {'proposals':'꿈꾸기'}
+                'pages': {'proposals':'꿈꾸기', 'all_proposals':'누구의꿈'}
             },
             {
                 'title': '마을',
