@@ -4655,7 +4655,14 @@ def register_routes(app):
         friend_ids = [f.receiver_id for f in Friend.query.filter_by(requester_id=uid, status='accepted').all()] + \
                      [f.requester_id for f in Friend.query.filter_by(receiver_id=uid, status='accepted').all()]
         friends = User.query.filter(User.id.in_(friend_ids)).all() if friend_ids else []
-        return jsonify({"friends": [{"id": f.id, "name": f.real_name or f.username, "town": f.town or '', "village": f.village or ''} for f in friends]})
+        # 받은 벗 신청
+        pending = Friend.query.filter_by(receiver_id=uid, status='pending').all()
+        requests = []
+        for p in pending:
+            req_user = User.query.get(p.requester_id)
+            if req_user:
+                requests.append({"id": req_user.id, "name": req_user.real_name or req_user.username})
+        return jsonify({"friends": [{"id": f.id, "name": f.real_name or f.username, "town": f.town or '', "village": f.village or ''} for f in friends], "requests": requests})
 
     @app.route('/friends/map')
     def friends_map():

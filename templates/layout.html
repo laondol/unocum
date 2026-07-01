@@ -164,7 +164,11 @@
                 💬
                 <span id="msgBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;font-size:0.6rem;">0</span>
             </a>
-            <a href="/user/{{ session.get('user_id') }}" class="text-decoration-none ms-2" title="회원정보">👤</a>
+            <a href="/user/{{ session.get('user_id') }}" class="text-decoration-none ms-2 position-relative" title="회원정보">
+                👤
+                <span id="userMsgBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;font-size:0.6rem;">0</span>
+                <span id="friendReqBadge" class="position-absolute top-100 start-100 translate-middle badge rounded-pill bg-success" style="display:none;font-size:0.6rem;">0</span>
+            </a>
             {% else %}
             <a href="/login" class="text-decoration-none text-muted ms-2" title="회원정보">👤</a>
             {% endif %}
@@ -211,21 +215,25 @@
     <script>
     document.addEventListener('DOMContentLoaded', () => {
         [...document.querySelectorAll('[data-bs-toggle="tooltip"]')].forEach(el => new bootstrap.Tooltip(el));
-        // 안 읽은 쪽지 개수 + 쪽지 아이콘 표시/숨김
+        // 안 읽은 쪽지 개수
         fetch('/message/count').then(r=>r.json()).then(d=>{
             const badge = document.getElementById('msgBadge');
             const icon = document.getElementById('msgIcon');
+            const userBadge = document.getElementById('userMsgBadge');
             if(d.count > 0) {
-                badge.textContent = d.count;
-                badge.style.display = '';
+                userBadge.textContent = d.count; userBadge.style.display = '';
+                badge.textContent = d.count; badge.style.display = '';
                 icon.style.display = '';
             }
         }).catch(()=>{});
-        // 벗 아이콘 표시/숨김
+        // 벗 신청 개수
         fetch('/friends/list').then(r=>r.json()).then(d=>{
             const icon = document.getElementById('friendIcon');
-            if(!d.friends || d.friends.length === 0) {
-                icon.style.display = 'none';
+            const reqBadge = document.getElementById('friendReqBadge');
+            if(d.friends && d.friends.length > 0) icon.style.display = '';
+            else icon.style.display = 'none';
+            if(d.requests && d.requests.length > 0) {
+                reqBadge.textContent = d.requests.length; reqBadge.style.display = '';
             }
         }).catch(()=>{});
         // Summernote 에디터 초기화
