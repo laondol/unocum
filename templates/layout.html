@@ -140,7 +140,15 @@
             </div>
             {% if session.get('user_id') %}
             {% if 'village' in (session.get('managed_pages','')) or session.get('role') == 'leader' %}
-            <a href="/village" class="text-decoration-none ms-2" title="주민봉사" style="font-size:1.2rem;">🏘️</a>
+            {% set mp = session.get('managed_pages','') %}
+            {% set tooltip_text = '주민봉사' %}
+            {% for vp in mp.split(',') %}
+                {% if vp.startswith('vi_') %}
+                    {% set parts = vp[3:].split('_') %}
+                    {% set tooltip_text = parts[0] + '봉사' %}
+                {% endif %}
+            {% endfor %}
+            <a href="/village" class="text-decoration-none ms-2" title="{{ tooltip_text }}" style="font-size:1.2rem;">🏘️</a>
             {% endif %}
             <a href="/user/{{ session.get('user_id') }}" class="text-decoration-none ms-2" title="회원정보">👤</a>
             {% else %}
