@@ -1,6 +1,18 @@
 {% extends 'layout.html' %}
 {% block content %}
 <div class="container py-4" style="max-width: 800px;">
+    <div class="d-flex justify-content-end mb-2">
+        {% if session.get('role') in ('admin','leader') %}
+        <a href="/service/legal/edit" class="btn btn-sm btn-outline-info">⚙️ 관리</a>
+        {% endif %}
+    </div>
+    {% if page and page.content %}
+    <div class="card border-0 shadow-sm" style="border-radius:18px;">
+        <div class="card-body p-4">
+            {{ page.content|safe }}
+        </div>
+    </div>
+    {% else %}
     <div class="card border-0 shadow-sm" style="border-radius: 18px;">
         <div class="card-body p-4 text-center">
             <div style="font-size: 60px;">⚖️</div>
@@ -15,6 +27,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
     <div class="row g-3 mt-3">
         <div class="col-4">
@@ -29,13 +42,9 @@
         </div>
         <div class="col-4">
             <a href="/legal/schedule" class="btn btn-outline-success w-100 py-3 fw-bold">
-                📅 방문상담<br><small class="text-muted">대면 상담 신청</small>
+                📅 방문상담<br><small class="text-muted">예약 신청</small>
             </a>
         </div>
-    </div>
-
-    <div class="text-center mt-3">
-        <a href="/intro" class="btn btn-sm btn-outline-secondary">← 사업소개</a>
     </div>
 </div>
 {% endblock %}

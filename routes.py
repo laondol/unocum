@@ -3566,7 +3566,26 @@ def register_routes(app):
             day_name = days[s.day_of_week]
             hours_text += f'{day_name} {s.start_hour:02d}:00-{s.end_hour:02d}:00, '
         hours_text = hours_text.rstrip(', ') or '평일 10:00-16:00'
-        return render_template('service_legal.html', hours_text=hours_text)
+        # 편집 가능한 페이지 내용
+        from models import VillagePage
+        page = VillagePage.query.filter_by(myeon='legal', ri='service').first()
+        return render_template('service_legal.html', hours_text=hours_text, page=page)
+
+    @app.route('/service/legal/edit', methods=['GET','POST'])
+    def service_legal_edit():
+        if session.get('role') not in ('admin','leader'):
+            return "<script>alert('관리자 전용입니다.'); history.back();</script>"
+        from models import VillagePage
+        page = VillagePage.query.filter_by(myeon='legal', ri='service').first()
+        if not page:
+            page = VillagePage(myeon='legal', ri='service', title='이훈노무사 노동법률상담실', content='', visibility='public', created_by=session.get('user_id'))
+            db.session.add(page)
+            db.session.flush()
+        if request.method == 'POST':
+            page.content = request.form.get('content', page.content)
+            db.session.commit()
+            return redirect(url_for('service_legal'))
+        return render_template('service_legal_edit.html', page=page)
 
     @app.route('/service/psycho')
     def service_psycho(): return render_template('service_psycho.html')
