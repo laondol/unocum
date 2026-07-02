@@ -3685,6 +3685,19 @@ def register_routes(app):
         db.session.commit()
         return jsonify({"status":"success","new_status":post.status})
 
+    @app.route('/legal/post/<int:post_id>/delete', methods=['POST'])
+    def legal_post_delete(post_id):
+        post = LegalPost.query.get_or_404(post_id)
+        uid = session.get('user_id')
+        role = session.get('role','')
+        if not uid or (post.user_id != uid and role not in ('admin','leader')):
+            return jsonify({"error":"삭제 권한이 없습니다."})
+        if post.answer and role not in ('admin','leader'):
+            return jsonify({"error":"답변된 글은 삭제할 수 없습니다."})
+        db.session.delete(post)
+        db.session.commit()
+        return jsonify({"status":"success"})
+
     @app.route('/legal/forgot-password', methods=['POST'])
     def legal_forgot_password():
         email = request.form.get('email','').strip()

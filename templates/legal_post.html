@@ -41,6 +41,9 @@
             {% if session.get('user_id') and (post.user_id == session.get('user_id') or session.get('role') in ('admin','leader')) and (not post.answer or session.get('role') in ('admin','leader') or post.status == 'flagged') %}
             <a href="/legal/post/{{ post.id }}/edit" class="btn btn-sm btn-outline-secondary mb-2">✏️ 수정</a>
             {% endif %}
+            {% if session.get('user_id') and post.user_id == session.get('user_id') and not post.answer %}
+            <button class="btn btn-sm btn-outline-danger mb-2 ms-1" onclick="if(confirm('삭제하시겠습니까?'))deletePost()">🗑️ 삭제</button>
+            {% endif %}
             {% if session.get('role') in ('admin','leader') %}
             <button class="btn btn-sm btn-{{ 'outline-warning' if post.status != 'flagged' else 'outline-success' }} mb-2 ms-1" onclick="toggleStatus({{ post.id }})">{{ '보류' if post.status != 'flagged' else '보류해제' }}</button>
             {% endif %}
@@ -139,6 +142,12 @@ function saveAnswer() {
     var fd = new FormData(); fd.append('answer', answer);
     fetch('/legal/admin/answer/edit/{{ post.id }}', {method:'POST', body:fd}).then(r=>r.json()).then(d=>{
         if(d.status==='success') location.reload();
+        else alert(d.error);
+    });
+}
+function deletePost() {
+    fetch('/legal/post/{{ post.id }}/delete', {method:'POST'}).then(r=>r.json()).then(d=>{
+        if(d.status==='success') { alert('삭제되었습니다.'); location.href='/legal/list'; }
         else alert(d.error);
     });
 }
