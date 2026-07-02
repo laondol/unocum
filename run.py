@@ -384,6 +384,19 @@ def create_app():
                     with db.engine.connect() as conn:
                         conn.execute(db.text('ALTER TABLE legal_post ADD COLUMN travel_allowance INTEGER'))
                         print('[OK] legal_post.travel_allowance column added')
+                for col in [('ai_score','INTEGER DEFAULT 0'),('ai_reason','TEXT'),('status','VARCHAR(20) DEFAULT "pending"'),('labor_approved','BOOLEAN DEFAULT 0')]:
+                    col_name = col[0]
+                    if col_name not in cols:
+                        with db.engine.connect() as conn:
+                            conn.execute(db.text(f'ALTER TABLE legal_post ADD COLUMN {col[0]} {col[1]}'))
+                            print(f'[OK] legal_post.{col_name} column added')
+                cols = [c['name'] for c in inspector.get_columns('psycho_post')]
+                for col in [('ai_score','INTEGER DEFAULT 0'),('ai_reason','TEXT'),('status','VARCHAR(20) DEFAULT "pending"')]:
+                    col_name = col[0]
+                    if col_name not in cols:
+                        with db.engine.connect() as conn:
+                            conn.execute(db.text(f'ALTER TABLE psycho_post ADD COLUMN {col[0]} {col[1]}'))
+                            print(f'[OK] psycho_post.{col_name} column added')
             except:
                 with db.engine.connect() as conn:
                     conn.execute(db.text('''
@@ -695,7 +708,7 @@ def create_app():
             inspector = inspect(db.engine)
             user_cols = [c['name'] for c in inspector.get_columns('user')]
             with db.engine.connect() as conn:
-                for col in ['social_id', 'social_provider', 'social_email', 'email_verification_token', 'email_verification_sent_at', 'is_neighbor']:
+                for col in ['social_id', 'social_provider', 'social_email', 'email_verification_token', 'email_verification_sent_at', 'is_neighbor', 'jin_verified_at', 'photo_path']:
                     if col not in user_cols:
                         col_type = 'VARCHAR(200)' if col in ('social_id', 'email_verification_token') else 'VARCHAR(100)' if col in ('social_email',) else 'VARCHAR(20)' if col in ('social_provider',) else 'BOOLEAN DEFAULT 0' if col in ('is_neighbor',) else 'DATETIME'
                         conn.execute(db.text(f'ALTER TABLE user ADD COLUMN {col} {col_type}'))
