@@ -25,6 +25,37 @@ def create_app():
     
     # DB 초기화 (순환 참조 원천 해결)
     db.init_app(app)
+
+    # 중요: 신규 컬럼 즉시 추가 (다른 마이그레이션보다 먼저 실행)
+    with app.app_context():
+        from sqlalchemy import inspect as _insp
+        try:
+            _inspector = _insp(db.engine)
+            user_cols = [c['name'] for c in _inspector.get_columns('user')]
+            with db.engine.connect() as conn:
+                for col in ['jin_verified_at', 'photo_path']:
+                    if col not in user_cols:
+                        col_t = 'DATETIME' if col == 'jin_verified_at' else 'VARCHAR(300)'
+                        conn.execute(db.text(f'ALTER TABLE user ADD COLUMN {col} {col_t}'))
+                        conn.commit()
+                        print(f'[OK] user.{col} column added')
+            for tbl in ['legal_post', 'psycho_post']:
+                try:
+                    tbl_cols = [c['name'] for c in _inspector.get_columns(tbl)]
+                    with db.engine.connect() as conn:
+                        for col, ct in [('ai_score','INTEGER DEFAULT 0'),('ai_reason','TEXT'),('status',"VARCHAR(20) DEFAULT 'pending'")]:
+                            if col not in tbl_cols:
+                                conn.execute(db.text(f'ALTER TABLE {tbl} ADD COLUMN {col} {ct}'))
+                                conn.commit()
+                                print(f'[OK] {tbl}.{col} column added')
+                        if tbl == 'legal_post' and 'labor_approved' not in tbl_cols:
+                            conn.execute(db.text(f'ALTER TABLE legal_post ADD COLUMN labor_approved BOOLEAN DEFAULT 0'))
+                            conn.commit()
+                            print('[OK] legal_post.labor_approved column added')
+                except:
+                    pass
+        except Exception as e:
+            print(f'[SKIP] critical column migration: {e}')
     
     # OAuth2 초기화 (Google/Kakao/Naver)
     from services.oauth import init_oauth
