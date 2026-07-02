@@ -15,7 +15,7 @@
                     <a href="/village/event/{{ event.id }}/qr" class="btn btn-sm btn-outline-secondary py-0 px-1 mt-1">📱 QR</a>
                 </div>
             </div>
-            <p class="mt-2">{{ event.description or '' }}</p>
+            <p class="mt-2">{{ event.description|safe if event.description else '' }}</p>
             {% if has_page_access('village') %}
             <div class="d-flex gap-1 mt-2">
                 <button class="btn btn-sm btn-outline-secondary" onclick="setStatus('upcoming')">예정</button>
