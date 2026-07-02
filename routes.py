@@ -3710,6 +3710,23 @@ def register_routes(app):
             session['email_verified_for_legal'] = True
         return jsonify({"status":"success"})
 
+    @app.route('/legal/post/<int:post_id>/comment', methods=['POST'])
+    def legal_post_comment(post_id):
+        uid = session.get('user_id')
+        if not uid: return jsonify({"error":"로그인 필요"}), 401
+        post = LegalPost.query.get_or_404(post_id)
+        content = request.form.get('content','').strip()
+        if not content: return jsonify({"error":"내용을 입력하세요."})
+        existing = (post.comments or '').count(f'[{uid}]')
+        if existing >= 3: return jsonify({"error":"댓글은 3회까지만 가능합니다."})
+        from services.ai_service import moderate_comment
+        ok, reason = moderate_comment(content)
+        if not ok: return jsonify({"error":reason})
+        name = session.get('real_name') or session.get('username','')
+        post.comments = (post.comments or '') + f'\n[{name}] {content} ({datetime.now().strftime("%m/%d %H:%M")})'
+        db.session.commit()
+        return jsonify({"status":"success"})
+
     @app.route('/psycho/post/<int:post_id>/comment', methods=['POST'])
     def psycho_post_comment(post_id):
         uid = session.get('user_id')
