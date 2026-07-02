@@ -327,14 +327,43 @@ def register_routes(app):
         email = request.form.get('email', '').strip()
         if not email:
             return jsonify({'status':'error','msg':'이메일을 입력해 주세요.'})
-        session['verify_email'] = email
+        redirect_url = request.form.get('redirect', '/legal/list')
+        import secrets
+        from models import TempEmailVerify
+        token = secrets.token_urlsafe(32)
+        existing = TempEmailVerify.query.filter_by(email=email, is_verified=False).first()
+        if existing:
+            db.session.delete(existing)
+            db.session.commit()
+        record = TempEmailVerify(email=email, token=token, redirect=redirect_url)
+        db.session.add(record)
+        db.session.commit()
+        verify_url = url_for('register_verify_email_confirm', token=token, _external=True)
+        from services.email_service import EmailService
+        EmailService.send(email, '[양평마을] 이메일 인증을 완료해 주세요',
+            f'아래 링크를 클릭하면 이메일 인증이 완료됩니다.\n\n{verify_url}\n\n이 링크는 30분간 유효합니다.\n문의: yp@unocum.kr')
+        return jsonify({'status':'success','msg':'인증 링크를 이메일로 발송했습니다. 메일함을 확인해 주세요.'})
+
+    @app.route('/register/verify-email/<token>')
+    def register_verify_email_confirm(token):
+        from models import TempEmailVerify
+        record = TempEmailVerify.query.filter_by(token=token, is_verified=False).first()
+        if not record:
+            return "<script>alert('만료되었거나 유효하지 않은 링크입니다.'); location.href='/legal/list';</script>"
+        if record.created_at and datetime.now() - record.created_at > timedelta(minutes=30):
+            db.session.delete(record)
+            db.session.commit()
+            return "<script>alert('인증 링크가 만료되었습니다. 다시 인증해 주세요.'); location.href='/legal/list';</script>"
+        record.is_verified = True
+        db.session.commit()
+        session['verify_email'] = record.email
         session['email_verified_for_legal'] = True
         session['email_verified_for_psycho'] = True
-        session['email_verified_for_register'] = email
-        from services.email_service import EmailService
-        EmailService.send(email, '[양평마을] 이메일 인증 안내',
-            f'이메일 주소({email})가 인증되었습니다.\n\n양평마을의 상담 게시판을 이용하실 수 있습니다.\n문의: yp@unocum.kr')
-        return jsonify({'status':'success','msg':'이메일 인증 완료!', 'email': email})
+        session['email_verified_for_register'] = record.email
+        target = record.redirect or '/legal/list'
+        db.session.delete(record)
+        db.session.commit()
+        return f"<script>alert('이메일 인증이 완료되었습니다.'); location.href='{target}';</script>"
 
     @app.route('/reset-password')
     def reset_password():

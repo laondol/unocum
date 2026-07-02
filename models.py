@@ -611,3 +611,12 @@ class BlockedEmail(db.Model):
     email = db.Column(db.String(100), nullable=False, unique=True)
     reason = db.Column(db.String(200))
     created_at = db.Column(db.DateTime, default=datetime.now)
+
+class TempEmailVerify(db.Model):
+    __tablename__ = 'temp_email_verify'
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(100), nullable=False)
+    token = db.Column(db.String(100), nullable=False, unique=True)
+    redirect = db.Column(db.String(200), default='/legal/list')
+    is_verified = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.now)

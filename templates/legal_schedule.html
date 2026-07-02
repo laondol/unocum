@@ -6,11 +6,15 @@
     {% if not session.user_id %}
     <div id="verifySection" class="mb-3">
         <label class="form-label small fw-bold">📧 이메일 인증</label>
+        {% if session.get('email_verified_for_legal') %}
+        <div class="small text-success">✅ 이메일 인증 완료</div>
+        {% else %}
         <div class="input-group input-group-sm">
             <input type="email" id="verifyEmail" class="form-control" placeholder="이메일 주소">
             <button type="button" class="btn btn-success" onclick="verifyEmail('legal')">인증하기</button>
         </div>
         <div id="verifyStatus" class="small mt-1"></div>
+        {% endif %}
     </div>
     {% endif %}
 
@@ -114,18 +118,18 @@
     {% endif %}
 </div>
 <script>
-var verified = {{ 'true' if session.user_id else 'false' }};
+var verified = {{ 'true' if session.user_id else ('true' if session.get('email_verified_for_legal') else 'false') }};
 function verifyEmail(p) {
     var email = document.getElementById('verifyEmail').value.trim();
     if (!email) return alert('이메일을 입력하세요.');
-    var fd = new FormData(); fd.append('email', email);
+    var fd = new FormData(); fd.append('email', email); fd.append('redirect', '/legal/schedule');
+    var btn = document.querySelector('#verifySection .btn'); btn.disabled=true; btn.textContent='발송 중...';
     fetch('/register/verify-email-button', {method:'POST', body:fd}).then(r=>r.json()).then(d=>{
+        btn.disabled=false; btn.textContent='인증하기';
         if (d.status==='success') {
-            verified = true;
-            document.getElementById('bookEmail').value = email;
-            document.getElementById('verifyStatus').innerHTML = '<span class="text-success">✅ 인증완료</span>';
+            document.getElementById('verifyStatus').innerHTML = '<span class="text-success">✅ 인증 링크를 발송했습니다.<br><small>메일함을 확인하고 링크를 클릭해 주세요.</small></span>';
         } else { alert(d.msg); }
-    });
+    }).catch(function(){btn.disabled=false;btn.textContent='인증하기';alert('오류가 발생했습니다.');});
 }
 function checkBooking() {
     {% if not session.user_id %}

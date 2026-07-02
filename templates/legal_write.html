@@ -5,11 +5,15 @@
     {% if not session.get('user_id') %}
     <div id="verifySection" class="card border-0 shadow-sm p-3 mb-3" style="border-radius:12px;">
         <p class="small text-muted mb-2"><strong>📧 이메일 인증이 먼저 필요합니다.</strong></p>
+        {% if session.get('email_verified_for_legal') %}
+        <div class="small text-success">✅ 이메일 인증 완료</div>
+        {% else %}
         <div class="input-group input-group-sm">
             <input type="email" id="verifyEmail" class="form-control" placeholder="이메일">
             <button class="btn btn-success" onclick="verifyEmail('legal')">인증하기</button>
         </div>
         <div id="verifyStatus" class="small mt-1"></div>
+        {% endif %}
     </div>
     {% endif %}
 
@@ -78,8 +82,8 @@
 </div>
 
 <script>
-var verified = {{ 'true' if session.get('user_id') else 'false' }};
-function verifyEmail(p){var email=document.getElementById('verifyEmail').value.trim();if(!email)return alert('이메일 입력');var fd=new FormData();fd.append('email',email);fetch('/register/verify-email-button',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status==='success'){verified=true;document.getElementById('postEmail').value=email;document.getElementById('verifyStatus').innerHTML='✅ 인증완료';}else alert(d.msg);});}
+var verified = {{ 'true' if session.get('user_id') else ('true' if session.get('email_verified_for_legal') else 'false') }};
+function verifyEmail(p){var email=document.getElementById('verifyEmail').value.trim();if(!email)return alert('이메일 입력');var fd=new FormData();fd.append('email',email);fd.append('redirect','/legal/write');var btn=document.querySelector('#verifySection .btn');btn.disabled=true;btn.textContent='발송 중...';fetch('/register/verify-email-button',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{btn.disabled=false;btn.textContent='인증하기';if(d.status==='success'){document.getElementById('verifyStatus').innerHTML='✅ 인증 링크를 발송했습니다.<br><small class=text-muted>메일함을 확인하고 링크를 클릭해 주세요.</small>';}else alert(d.msg);}).catch(function(){btn.disabled=false;btn.textContent='인증하기';alert('오류가 발생했습니다.');});}
 function checkSubmit(){if(!verified&&!{{ 'true' if session.get('user_id') else 'false' }}){alert('이메일 인증을 먼저 완료해 주세요.');return false;}document.getElementById('contentInput').value=document.getElementById('editor').innerHTML;this.querySelector('button[type=submit]').disabled=true;return true;}
 
 function execCmd(cmd){document.execCommand(cmd,false,null);document.getElementById('editor').focus();}
