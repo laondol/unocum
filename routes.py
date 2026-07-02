@@ -3558,7 +3558,15 @@ def register_routes(app):
         return "<script>alert('봉사 신청이 접수되었습니다. 될 수 있는 한 회원가입 후 신청해 주시면 감사하겠습니다. (unocumyp@gmail.com)'); location.href='/service/ramp';</script>"
 
     @app.route('/service/legal')
-    def service_legal(): return render_template('service_legal.html')
+    def service_legal():
+        schedules = LawyerSchedule.query.filter_by(is_available=True).order_by(LawyerSchedule.day_of_week).all()
+        days = ['월','화','수','목','금','토','일']
+        hours_text = ''
+        for s in schedules:
+            day_name = days[s.day_of_week]
+            hours_text += f'{day_name} {s.start_hour:02d}:00-{s.end_hour:02d}:00, '
+        hours_text = hours_text.rstrip(', ') or '평일 10:00-16:00'
+        return render_template('service_legal.html', hours_text=hours_text)
 
     @app.route('/service/psycho')
     def service_psycho(): return render_template('service_psycho.html')
