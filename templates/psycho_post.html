@@ -28,18 +28,40 @@
 
             {% if post.answer %}
             <div class="bg-success bg-opacity-10 p-3 rounded" style="border-left: 4px solid #198754;">
-                <h6 class="fw-bold text-success">🧠 심리상담사 답변</h6>
-                <div style="line-height: 1.8;">{{ post.answer|safe }}</div>
-                {% if post.fee %}
-                <div class="mt-2"><strong>💰 상담비</strong> : {{ '{:,}'.format(post.fee) }}원</div>
+                <div class="d-flex justify-content-between">
+                    <h6 class="fw-bold text-success">🧠 심리상담사 답변</h6>
+                    {% if session.get('role') in ('admin','leader') %}
+                    <button class="btn btn-sm btn-outline-secondary py-0" onclick="editAnswer()">✏️ 수정</button>
+                    {% endif %}
+                </div>
+                <div id="answerContent" style="line-height: 1.8;">{{ post.answer|safe }}</div>
+                {% if session.get('role') in ('admin','leader') %}
+                <div id="answerEdit" style="display:none;" class="mt-2">
+                    <textarea id="answerEditText" class="form-control form-control-sm mb-1" rows="3">{{ post.answer }}</textarea>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-success" onclick="saveAnswer()">저장</button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('answerEdit').style.display='none';document.getElementById('answerContent').style.display=''">취소</button>
+                    </div>
+                </div>
                 {% endif %}
-                {% if post.travel_allowance %}
-                <div><strong>🚗 출장비</strong> : {{ '{:,}'.format(post.travel_allowance) }}원</div>
-                {% endif %}
+                {% if post.fee %}<div class="mt-2"><strong>💰 상담비</strong> : {{ '{:,}'.format(post.fee) }}원</div>{% endif %}
+                {% if post.travel_allowance %}<div><strong>🚗 출장비</strong> : {{ '{:,}'.format(post.travel_allowance) }}원</div>{% endif %}
                 <small class="text-muted d-block mt-1">답변일: {{ post.answered_at.strftime('%Y-%m-%d %H:%M') }}</small>
             </div>
             {% else %}
             <div class="text-center text-muted py-3">아직 답변이 등록되지 않았습니다.</div>
+            {% endif %}
+
+            <h6 class="fw-bold mt-4 mb-2">💬 댓글</h6>
+            {% set comments = (post.comments or '').strip().split('\n') %}
+            {% for c in comments %}{% if c.strip() %}
+            <div class="small border-bottom py-1 text-muted">{{ c }}</div>
+            {% endif %}{% endfor %}
+            {% if session.get('user_id') %}
+            <div class="input-group input-group-sm mt-2">
+                <input type="text" id="commentInput" class="form-control" placeholder="댓글 (최대 3회)">
+                <button class="btn btn-outline-success" onclick="postComment()">등록</button>
+            </div>
             {% endif %}
         </div>
     </div>
@@ -48,4 +70,27 @@
     </div>
     {% endif %}
 </div>
+<script>
+function postComment() {
+    var content = document.getElementById('commentInput').value.trim();
+    if(!content) return;
+    var fd = new FormData(); fd.append('content', content);
+    fetch('/psycho/post/{{ post.id }}/comment', {method:'POST', body:fd}).then(r=>r.json()).then(d=>{
+        if(d.status==='success') location.reload();
+        else alert(d.error);
+    });
+}
+function editAnswer() {
+    document.getElementById('answerEdit').style.display='';
+    document.getElementById('answerContent').style.display='none';
+}
+function saveAnswer() {
+    var answer = document.getElementById('answerEditText').value;
+    var fd = new FormData(); fd.append('answer', answer);
+    fetch('/psycho/admin/answer/edit/{{ post.id }}', {method:'POST', body:fd}).then(r=>r.json()).then(d=>{
+        if(d.status==='success') location.reload();
+        else alert(d.error);
+    });
+}
+</script>
 {% endblock %}
