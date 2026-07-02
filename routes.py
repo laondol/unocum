@@ -4195,6 +4195,11 @@ def register_routes(app):
         if not page or page.visibility == 'off':
             return "<script>alert('마을 페이지가 준비되지 않았습니다.'); history.back();</script>"
         uid = session.get('user_id')
+        at_location = False
+        if uid:
+            user = User.query.get(uid)
+            if user:
+                at_location = (user.curr_village == tri) or (user.village == tri)
         is_member = False
         if uid:
             mp_users = []
@@ -4229,7 +4234,7 @@ def register_routes(app):
             post_items = ''.join([f'<div class="mb-2"><a href="/post/{p.id}" class="text-decoration-none"><strong>{p.title}</strong></a><br><small class="text-muted">{p.created_at.strftime("%m/%d") if p.created_at else ""} | 👍 {p.like_count or 0}</small></div>' for p in recent_posts])
             posts_html = f'<div class="my-3">{post_items}</div>' if post_items else '<p class="text-muted">게시글이 없습니다.</p>'
             content = content.replace('[posts]', posts_html)
-        return render_template('village_page_view.html', page=page, is_member=is_member, content=content)
+        return render_template('village_page_view.html', page=page, is_member=is_member, content=content, at_location=at_location)
 
     @app.route('/village/page/toggle', methods=['POST'])
     def village_page_toggle():

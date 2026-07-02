@@ -5,12 +5,20 @@
         <div class="card-body p-4">
             <h4 class="fw-bold mb-3">{{ page.title }}</h4>
             <div class="mb-3 small text-muted">
-                {{ page.myeon }} {{ page.ri }} 봉사페이지 | {{ page.created_at.strftime('%Y-%m-%d') if page.created_at else '' }}
+                {{ page.myeon }} {{ page.ri }} 봉사 | {{ page.created_at.strftime('%Y-%m-%d') if page.created_at else '' }}
             </div>
+            {% if not at_location %}
+            <div class="text-center py-5">
+                <div class="fs-1 mb-3">📍</div>
+                <h5 class="fw-bold mb-2">{{ page.ri }}에 오시면 페이지가 열립니다</h5>
+                <p class="text-muted">이 마을에 계실 때만 내용이 표시됩니다.<br>현재 위치가 {{ page.myeon }} {{ page.ri }}인지 확인해 주세요.</p>
+            </div>
+            {% else %}
             <hr>
             <div class="village-content">
-                {{ page.content | safe }}
+                {{ content | safe }}
             </div>
+            {% endif %}
         </div>
     </div>
 </div>
