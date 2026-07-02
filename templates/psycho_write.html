@@ -57,7 +57,7 @@
 var verified = {{ 'true' if session.get('user_id') else 'false' }};
 function sendVerify(p){var email=document.getElementById('verifyEmail').value.trim();if(!email)return alert('이메일 입력');var fd=new FormData();fd.append('email',email);fd.append('purpose',p||'psycho');fetch('/register/send-code',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{document.getElementById('verifyStatus').innerHTML=d.msg;if(d.status==='success')document.getElementById('codeSection').style.display='';});}
 function checkVerify(p){var code=document.getElementById('verifyCode').value.trim();var fd=new FormData();fd.append('code',code);fd.append('purpose',p||'psycho');fetch('/register/verify-code',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status==='success'){verified=true;document.getElementById('postEmail').value=document.getElementById('verifyEmail').value;document.getElementById('verifyStatus').innerHTML='✅ 인증완료';}else alert(d.msg);});}
-function checkSubmit(){if(!verified&&!{{ 'true' if session.get('user_id') else 'false' }}){alert('이메일 인증을 먼저 완료해 주세요.');return false;}return true;}
+function checkSubmit(){if(!verified&&!{{ 'true' if session.get('user_id') else 'false' }}){alert('이메일 인증을 먼저 완료해 주세요.');return false;}document.querySelector('button[type=submit]').disabled=true;return true;}
 function togglePw(){var i=document.getElementById('pwInput');i.type=i.type==='password'?'text':'password';}
 </script>
 {% endblock %}
