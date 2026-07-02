@@ -10,14 +10,10 @@
 
     {% if not session.get('user_id') %}
     <div id="verifySection" class="card border-0 shadow-sm p-3 mb-3" style="border-radius:12px;">
-        <p class="small text-muted mb-2">📧 비회원은 이메일 인증 후 글을 쓰고 볼 수 있습니다.</p>
+        <p class="small text-muted mb-2">📧 비회원은 이메일 인증 후 이용할 수 있습니다.</p>
         <div class="input-group input-group-sm">
             <input type="email" id="verifyEmail" class="form-control" placeholder="이메일">
-            <button class="btn btn-success" onclick="sendVerify('legal')">인증하기</button>
-        </div>
-        <div class="input-group input-group-sm mt-1" id="codeSection" style="display:none;">
-            <input type="text" id="verifyCode" class="form-control" placeholder="인증코드 6자리" maxlength="6">
-            <button class="btn btn-outline-success" onclick="checkVerify('legal')">확인</button>
+            <button class="btn btn-success" onclick="verifyEmail('legal')">인증하기</button>
         </div>
         <div id="verifyStatus" class="small mt-1"></div>
     </div>
@@ -35,10 +31,10 @@
                         <td>{{ p.id }}</td>
                         <td>
                             <a href="/legal/post/{{ p.id }}" class="text-decoration-none">
-                                {% if is_admin or is_author %}
+                                {% if is_admin or is_author or session.get('user_id') %}
                                 {{ p.title }}
                                 {% elif p.email %}
-                                {{ p.title[:6] }}{% if p.title|length > 6 %}...{% endif %}{% if not session.get('user_id') %} 🔒{% endif %}
+                                🔒 비회원글
                                 {% else %}
                                 {{ p.title[:6] }}...
                                 {% endif %}
@@ -85,8 +81,7 @@
 </div>
 <script>
 var verified=false;
-function sendVerify(p){var email=document.getElementById('verifyEmail').value.trim();if(!email)return alert('이메일 입력');var fd=new FormData();fd.append('email',email);fd.append('purpose',p||'legal');fetch('/register/send-code',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{document.getElementById('verifyStatus').innerHTML=d.msg;if(d.status==='success')document.getElementById('codeSection').style.display='';});}
-function checkVerify(p){var code=document.getElementById('verifyCode').value.trim();var fd=new FormData();fd.append('code',code);fd.append('purpose',p||'legal');fetch('/register/verify-code',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status==='success'){verified=true;document.getElementById('verifyStatus').innerHTML='✅ 인증완료';}else alert(d.msg);});}
+function verifyEmail(p){var email=document.getElementById('verifyEmail').value.trim();if(!email)return alert('이메일 입력');var fd=new FormData();fd.append('email',email);fetch('/register/verify-email-button',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status==='success'){verified=true;document.getElementById('verifyStatus').innerHTML='✅ 인증완료';location.reload();}else alert(d.msg);});}
 function aiDecision(pid, decision) {
     if(!confirm(decision==='yes' ? '작성자에게 24시간 수정 요청 이메일을 보냅니다.' : '보류를 해제합니다.')) return;
     var fd = new FormData();

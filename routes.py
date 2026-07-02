@@ -3634,7 +3634,11 @@ def register_routes(app):
         elif uid:
             posts = LegalPost.query.filter_by(user_id=uid).order_by(LegalPost.created_at.desc()).all()
         else:
-            posts = LegalPost.query.filter(LegalPost.user_id.is_(None)).order_by(LegalPost.created_at.desc()).all()
+            verified_email = session.get('verify_email')
+            if verified_email and session.get('email_verified_for_legal'):
+                posts = LegalPost.query.filter_by(email=verified_email).order_by(LegalPost.created_at.desc()).all()
+            else:
+                posts = []
         return render_template('legal_board.html', posts=posts)
 
     @app.route('/legal/write', methods=['GET', 'POST'])
@@ -3702,8 +3706,13 @@ def register_routes(app):
                 EmailService.send(email, '[양평마을] 상담글 검토 필요',
                     f'{author_name}님의 상담글에 부적절한 내용이 감지되었습니다.\n24시간 내에 수정하지 않으면 글이 삭제되며, 이후 이 이메일로는 상담이 불가능합니다.')
             from services.email_service import EmailService
-            EmailService.send('daerilee@gmail.com', f'[법률상담] {title}',
-                f'작성자: {author_name}\n이메일: {email}\n제목: {title}\n내용: {content[:500]}')
+            admins = User.query.filter(User.role.in_(['admin','leader'])).all()
+            for admin in admins:
+                try:
+                    EmailService.send(admin.email, f'[법률상담] {title}',
+                        f'작성자: {author_name}\n이메일: {email}\n제목: {title}\n내용: {content[:500]}')
+                except:
+                    pass
             session.pop('email_verified_for_legal', None)
             session.pop('verify_email', None)
             return "<script>alert('상담 글이 등록되었습니다.'); location.href='/legal/list';</script>"
@@ -3932,7 +3941,14 @@ def register_routes(app):
         post.travel_allowance = int(request.form.get('travel_allowance')) if request.form.get('travel_allowance') else None
         db.session.commit()
         EmailService.send(post.email, f"[양평마을] 법률상담 답변이 등록되었습니다",
-            f"문의하신 '{post.title}'에 대한 답변이 등록되었습니다.\n\nhttps://test.unocum.kr/legal/post/{post.id}")
+            f"문의하신 '{post.title}'에 대한 답변이 등록되었습니다.\n\n{request.host_url}legal/post/{post.id}")
+        admins = User.query.filter(User.role.in_(['admin','leader'])).all()
+        for admin in admins:
+            try:
+                EmailService.send(admin.email, f'[법률상담 답변] {post.title}',
+                    f'{session.get("username","")}님이 답변을 등록했습니다.\n\n{request.host_url}legal/admin')
+            except:
+                pass
         return "<script>alert('답변이 등록되었습니다.'); location.href='/legal/admin';</script>"
 
     @app.route('/legal/admin/appointment/<int:appt_id>/approve', methods=['POST'])
@@ -3947,7 +3963,14 @@ def register_routes(app):
         appt.travel_allowance = int(request.form.get('travel_allowance')) if request.form.get('travel_allowance') else None
         db.session.commit()
         EmailService.send(appt.email, "[양평마을] 법률상담 예약이 승인되었습니다",
-            f"법률상담 예약이 승인되었습니다.\n\n일시: {appt.date} {appt.time_slot}\n\nhttps://test.unocum.kr/legal/schedule")
+            f"법률상담 예약이 승인되었습니다.\n\n일시: {appt.date} {appt.time_slot}\n\n{request.host_url}legal/schedule")
+        admins = User.query.filter(User.role.in_(['admin','leader'])).all()
+        for admin in admins:
+            try:
+                EmailService.send(admin.email, f'[법률상담 예약승인] {appt.content[:30]}',
+                    f'{session.get("username","")}님이 예약을 승인했습니다.\n\n{request.host_url}legal/admin')
+            except:
+                pass
         return "<script>alert('예약이 승인되었습니다.'); location.href='/legal/admin';</script>"
 
     @app.route('/legal/admin/appointment/<int:appt_id>/reject', methods=['POST'])
@@ -4081,8 +4104,13 @@ def register_routes(app):
             db.session.commit()
         # 담당자에게 이메일 발송
         from services.email_service import EmailService
-        EmailService.send('daerilee@gmail.com', f'[법률상담] {title}',
-            f'신청자: {name}\n이메일: {email}\n연락처: {phone}\n날짜: {date_str} {time_slot}\n장소: {location}\n내용: {content}')
+        admins = User.query.filter(User.role.in_(['admin','leader'])).all()
+        for admin in admins:
+            try:
+                EmailService.send(admin.email, f'[법률상담 예약] {title}',
+                    f'신청자: {name}\n이메일: {email}\n연락처: {phone}\n날짜: {date_str} {time_slot}\n장소: {location}\n내용: {content}')
+            except:
+                pass
         return "<script>alert('예약이 신청되었습니다. 승인 후 이메일로 안내드립니다.'); location.href='/service/legal';</script>"
 
     @app.route('/legal/appointment/<int:appt_id>/edit', methods=['GET','POST'])
@@ -4981,7 +5009,11 @@ def register_routes(app):
         elif uid:
             posts = PsychoPost.query.filter_by(user_id=uid).order_by(PsychoPost.created_at.desc()).all()
         else:
-            posts = PsychoPost.query.filter(PsychoPost.user_id.is_(None)).order_by(PsychoPost.created_at.desc()).all()
+            verified_email = session.get('verify_email')
+            if verified_email and session.get('email_verified_for_psycho'):
+                posts = PsychoPost.query.filter_by(email=verified_email).order_by(PsychoPost.created_at.desc()).all()
+            else:
+                posts = []
         return render_template('psycho_board.html', posts=posts)
 
     @app.route('/psycho/write', methods=['GET', 'POST'])
@@ -5019,6 +5051,14 @@ def register_routes(app):
                     return "<script>alert('닢이 부족합니다 (100닢 필요).'); history.back();</script>"
             db.session.add(post)
             db.session.commit()
+            from services.email_service import EmailService
+            admins = User.query.filter(User.role.in_(['admin','leader'])).all()
+            for admin in admins:
+                try:
+                    EmailService.send(admin.email, f'[심리상담] {title}',
+                        f'작성자: {author_name}\n이메일: {email}\n제목: {title}\n내용: {content[:500]}')
+                except:
+                    pass
             session.pop('email_verified_for_psycho', None)
             session.pop('verify_email', None)
             return "<script>alert('상담 글이 등록되었습니다.'); location.href='/psycho/list';</script>"
@@ -5095,7 +5135,14 @@ def register_routes(app):
         post.travel_allowance = int(request.form.get('travel_allowance')) if request.form.get('travel_allowance') else None
         db.session.commit()
         EmailService.send(post.email, f"[양평마을] 심리상담 답변이 등록되었습니다",
-            f"문의하신 '{post.title}'에 대한 답변이 등록되었습니다.\n\nhttps://test.unocum.kr/psycho/post/{post.id}")
+            f"문의하신 '{post.title}'에 대한 답변이 등록되었습니다.\n\n{request.host_url}psycho/post/{post.id}")
+        admins = User.query.filter(User.role.in_(['admin','leader'])).all()
+        for admin in admins:
+            try:
+                EmailService.send(admin.email, f'[심리상담 답변] {post.title}',
+                    f'{session.get("username","")}님이 답변을 등록했습니다.\n\n{request.host_url}psycho/admin')
+            except:
+                pass
         return "<script>alert('답변이 등록되었습니다.'); location.href='/psycho/admin';</script>"
 
     @app.route('/psycho/admin/appointment/<int:appt_id>/approve', methods=['POST'])
@@ -5110,7 +5157,14 @@ def register_routes(app):
         appt.travel_allowance = int(request.form.get('travel_allowance')) if request.form.get('travel_allowance') else None
         db.session.commit()
         EmailService.send(appt.email, "[양평마을] 심리상담 예약이 승인되었습니다",
-            f"심리상담 예약이 승인되었습니다.\n\n일시: {appt.date} {appt.time_slot}\n\nhttps://test.unocum.kr/psycho/schedule")
+            f"심리상담 예약이 승인되었습니다.\n\n일시: {appt.date} {appt.time_slot}\n\n{request.host_url}psycho/schedule")
+        admins = User.query.filter(User.role.in_(['admin','leader'])).all()
+        for admin in admins:
+            try:
+                EmailService.send(admin.email, f'[심리상담 예약승인] {appt.content[:30]}',
+                    f'{session.get("username","")}님이 예약을 승인했습니다.\n\n{request.host_url}psycho/admin/appointments')
+            except:
+                pass
         return "<script>alert('예약이 승인되었습니다.'); location.href='/psycho/admin/appointments';</script>"
 
     @app.route('/psycho/admin/appointment/<int:appt_id>/reject', methods=['POST'])
@@ -5226,8 +5280,13 @@ def register_routes(app):
         db.session.add(appt)
         db.session.commit()
         from services.email_service import EmailService
-        EmailService.send('herb2727@naver.com', f'[심리상담] {title}',
-            f'신청자: {name}\n이메일: {email}\n연락처: {phone}\n날짜: {date_str} {time_slot}\n장소: {location}\n내용: {content}')
+        admins = User.query.filter(User.role.in_(['admin','leader'])).all()
+        for admin in admins:
+            try:
+                EmailService.send(admin.email, f'[심리상담 예약] {title}',
+                    f'신청자: {name}\n이메일: {email}\n연락처: {phone}\n날짜: {date_str} {time_slot}\n장소: {location}\n내용: {content}')
+            except:
+                pass
         return "<script>alert('예약이 신청되었습니다. 승인 후 이메일로 안내드립니다.'); location.href='/service/psycho';</script>"
 
     @app.route('/friends')

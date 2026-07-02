@@ -7,11 +7,7 @@
         <p class="small text-muted mb-2"><strong>📧 이메일 인증이 먼저 필요합니다.</strong></p>
         <div class="input-group input-group-sm">
             <input type="email" id="verifyEmail" class="form-control" placeholder="이메일">
-            <button class="btn btn-success" onclick="sendVerify('legal')">인증코드 받기</button>
-        </div>
-        <div class="input-group input-group-sm mt-1" id="codeSection" style="display:none;">
-            <input type="text" id="verifyCode" class="form-control" placeholder="인증코드 6자리" maxlength="6">
-            <button class="btn btn-outline-success" onclick="checkVerify('legal')">확인</button>
+            <button class="btn btn-success" onclick="verifyEmail('legal')">인증하기</button>
         </div>
         <div id="verifyStatus" class="small mt-1"></div>
     </div>
@@ -83,8 +79,7 @@
 
 <script>
 var verified = {{ 'true' if session.get('user_id') else 'false' }};
-function sendVerify(p){var email=document.getElementById('verifyEmail').value.trim();if(!email)return alert('이메일 입력');var fd=new FormData();fd.append('email',email);fd.append('purpose',p||'legal');fetch('/register/send-code',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{document.getElementById('verifyStatus').innerHTML=d.msg;if(d.status==='success')document.getElementById('codeSection').style.display='';});}
-function checkVerify(p){var code=document.getElementById('verifyCode').value.trim();var fd=new FormData();fd.append('code',code);fd.append('purpose',p||'legal');fetch('/register/verify-code',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status==='success'){verified=true;document.getElementById('postEmail').value=document.getElementById('verifyEmail').value;document.getElementById('verifyStatus').innerHTML='✅ 인증완료';}else alert(d.msg);});}
+function verifyEmail(p){var email=document.getElementById('verifyEmail').value.trim();if(!email)return alert('이메일 입력');var fd=new FormData();fd.append('email',email);fetch('/register/verify-email-button',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status==='success'){verified=true;document.getElementById('postEmail').value=email;document.getElementById('verifyStatus').innerHTML='✅ 인증완료';}else alert(d.msg);});}
 function checkSubmit(){if(!verified&&!{{ 'true' if session.get('user_id') else 'false' }}){alert('이메일 인증을 먼저 완료해 주세요.');return false;}document.getElementById('contentInput').value=document.getElementById('editor').innerHTML;this.querySelector('button[type=submit]').disabled=true;return true;}
 
 function execCmd(cmd){document.execCommand(cmd,false,null);document.getElementById('editor').focus();}

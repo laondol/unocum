@@ -25,10 +25,20 @@
                 </thead>
                 <tbody>
                     {% for p in posts %}
+                    {% set p_is_admin = session.get('role') in ('admin','leader') %}
+                    {% set p_is_author = session.get('user_id') and session.get('user_id') == p.user_id %}
                     <tr>
                         <td class="text-muted">{{ p.id }}</td>
-                        <td><a href="/psycho/post/{{ p.id }}" class="text-decoration-none fw-bold">{{ p.title }}</a></td>
-                        <td>{{ p.author_name or '익명' }}</td>
+                        <td><a href="/psycho/post/{{ p.id }}" class="text-decoration-none fw-bold">
+                            {% if p_is_admin or p_is_author or session.get('user_id') %}
+                            {{ p.title }}
+                            {% elif p.email %}
+                            🔒 비회원글
+                            {% else %}
+                            {{ p.title }}
+                            {% endif %}
+                        </a></td>
+                        <td>{{ (p.author_name or '익명')[:2] }}**</td>
                         <td>
                             {% if p.answer %}
                             <span class="badge bg-success">답변완료</span>

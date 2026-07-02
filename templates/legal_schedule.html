@@ -8,11 +8,7 @@
         <label class="form-label small fw-bold">📧 이메일 인증</label>
         <div class="input-group input-group-sm">
             <input type="email" id="verifyEmail" class="form-control" placeholder="이메일 주소">
-            <button type="button" class="btn btn-success" onclick="sendVerify('legal')">인증하기</button>
-        </div>
-        <div class="input-group input-group-sm mt-1" id="codeSection" style="display:none;">
-            <input type="text" id="verifyCode" class="form-control" placeholder="인증코드 6자리" maxlength="6">
-            <button type="button" class="btn btn-outline-success" onclick="checkVerify('legal')">확인</button>
+            <button type="button" class="btn btn-success" onclick="verifyEmail('legal')">인증하기</button>
         </div>
         <div id="verifyStatus" class="small mt-1"></div>
     </div>
@@ -119,22 +115,14 @@
 </div>
 <script>
 var verified = {{ 'true' if session.user_id else 'false' }};
-function sendVerify(p) {
+function verifyEmail(p) {
     var email = document.getElementById('verifyEmail').value.trim();
     if (!email) return alert('이메일을 입력하세요.');
-    var fd = new FormData(); fd.append('email', email); fd.append('purpose', p||'legal');
-    fetch('/register/send-code', {method:'POST', body:fd}).then(r=>r.json()).then(d=>{
-        document.getElementById('verifyStatus').innerHTML = '<span class="text-success">'+d.msg+'</span>';
-        if (d.status==='success') document.getElementById('codeSection').style.display='';
-    });
-}
-function checkVerify(p) {
-    var code = document.getElementById('verifyCode').value.trim();
-    var fd = new FormData(); fd.append('code', code); fd.append('purpose', p||'legal');
-    fetch('/register/verify-code', {method:'POST', body:fd}).then(r=>r.json()).then(d=>{
+    var fd = new FormData(); fd.append('email', email);
+    fetch('/register/verify-email-button', {method:'POST', body:fd}).then(r=>r.json()).then(d=>{
         if (d.status==='success') {
             verified = true;
-            document.getElementById('bookEmail').value = document.getElementById('verifyEmail').value;
+            document.getElementById('bookEmail').value = email;
             document.getElementById('verifyStatus').innerHTML = '<span class="text-success">✅ 인증완료</span>';
         } else { alert(d.msg); }
     });

@@ -105,6 +105,20 @@ def register_verify_code():
     session.pop('verify_code', None); session.pop('verify_code_time', None)
     return jsonify({'status':'success','msg':'이메일 인증 완료!'})
 
+@auth_bp.route('/register/verify-email-button', methods=['POST'])
+def register_verify_email_button():
+    email = request.form.get('email', '').strip()
+    if not email:
+        return jsonify({'status':'error','msg':'이메일을 입력해 주세요.'})
+    session['verify_email'] = email
+    session['email_verified_for_legal'] = True
+    session['email_verified_for_psycho'] = True
+    session['email_verified_for_register'] = email
+    from services.email_service import EmailService
+    EmailService.send(email, '[양평마을] 이메일 인증 안내',
+        f'이메일 주소({email})가 인증되었습니다.\n\n양평마을의 상담 게시판을 이용하실 수 있습니다.\n문의: yp@unocum.kr')
+    return jsonify({'status':'success','msg':'이메일 인증 완료!', 'email': email})
+
 def add_points(uid, amount, change_type, description, related_id=None):
     from models import User, PointHistory
     user = User.query.get(uid)
