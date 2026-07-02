@@ -22,7 +22,24 @@
                 <button class="btn btn-sm btn-outline-primary" onclick="setStatus('ongoing')">진행</button>
                 <button class="btn btn-sm btn-outline-success" onclick="setStatus('completed')">완료</button>
                 <button class="btn btn-sm btn-outline-warning" onclick="setStatus('afterparty')">뒤풀이</button>
+                <button class="btn btn-sm btn-outline-info" onclick="showMsgForm()">✉️ 쪽지</button>
                 <span class="ms-2 align-self-center small text-muted">현재: {{ event.status }}</span>
+            </div>
+            <div id="msgForm" class="mt-2 p-2 bg-light rounded d-none">
+                <div class="small fw-bold mb-1">✉️ 쪽지 발송 (1인당 1닢)</div>
+                <select id="msgScope" class="form-select form-select-sm mb-1">
+                    <option value="attendees">참석자만</option>
+                    <option value="village">{{ event.ri or '마을' }} 주민</option>
+                    <option value="myeon">{{ event.myeon or '면' }} 전체</option>
+                    <option value="all">전체회원</option>
+                </select>
+                <input type="text" id="msgSubject" class="form-control form-control-sm mb-1" placeholder="제목">
+                <textarea id="msgContent" class="form-control form-control-sm mb-1" rows="2" placeholder="내용"></textarea>
+                <div class="d-flex gap-1">
+                    <button class="btn btn-sm btn-success" onclick="sendMsg()">발송</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('msgForm').classList.add('d-none')">취소</button>
+                </div>
+                <div id="msgResult" class="small mt-1"></div>
             </div>
             {% endif %}
         </div>
@@ -198,6 +215,19 @@ function markAttend(aid, status) {
 function setStatus(status) {
     var fd = new FormData(); fd.append('status',status);
     fetch('/village/event/{{ event.id }}/status', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{location.reload();});
+}
+function showMsgForm() {
+    document.getElementById('msgForm').classList.remove('d-none');
+}
+function sendMsg() {
+    var fd = new FormData();
+    fd.append('scope', document.getElementById('msgScope').value);
+    fd.append('subject', document.getElementById('msgSubject').value);
+    fd.append('content', document.getElementById('msgContent').value);
+    fetch('/village/event/{{ event.id }}/message', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+        document.getElementById('msgResult').innerHTML = '<span class="text-'+(d.status==='success'?'success':'danger')+'">'+d.msg+'</span>';
+        if(d.status==='success') setTimeout(function(){document.getElementById('msgForm').classList.add('d-none');}, 1500);
+    });
 }
 </script>
 {% endblock %}

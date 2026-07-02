@@ -4455,6 +4455,48 @@ def register_routes(app):
         qr_url = f'{site_url}/village/event/{ev.id}'
         return render_template('village_event_qr.html', event=ev, qr_url=qr_url)
 
+    @app.route('/village/event/<int:event_id>/message', methods=['POST'])
+    def village_event_message(event_id):
+        if not has_page_access('village'):
+            return jsonify({"error":"권한 없음"}), 403
+        ev = VillageEvent.query.get_or_404(event_id)
+        subject = request.form.get('subject','').strip()
+        msg_content = request.form.get('content','').strip()
+        if not subject or not msg_content:
+            return jsonify({"error":"제목과 내용을 입력하세요."})
+        scope = request.form.get('scope','attendees')
+        uid = session.get('user_id')
+        user = User.query.get(uid)
+        # 대상자 선정
+        receivers = []
+        if scope == 'attendees':
+            attendees = VillageEventAttendee.query.filter_by(event_id=event_id).all()
+            for a in attendees:
+                if a.user_id:
+                    u = User.query.get(a.user_id)
+                    if u: receivers.append(u)
+        elif scope == 'village':
+            receivers = User.query.filter(User.village == ev.ri).all()
+        elif scope == 'myeon':
+            receivers = User.query.filter(User.town == ev.myeon).all()
+        elif scope == 'all':
+            receivers = User.query.all()
+        # 비용 체크
+        cost = len(receivers)
+        if (user.points or 0) < cost:
+            return jsonify({"error":f"닢이 부족합니다. (필요: {cost}닢, 보유: {user.points or 0}닢)"})
+        # 발송
+        count = 0
+        for r in receivers:
+            if r.id == uid: continue
+            msg = Message(sender_id=uid, sender_name=user.real_name or user.username,
+                receiver_id=r.id, subject=subject, content=msg_content)
+            db.session.add(msg)
+            count += 1
+        add_points(uid, -cost, 'event_message', f'활동 쪽지: {ev.title[:30]} ({count}명)')
+        db.session.commit()
+        return jsonify({"status":"success","msg":f"{count}명에게 쪽지 발송 완료 ({cost}닢 차감)"})
+
     @app.route('/village/event/<int:event_id>/ping', methods=['POST'])
     def village_event_ping(event_id):
         uid = session.get('user_id')
