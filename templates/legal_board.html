@@ -5,13 +5,14 @@
         <h4 class="fw-bold mb-0">📋 법률상담 게시판</h4>
         <div class="d-flex gap-2">
             {% if session.get('role') in ('admin','leader') %}
-            <a href="/legal/admin" class="btn btn-sm btn-outline-info">⚙️ 상담관리</a>
+            <button class="btn btn-sm btn-outline-secondary" onclick="document.querySelectorAll('.admin-answer').forEach(e=>e.style.display=e.style.display==='none'?'':'none')">⚡ 빠른답변</button>
             {% endif %}
             {% if session.get('user_id') %}
             <a href="/legal/write" class="btn btn-sm btn-success">상담 글쓰기</a>
             {% endif %}
         </div>
     </div>
+
     {% if not session.get('user_id') %}
     <div id="verifySection" class="card border-0 shadow-sm p-3 mb-3" style="border-radius:12px;">
         <p class="small text-muted mb-2">📧 비회원은 이메일 인증 후 글을 쓰고 볼 수 있습니다.</p>
@@ -30,31 +31,48 @@
     <div class="card border-0 shadow-sm" style="border-radius:16px;">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0 small">
-                <thead class="table-light"><tr><th>#</th><th>제목</th><th>작성자</th><th>답변</th><th>작성일</th></tr></thead>
+                <thead class="table-light"><tr><th>#</th><th>제목</th><th>작성자</th><th>상태</th><th>작성일</th><th></th></tr></thead>
                 <tbody>
                     {% for p in posts %}
+                    {% set is_admin = session.get('role') in ('admin','leader') %}
+                    {% set is_author = session.get('user_id') and session.get('user_id') == p.user_id %}
                     <tr>
                         <td>{{ p.id }}</td>
                         <td>
                             <a href="/legal/post/{{ p.id }}" class="text-decoration-none">
-                                {% if session.get('user_id') and session.get('user_id') == p.user_id %}
+                                {% if is_admin or is_author %}
                                 {{ p.title }}
-                                {% elif session.get('role') in ('admin','leader') %}
-                                {{ p.title }}
+                                {% elif p.email %}
+                                {{ p.title[:6] }}{% if p.title|length > 6 %}...{% endif %}{% if not session.get('user_id') %} 🔒{% endif %}
                                 {% else %}
-                                {{ p.title[:6] }}{% if p.title|length > 6 %}...{% endif %}
+                                {{ p.title[:6] }}...
                                 {% endif %}
                             </a>
                         </td>
                         <td>
-                            {% if p.email and not session.get('user_id') %}
-                            {{ p.email[:2] }}{% if p.email|length > 2 %}***{% endif %}
-                            {% else %}
+                            {% if is_admin or is_author %}
                             {{ p.author_name or '익명' }}
+                            {% else %}
+                            {{ (p.author_name or '익명')[:2] }}**
                             {% endif %}
                         </td>
-                        <td>{% if p.answer %}<span class="badge bg-success">완료</span>{% else %}<span class="badge bg-warning">대기</span>{% endif %}</td>
+                        <td>
+                            {% if p.answer %}
+                            <span class="badge bg-success">답변완료</span>
+                            {% elif p.status == 'flagged' %}
+                            <span class="badge bg-warning">보류</span>
+                            {% else %}
+                            <span class="badge bg-secondary">대기</span>
+                            {% endif %}
+                        </td>
                         <td>{{ p.created_at.strftime('%m/%d') if p.created_at else '' }}</td>
+                        <td>
+                            {% if is_admin and not p.answer %}
+                            <div class="admin-answer d-flex gap-1" style="display:none;">
+                                <input type="text" class="form-control form-control-sm quick-reply" data-pid="{{ p.id }}" placeholder="답변/보류/자료부족" style="width:120px;" onkeypress="if(event.key==='Enter')quickAnswer(this)">
+                            </div>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -66,5 +84,17 @@
 var verified=false;
 function sendVerify(p){var email=document.getElementById('verifyEmail').value.trim();if(!email)return alert('이메일 입력');var fd=new FormData();fd.append('email',email);fd.append('purpose',p||'legal');fetch('/register/send-code',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{document.getElementById('verifyStatus').innerHTML=d.msg;if(d.status==='success')document.getElementById('codeSection').style.display='';});}
 function checkVerify(p){var code=document.getElementById('verifyCode').value.trim();var fd=new FormData();fd.append('code',code);fd.append('purpose',p||'legal');fetch('/register/verify-code',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status==='success'){verified=true;document.getElementById('verifyStatus').innerHTML='✅ 인증완료';}else alert(d.msg);});}
+function quickAnswer(el) {
+    var answer = el.value.trim();
+    if(!answer) return;
+    var pid = el.getAttribute('data-pid');
+    var fd = new FormData();
+    fd.append('answer', answer);
+    fd.append('fee', '');
+    fetch('/legal/admin/answer/'+pid, {method:'POST', body:fd}).then(r=>{
+        if(r.ok) location.reload();
+        else alert('답변 실패');
+    });
+}
 </script>
 {% endblock %}
