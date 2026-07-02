@@ -425,14 +425,14 @@ def create_app():
                     with db.engine.connect() as conn:
                         conn.execute(db.text('ALTER TABLE legal_post ADD COLUMN travel_allowance INTEGER'))
                         print('[OK] legal_post.travel_allowance column added')
-                for col in [('ai_score','INTEGER DEFAULT 0'),('ai_reason','TEXT'),('status','VARCHAR(20) DEFAULT "pending"'),('labor_approved','BOOLEAN DEFAULT 0')]:
+                for col in [('ai_score','INTEGER DEFAULT 0'),('ai_reason','TEXT'),('status','VARCHAR(20) DEFAULT "pending"'),('labor_approved','BOOLEAN DEFAULT 0'),('viewed_at','DATETIME'),('flagged_decision_at','DATETIME')]:
                     col_name = col[0]
                     if col_name not in cols:
                         with db.engine.connect() as conn:
                             conn.execute(db.text(f'ALTER TABLE legal_post ADD COLUMN {col[0]} {col[1]}'))
                             print(f'[OK] legal_post.{col_name} column added')
                 cols = [c['name'] for c in inspector.get_columns('psycho_post')]
-                for col in [('ai_score','INTEGER DEFAULT 0'),('ai_reason','TEXT'),('status','VARCHAR(20) DEFAULT "pending"')]:
+                for col in [('ai_score','INTEGER DEFAULT 0'),('ai_reason','TEXT'),('status','VARCHAR(20) DEFAULT "pending"'),('viewed_at','DATETIME'),('flagged_decision_at','DATETIME')]:
                     col_name = col[0]
                     if col_name not in cols:
                         with db.engine.connect() as conn:
@@ -777,7 +777,7 @@ def create_app():
             for tbl_name in ['legal_post', 'psycho_post']:
                 tbl_cols = [c['name'] for c in inspector.get_columns(tbl_name)]
                 with db.engine.connect() as conn:
-                    for col, col_type in [('ai_score','INTEGER DEFAULT 0'),('ai_reason','TEXT'),('status',"VARCHAR(20) DEFAULT 'pending'"),('flagged_decision_at','DATETIME')]:
+                    for col, col_type in [('ai_score','INTEGER DEFAULT 0'),('ai_reason','TEXT'),('status',"VARCHAR(20) DEFAULT 'pending'"),('viewed_at','DATETIME'),('flagged_decision_at','DATETIME')]:
                         if col not in tbl_cols:
                             conn.execute(db.text(f'ALTER TABLE {tbl_name} ADD COLUMN {col} {col_type}'))
                             print(f'[OK] {tbl_name}.{col} column added')
