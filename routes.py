@@ -17,11 +17,27 @@ from services.geocode import haversine, gps_to_town_village, get_nearby_reports,
 
 # --- [페이지 관리 권한] ---
 def has_page_access(page):
-    """특정 페이지 관리 권한 확인 (leader:전체, admin:지정페이지만)"""
+    """특정 페이지 관리 권한 확인
+    - leader: 모든 권한 (단, 마을은 체크 필요)
+    - managed_pages에 체크된 페이지만 접근 가능
+    """
     role = session.get('role','')
+    uid = session.get('user_id')
+    # 마을 관련 권한은 leader도 체크 필요
+    if page == 'village' or page.startswith('vi_'):
+        if uid:
+            user = User.query.get(uid)
+            if user and user.managed_pages:
+                pages = user.managed_pages.split(',')
+                if page in pages or 'village' in pages:
+                    return True
+                for p in pages:
+                    if p.startswith('vi_'):
+                        return True
+        return False
+    # 마을 외 페이지: leader 자동 권한
     if role == 'leader':
         return True
-    uid = session.get('user_id')
     if uid:
         user = User.query.get(uid)
         if user and user.managed_pages:
@@ -3592,16 +3608,15 @@ def register_routes(app):
 
     # --- [법률상담 게시판] ---
     @app.route('/legal/list')
-    def legal_list():
-        uid = session.get('user_id')
-        role = session.get('role','')
-        if role in ('admin','leader'):
-            posts = LegalPost.query.order_by(LegalPost.created_at.desc()).all()
-        elif uid:
-            posts = LegalPost.query.filter_by(user_id=uid).order_by(LegalPost.created_at.desc()).all()
-        else:
-            posts = LegalPost.query.filter(LegalPost.user_id.is_(None)).order_by(LegalPost.created_at.desc()).all()
-        return render_template('legal_board.html', posts=posts)
+     def legal_list():
+         uid = session.get('user_id')
+         if has_page_access('legal'):
+             posts = LegalPost.query.order_by(LegalPost.created_at.desc()).all()
+         elif uid:
+             posts = LegalPost.query.filter_by(user_id=uid).order_by(LegalPost.created_at.desc()).all()
+         else:
+             posts = LegalPost.query.filter(LegalPost.user_id.is_(None)).order_by(LegalPost.created_at.desc()).all()
+         return render_template('legal_board.html', posts=posts)
 
     @app.route('/legal/write', methods=['GET', 'POST'])
     def legal_write():
@@ -4859,16 +4874,15 @@ def register_routes(app):
 
     # --- [심리상담소] ---
     @app.route('/psycho/list')
-    def psycho_list():
-        uid = session.get('user_id')
-        role = session.get('role','')
-        if role in ('admin','leader'):
-            posts = PsychoPost.query.order_by(PsychoPost.created_at.desc()).all()
-        elif uid:
-            posts = PsychoPost.query.filter_by(user_id=uid).order_by(PsychoPost.created_at.desc()).all()
-        else:
-            posts = PsychoPost.query.filter(PsychoPost.user_id.is_(None)).order_by(PsychoPost.created_at.desc()).all()
-        return render_template('psycho_board.html', posts=posts)
+def psycho_list():
+         uid = session.get('user_id')
+         if has_page_access('psycho'):
+             posts = PsychoPost.query.order_by(PsychoPost.created_at.desc()).all()
+         elif uid:
+             posts = PsychoPost.query.filter_by(user_id=uid).order_by(PsychoPost.created_at.desc()).all()
+         else:
+             posts = PsychoPost.query.filter(PsychoPost.user_id.is_(None)).order_by(PsychoPost.created_at.desc()).all()
+         return render_template('psycho_board.html', posts=posts)
 
     @app.route('/psycho/write', methods=['GET', 'POST'])
     def psycho_write():
