@@ -93,8 +93,8 @@ function toggleHtml(){var ed=document.getElementById('editor');var ha=document.g
 
 var drawing=false,drawCtx=null;
 function toggleDraw(){var da=document.getElementById('drawArea');da.style.display=da.style.display==='none'?'':'none';if(da.style.display!=='none'){var c=document.getElementById('drawCanvas');drawCtx=c.getContext('2d');drawCtx.lineWidth=2;drawCtx.strokeStyle='#000';}}
-function startDraw(e){drawing=true;drawCtx.beginPath();drawCtx.moveTo(e.offsetX,e.offsetY);}
-function draw(e){if(!drawing)return;drawCtx.lineWidth=document.getElementById('drawSize').value;drawCtx.strokeStyle=document.getElementById('drawColor').value;drawCtx.lineTo(e.offsetX,e.offsetY);drawCtx.stroke();}
+function startDraw(e){drawing=true;var r=document.getElementById('drawCanvas').getBoundingClientRect();drawCtx.beginPath();drawCtx.moveTo(e.clientX-r.left,e.clientY-r.top);}
+function draw(e){if(!drawing)return;var r=document.getElementById('drawCanvas').getBoundingClientRect();drawCtx.lineWidth=document.getElementById('drawSize').value;drawCtx.strokeStyle=document.getElementById('drawColor').value;drawCtx.lineTo(e.clientX-r.left,e.clientY-r.top);drawCtx.stroke();}
 function stopDraw(){drawing=false;}
 function startDrawTouch(e){e.preventDefault();var t=e.touches[0];var c=document.getElementById('drawCanvas');var r=c.getBoundingClientRect();drawing=true;drawCtx.beginPath();drawCtx.moveTo(t.clientX-r.left,t.clientY-r.top);}
 function drawTouch(e){e.preventDefault();if(!drawing)return;var t=e.touches[0];var c=document.getElementById('drawCanvas');var r=c.getBoundingClientRect();drawCtx.lineWidth=document.getElementById('drawSize').value;drawCtx.strokeStyle=document.getElementById('drawColor').value;drawCtx.lineTo(t.clientX-r.left,t.clientY-r.top);drawCtx.stroke();}

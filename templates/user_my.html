@@ -309,8 +309,9 @@ document.getElementById('drawBtn').addEventListener('click', ()=>{
     document.getElementById('drawPanel').style.display = '';
     const canvas = document.getElementById('drawCanvas');
     drawCtx = canvas.getContext('2d');
-    canvas.onmousedown = e => { drawing = true; drawCtx.beginPath(); drawCtx.moveTo(e.offsetX, e.offsetY); };
-    canvas.onmousemove = e => { if(!drawing) return; drawCtx.lineTo(e.offsetX, e.offsetY); drawCtx.strokeStyle = document.getElementById('drawColor').value; drawCtx.lineWidth = document.getElementById('drawSize').value; drawCtx.stroke(); };
+    var rect = canvas.getBoundingClientRect();
+    canvas.onmousedown = e => { drawing = true; drawCtx.beginPath(); drawCtx.moveTo(e.clientX-rect.left, e.clientY-rect.top); };
+    canvas.onmousemove = e => { if(!drawing) return; drawCtx.lineTo(e.clientX-rect.left, e.clientY-rect.top); drawCtx.strokeStyle = document.getElementById('drawColor').value; drawCtx.lineWidth = document.getElementById('drawSize').value; drawCtx.stroke(); };
     canvas.onmouseup = () => drawing = false;
 });
 
