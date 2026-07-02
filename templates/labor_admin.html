@@ -14,19 +14,9 @@
         <!-- AI 추천 탭 -->
         <div class="tab-pane fade show active" id="tabAi">
             <div class="card border-0 shadow-sm p-4" style="border-radius:16px;">
-                <p class="text-muted small">키워드를 입력하면 AI가 노동 관련 이슈 기사를 생성합니다. 수정 후 게시할 수 있습니다.</p>
-                <div class="input-group mb-2">
-                    <input type="text" id="aiKeyword" class="form-control" placeholder="예: 최저임금, 노조법, 주52시간" value="노동">
-                    <button class="btn btn-success" onclick="aiSuggest()">생성</button>
-                </div>
-                <div id="aiResult" class="d-none">
-                    <input type="text" id="aiTitle" class="form-control form-control-sm mb-1" placeholder="제목">
-                    <textarea id="aiContent" class="form-control form-control-sm mb-2" rows="8" placeholder="내용"></textarea>
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-sm btn-success" onclick="saveAiPost()">게시</button>
-                        <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('aiResult').classList.add('d-none')">취소</button>
-                    </div>
-                </div>
+                <p class="text-muted small">클릭하면 AI가 최신 노동 이슈 10개를 가져옵니다. 원하는 것만 골라 게시하세요.</p>
+                <button class="btn btn-success mb-3" onclick="aiSuggest()">🤖 최신 노동이슈 10개 가져오기</button>
+                <div id="aiStatus" class="small text-muted mb-2"></div>
             </div>
         </div>
 
@@ -87,11 +77,13 @@
 
 <script>
 function aiSuggest() {
-    var kw = document.getElementById('aiKeyword').value.trim() || '노동';
-    var fd = new FormData(); fd.append('keyword', kw);
-    fetch('/legal/issues/ai-suggest', {method:'POST', body:fd}).then(r=>r.json()).then(d=>{
-        if(d.status==='success') location.reload();
-        else alert(d.error);
+    document.getElementById('aiStatus').innerHTML = 'AI가 최신 노동 이슈를 가져오는 중...';
+    fetch('/legal/issues/ai-suggest', {method:'POST'}).then(r=>r.json()).then(d=>{
+        if(d.status==='success') {
+            document.getElementById('aiStatus').innerHTML = '<span class="text-success">'+d.count+'개 가져옴! 목록 탭에서 확인하세요.</span>';
+        } else {
+            document.getElementById('aiStatus').innerHTML = '<span class="text-danger">실패: '+d.error+'</span>';
+        }
     });
 }
 function importUrl() {

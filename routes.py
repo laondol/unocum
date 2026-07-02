@@ -4605,26 +4605,48 @@ def register_routes(app):
     def legal_issues_ai_suggest():
         if session.get('role') not in ['admin', 'leader']:
             return jsonify({"error":"권한 없음"}), 403
-        keyword = request.form.get('keyword','노동').strip()
+        count = 0
         try:
-            from openai import OpenAI
-            client = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=current_app.config.get('GROQ_API_KEY',''))
-            resp = client.chat.completions.create(
-                model="llama-3.1-8b-instant",
-                messages=[{"role":"system","content":"한국의 최신 노동 이슈 기사를 제목과 본문으로 작성해줘. JSON: {\"title\":\"제목\",\"content\":\"본문(500자내외)\"}"},
-                          {"role":"user","content":keyword}],
-                temperature=0.7, max_tokens=800
-            )
-            import json as _json
-            data = _json.loads(resp.choices[0].message.content)
-        except:
-            data = {"title":keyword,"content":"AI 생성 실패"}
-        post = LegalPost(title=data.get('title',keyword), content=data.get('content',''),
-                        email=session.get('email',''), author_name=session.get('real_name','이훈노무사'),
-                        user_id=session.get('user_id'), password='', labor_approved=False)
-        db.session.add(post)
-        db.session.commit()
-        return jsonify({"status":"success","id":post.id})
+            import requests as req_lib
+            naver_id = current_app.config.get('NAVER_SEARCH_CLIENT_ID','')
+            naver_secret = current_app.config.get('NAVER_SEARCH_CLIENT_SECRET','')
+            if naver_id and naver_secret:
+                resp = req_lib.get('https://openapi.naver.com/v1/search/news.json',
+                    headers={'X-Naver-Client-Id':naver_id,'X-Naver-Client-Secret':naver_secret},
+                    params={'query':'노동','display':10,'sort':'date'}, timeout=10)
+                items = resp.json().get('items',[])
+                for item in items:
+                    title = item.get('title','').replace('<b>','').replace('</b>','')
+                    desc = item.get('description','').replace('<b>','').replace('</b>','')
+                    link = item.get('link','')
+                    content = f'{desc}\n\n[원문링크]({link})'
+                    post = LegalPost(title=title, content=content, email=session.get('email',''),
+                                    author_name=session.get('real_name','이훈노무사'),
+                                    user_id=session.get('user_id'), password='', labor_approved=False)
+                    db.session.add(post)
+                    count += 1
+            else:
+                # Naver API 없는 경우 AI로 대체
+                from openai import OpenAI
+                client = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=current_app.config.get('GROQ_API_KEY',''))
+                resp = client.chat.completions.create(
+                    model="llama-3.1-8b-instant",
+                    messages=[{"role":"system","content":"한국 최신 노동 이슈 10개. JSON: [{\"title\":\"...\",\"content\":\"...\"}]"},
+                              {"role":"user","content":"노동"}],
+                    temperature=0.7, max_tokens=2000
+                )
+                import json as _json
+                items = _json.loads(resp.choices[0].message.content)
+                for item in items:
+                    post = LegalPost(title=item['title'], content=item['content'], email=session.get('email',''),
+                                    author_name=session.get('real_name','이훈노무사'),
+                                    user_id=session.get('user_id'), password='', labor_approved=False)
+                    db.session.add(post)
+                    count += 1
+            db.session.commit()
+        except Exception as e:
+            return jsonify({"status":"error","error":str(e)[:100]})
+        return jsonify({"status":"success","count":count})
 
     @app.route('/legal/issues/import-url', methods=['POST'])
     def legal_issues_import_url():
