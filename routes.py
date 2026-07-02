@@ -3647,6 +3647,9 @@ def register_routes(app):
                 return render_template('legal_post.html', post=post, need_password=False, error=False)
             return render_template('legal_post.html', post=post, need_password=True, error=True)
         if is_author or is_admin:
+            if is_admin and not post.viewed_at:
+                post.viewed_at = datetime.now()
+                db.session.commit()
             return render_template('legal_post.html', post=post, need_password=False, error=False)
         if session.get('email_verified_for_legal') and session.get('verify_email') == post.email:
             return render_template('legal_post.html', post=post, need_password=False, error=False)
@@ -3659,8 +3662,8 @@ def register_routes(app):
         role = session.get('role','')
         if not uid or (post.user_id != uid and role not in ('admin','leader')):
             return "<script>alert('수정 권한이 없습니다.'); history.back();</script>"
-        if post.answer and role not in ('admin','leader'):
-            return "<script>alert('관리자가 답변한 글은 수정할 수 없습니다.'); history.back();</script>"
+        if post.viewed_at and role not in ('admin','leader'):
+            return "<script>alert('관리자가 확인한 글은 수정할 수 없습니다.'); history.back();</script>"
         if request.method == 'POST':
             post.title = request.form.get('title', post.title)
             post.content = request.form.get('content', post.content)
@@ -4902,8 +4905,8 @@ def register_routes(app):
         role = session.get('role','')
         if not uid or (post.user_id != uid and role not in ('admin','leader')):
             return "<script>alert('수정 권한이 없습니다.'); history.back();</script>"
-        if post.answer and role not in ('admin','leader'):
-            return "<script>alert('관리자가 답변한 글은 수정할 수 없습니다.'); history.back();</script>"
+        if post.viewed_at and role not in ('admin','leader'):
+            return "<script>alert('관리자가 확인한 글은 수정할 수 없습니다.'); history.back();</script>"
         if request.method == 'POST':
             post.title = request.form.get('title', post.title)
             post.content = request.form.get('content', post.content)

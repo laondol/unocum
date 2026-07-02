@@ -80,16 +80,26 @@
             <div class="text-center text-muted py-3">아직 답변이 등록되지 않았습니다.</div>
             {% endif %}
 
-            <!-- 댓글 -->
-            <h6 class="fw-bold mt-4 mb-2">💬 댓글</h6>
+            <!-- 답글 -->
+            <h6 class="fw-bold mt-4 mb-2">💬 답글</h6>
             {% set comments = (post.comments or '').strip().split('\n') %}
             {% for c in comments %}{% if c.strip() %}
-            <div class="small border-bottom py-1 text-muted">{{ c }}</div>
+            <div class="card border-0 shadow-sm mb-2" style="border-radius:8px; background:#f8f9fa;">
+                <div class="card-body p-2 small">
+                    <div style="line-height:1.6;">{{ c|safe }}</div>
+                </div>
+            </div>
             {% endif %}{% endfor %}
             {% if session.get('user_id') %}
-            <div class="input-group input-group-sm mt-2">
-                <input type="text" id="commentInput" class="form-control" placeholder="댓글 (최대 3회)">
-                <button class="btn btn-outline-success" onclick="postComment()">등록</button>
+            <div class="card border-0 shadow-sm mt-2" style="border-radius:12px;">
+                <div class="card-body p-2">
+                    <textarea id="replyEditor" class="summernote-editor" placeholder="답글을 작성하세요..."></textarea>
+                    <input type="file" id="replyFile" class="form-control form-control-sm mt-1" style="display:none;">
+                    <div class="d-flex gap-1 mt-1">
+                        <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('replyFile').click()">📎</button>
+                        <button class="btn btn-sm btn-success" onclick="postReply()">등록</button>
+                    </div>
+                </div>
             </div>
             {% endif %}
         </div>
@@ -124,10 +134,12 @@ function verifyForgot() {
         else alert(d.error);
     });
 }
-function postComment() {
-    var content = document.getElementById('commentInput').value.trim();
-    if(!content) return;
+function postReply() {
+    var content = $('#replyEditor').summernote('code');
+    if(!content || content=='<p><br></p>') return;
     var fd = new FormData(); fd.append('content', content);
+    var file = document.getElementById('replyFile').files[0];
+    if(file) fd.append('file', file);
     fetch('/legal/post/{{ post.id }}/comment', {method:'POST', body:fd}).then(r=>r.json()).then(d=>{
         if(d.status==='success') location.reload();
         else alert(d.error);
