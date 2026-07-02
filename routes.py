@@ -3565,7 +3565,7 @@ def register_routes(app):
         for s in schedules:
             day_name = days[s.day_of_week]
             hours_text += f'{day_name} {s.start_hour:02d}:00-{s.end_hour:02d}:00, '
-        hours_text = hours_text.rstrip(', ') or '평일 10:00-16:00'
+        hours_text = '월 ~ 목 : 10~12, 13~17시'
         # 편집 가능한 페이지 내용
         from models import VillagePage
         page = VillagePage.query.filter_by(myeon='legal', ri='service').first()

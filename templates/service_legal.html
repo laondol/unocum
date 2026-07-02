@@ -1,12 +1,12 @@
 {% extends 'layout.html' %}
 {% block content %}
 <div class="container py-4" style="max-width: 800px;">
+    {% if page and page.content %}
     <div class="d-flex justify-content-end mb-2">
         {% if session.get('role') in ('admin','leader') %}
         <a href="/service/legal/edit" class="btn btn-sm btn-outline-info">⚙️ 관리</a>
         {% endif %}
     </div>
-    {% if page and page.content %}
     <div class="card border-0 shadow-sm" style="border-radius:18px;">
         <div class="card-body p-4">
             {{ page.content|safe }}
@@ -15,14 +15,19 @@
     {% else %}
     <div class="card border-0 shadow-sm" style="border-radius: 18px;">
         <div class="card-body p-4 text-center">
+            <div class="d-flex justify-content-end">
+                {% if session.get('role') in ('admin','leader') %}
+                <a href="/service/legal/edit" class="btn btn-sm btn-outline-info">⚙️ 관리</a>
+                {% endif %}
+            </div>
             <div style="font-size: 60px;">⚖️</div>
-            <h3 class="fw-bold mt-3">⚖️이훈노무사 노동법률상담실</h3>
+            <h3 class="fw-bold mt-3">⚖️이훈노무사 노동법률상담소</h3>
             <p class="text-muted">임금 체불, 부당 해고 등 억울한 노동 고민을 무료로 상담해 드립니다.</p>
             <hr>
             <div class="text-start small lh-lg">
                 <p><strong>대표 노무사</strong> : 이훈</p>
                 <p><strong>상담 분야</strong> : 임금체불, 부당해고, 산업재해, 인사·노무관리, 근로계약서 검토, 취업규칙 작성, 각종 노동위원회 사건</p>
-                <p><strong>운영 시간</strong> : {{ hours_text }}</p>
+                <p><strong>운영 시간</strong> : 월 ~ 목 : 10~12, 13~17시</p>
                 <p><strong>위치</strong> : 경기도 양평군</p>
             </div>
         </div>
