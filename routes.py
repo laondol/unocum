@@ -3608,15 +3608,15 @@ def register_routes(app):
 
     # --- [법률상담 게시판] ---
     @app.route('/legal/list')
-     def legal_list():
-         uid = session.get('user_id')
-         if has_page_access('legal'):
-             posts = LegalPost.query.order_by(LegalPost.created_at.desc()).all()
-         elif uid:
-             posts = LegalPost.query.filter_by(user_id=uid).order_by(LegalPost.created_at.desc()).all()
-         else:
-             posts = LegalPost.query.filter(LegalPost.user_id.is_(None)).order_by(LegalPost.created_at.desc()).all()
-         return render_template('legal_board.html', posts=posts)
+    def legal_list():
+        uid = session.get('user_id')
+        if has_page_access('legal'):
+            posts = LegalPost.query.order_by(LegalPost.created_at.desc()).all()
+        elif uid:
+            posts = LegalPost.query.filter_by(user_id=uid).order_by(LegalPost.created_at.desc()).all()
+        else:
+            posts = LegalPost.query.filter(LegalPost.user_id.is_(None)).order_by(LegalPost.created_at.desc()).all()
+        return render_template('legal_board.html', posts=posts)
 
     @app.route('/legal/write', methods=['GET', 'POST'])
     def legal_write():
@@ -4874,15 +4874,15 @@ def register_routes(app):
 
     # --- [심리상담소] ---
     @app.route('/psycho/list')
-def psycho_list():
-         uid = session.get('user_id')
-         if has_page_access('psycho'):
-             posts = PsychoPost.query.order_by(PsychoPost.created_at.desc()).all()
-         elif uid:
-             posts = PsychoPost.query.filter_by(user_id=uid).order_by(PsychoPost.created_at.desc()).all()
-         else:
-             posts = PsychoPost.query.filter(PsychoPost.user_id.is_(None)).order_by(PsychoPost.created_at.desc()).all()
-         return render_template('psycho_board.html', posts=posts)
+    def psycho_list():
+        uid = session.get('user_id')
+        if has_page_access('psycho'):
+            posts = PsychoPost.query.order_by(PsychoPost.created_at.desc()).all()
+        elif uid:
+            posts = PsychoPost.query.filter_by(user_id=uid).order_by(PsychoPost.created_at.desc()).all()
+        else:
+            posts = PsychoPost.query.filter(PsychoPost.user_id.is_(None)).order_by(PsychoPost.created_at.desc()).all()
+        return render_template('psycho_board.html', posts=posts)
 
     @app.route('/psycho/write', methods=['GET', 'POST'])
     def psycho_write():
