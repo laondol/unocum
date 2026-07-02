@@ -730,10 +730,23 @@ def create_app():
     # 상담게시판 보류글 1일 자동 삭제
     try:
         from models import LegalPost, PsychoPost
-        flagged_legal = LegalPost.query.filter(LegalPost.status == 'flagged', LegalPost.created_at < datetime.now() - timedelta(days=1)).all()
+        from sqlalchemy import or_
+        cutoff = datetime.now() - timedelta(days=1)
+        # 관리자 Yes 결정 후 24h 경과 또는 미결정 상태로 24h 경과
+        flagged_legal = LegalPost.query.filter(
+            LegalPost.status == 'flagged',
+            LegalPost.created_at < cutoff,
+            or_(
+                LegalPost.flagged_decision_at == None,
+                LegalPost.flagged_decision_at < cutoff
+            )
+        ).all()
         for p in flagged_legal:
             db.session.delete(p)
-        flagged_psycho = PsychoPost.query.filter(PsychoPost.status == 'flagged', PsychoPost.created_at < datetime.now() - timedelta(days=1)).all()
+        flagged_psycho = PsychoPost.query.filter(
+            PsychoPost.status == 'flagged',
+            PsychoPost.created_at < cutoff
+        ).all()
         for p in flagged_psycho:
             db.session.delete(p)
         if flagged_legal or flagged_psycho:
@@ -757,6 +770,20 @@ def create_app():
     except Exception as e:
         print(f'[SKIP] social column migration: {e}')
 
+    # legal_post / psycho_post AI 관련 컬럼 마이그레이션 (SQLite)
+    try:
+        with app.app_context():
+            inspector = inspect(db.engine)
+            for tbl_name in ['legal_post', 'psycho_post']:
+                tbl_cols = [c['name'] for c in inspector.get_columns(tbl_name)]
+                with db.engine.connect() as conn:
+                    for col, col_type in [('ai_score','INTEGER DEFAULT 0'),('ai_reason','TEXT'),('status',"VARCHAR(20) DEFAULT 'pending'"),('flagged_decision_at','DATETIME')]:
+                        if col not in tbl_cols:
+                            conn.execute(db.text(f'ALTER TABLE {tbl_name} ADD COLUMN {col} {col_type}'))
+                            print(f'[OK] {tbl_name}.{col} column added')
+    except Exception as e:
+        print(f'[SKIP] legal/psycho column migration: {e}')
+
     # PostgreSQL: jin_verified_at 컬럼 추가
     if DB_MODE == 'postgresql':
         try:
@@ -778,7 +805,7 @@ def create_app():
                     for tbl_name in ['legal_post', 'psycho_post']:
                         try:
                             tbl_cols = [c['name'] for c in sa_insp(db.engine).get_columns(tbl_name)]
-                            for col, col_type in [('ai_score','INTEGER DEFAULT 0'),('ai_reason','TEXT'),('status',"VARCHAR(20) DEFAULT 'pending'")]:
+                            for col, col_type in [('ai_score','INTEGER DEFAULT 0'),('ai_reason','TEXT'),('status',"VARCHAR(20) DEFAULT 'pending'"),('flagged_decision_at','TIMESTAMP')]:
                                 if col not in tbl_cols:
                                     conn.execute(db.text(f'ALTER TABLE {tbl_name} ADD COLUMN {col} {col_type}'))
                                     conn.commit()

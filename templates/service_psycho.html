@@ -1,8 +1,25 @@
 {% extends 'layout.html' %}
 {% block content %}
 <div class="container py-4" style="max-width: 800px;">
+    {% if page and page.content %}
+    <div class="d-flex justify-content-end mb-2 gap-1">
+        {% if session.get('role') in ('admin','leader') or 'psycho' in (session.get('managed_pages','')) %}
+        <a href="/service/psycho/edit" class="btn btn-sm btn-outline-info">⚙️ 관리</a>
+        {% endif %}
+    </div>
+    <div class="card border-0 shadow-sm" style="border-radius:18px;">
+        <div class="card-body p-4">
+            {{ page.content|safe }}
+        </div>
+    </div>
+    {% else %}
     <div class="card border-0 shadow-sm" style="border-radius: 18px;">
         <div class="card-body p-4 text-center">
+            <div class="d-flex justify-content-end gap-1">
+                {% if session.get('role') == 'leader' or 'psycho' in (session.get('managed_pages','')) %}
+                <a href="/service/psycho/edit" class="btn btn-sm btn-outline-info">⚙️ 관리</a>
+                {% endif %}
+            </div>
             <div style="font-size: 60px;">🧠</div>
             <h3 class="fw-bold mt-3">숨상담심리연구소</h3>
             <p class="text-muted">자녀양육의 어려움을 나누고 청소년상담과 장애인 가족의 일상을 위한 상담</p>
@@ -14,6 +31,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
     <div class="row g-3 mt-3">
         <div class="col-6">
@@ -26,10 +44,6 @@
                 📅 방문상담 예약<br><small class="text-muted">대면 상담 신청</small>
             </a>
         </div>
-    </div>
-
-    <div class="text-center mt-3">
-        <a href="/intro" class="btn btn-sm btn-outline-secondary">← 사업소개</a>
     </div>
 </div>
 {% endblock %}

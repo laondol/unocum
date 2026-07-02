@@ -1,4 +1,5 @@
 import smtplib
+import ssl
 from email.mime.text import MIMEText
 from flask import current_app
 
@@ -6,7 +7,7 @@ class EmailService:
     @staticmethod
     def send(to, subject, body):
         smtp_host = current_app.config.get('SMTP_HOST')
-        smtp_port = current_app.config.get('SMTP_PORT', 587)
+        smtp_port = int(current_app.config.get('SMTP_PORT', 587))
         smtp_user = current_app.config.get('SMTP_USERNAME')
         smtp_pass = current_app.config.get('SMTP_PASSWORD')
         from_addr = current_app.config.get('MAIL_FROM', 'yp@unocum.kr')
@@ -22,8 +23,18 @@ class EmailService:
         msg['To'] = to
 
         try:
-            server = smtplib.SMTP(smtp_host, smtp_port, timeout=10)
-            server.starttls()
+            use_ssl = (smtp_port == 465)
+            if use_ssl:
+                server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10)
+            else:
+                ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                if hasattr(ssl, 'OP_LEGACY_SERVER_CONNECT'):
+                    ctx.options |= ssl.OP_LEGACY_SERVER_CONNECT
+                ctx.set_ciphers('DEFAULT:@SECLEVEL=0')
+                server = smtplib.SMTP(smtp_host, smtp_port, timeout=10)
+                server.starttls(context=ctx)
             server.login(smtp_user, smtp_pass)
             server.sendmail(from_addr, [to], msg.as_string())
             server.quit()

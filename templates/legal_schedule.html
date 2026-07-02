@@ -92,6 +92,9 @@
         </div>
     </div>
     <div class="text-center mt-3">
+        {% if session.get('role') in ('admin','leader') %}
+        <a href="/legal/admin/appointments" class="btn btn-sm btn-outline-info">📅 예약 관리</a>
+        {% endif %}
         <a href="/service/legal" class="btn btn-sm btn-outline-secondary">← 법률사무소</a>
     </div>
 

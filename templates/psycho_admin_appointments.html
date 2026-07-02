@@ -1,0 +1,124 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container py-4" style="max-width: 900px;">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="fw-bold mb-0">📅 심리상담 예약 관리</h4>
+        <a href="/psycho/admin" class="btn btn-sm btn-outline-info">🧠 상담 관리</a>
+    </div>
+
+    <ul class="nav nav-tabs mb-3" id="apptTab" role="tablist">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#appointments">예약 관리</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#schedule">상담시간 설정</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#google">🔗 구글 캘린더</button></li>
+    </ul>
+
+    <div class="tab-content">
+        <div class="tab-pane fade show active" id="appointments">
+            <div class="card border-0 shadow-sm" style="border-radius: 16px;">
+                <div class="card-body">
+                    <h6 class="fw-bold">예약 신청</h6>
+                    {% for a in pending_appointments %}
+                    <div class="border-bottom pb-2 mb-2">
+                        <div class="fw-bold">{{ a.name }} ({{ a.email }})</div>
+                        <small>{{ a.date }} {{ a.time_slot }} | {{ a.location or '장소미정' }} | {{ a.phone or '연락처 없음' }}</small>
+                        <div class="mt-1 text-muted small">{% if a.fee %}💰 {{ '{:,}'.format(a.fee) }}원{% endif %} {% if a.travel_allowance %}🚗 {{ '{:,}'.format(a.travel_allowance) }}원{% endif %}</div>
+                        <div class="mt-1 small">{{ a.content[:80] or '' }}</div>
+                        <form method="post" action="/psycho/admin/appointment/{{ a.id }}/approve" class="d-inline">
+                            <input type="number" name="fee" class="form-control form-control-sm d-inline" style="width:120px;" placeholder="상담비">
+                            <input type="number" name="travel_allowance" class="form-control form-control-sm d-inline" style="width:120px;" placeholder="출장비">
+                            <button class="btn btn-sm btn-success">승인</button>
+                        </form>
+                        <form method="post" action="/psycho/admin/appointment/{{ a.id }}/reject" class="d-inline">
+                            <button class="btn btn-sm btn-outline-danger">거절</button>
+                        </form>
+                    </div>
+                    {% else %}<p class="text-muted text-center py-2">대기중인 예약이 없습니다.</p>{% endfor %}
+
+                    <h6 class="fw-bold mt-3">승인된 예약</h6>
+                    {% for a in approved_appointments %}
+                    <div class="border-bottom pb-2 mb-2">
+                        <strong>{{ a.name }}</strong> | {{ a.date }} {{ a.time_slot }} | {{ a.location or '' }}
+                        {% if a.fee %}| 💰 {{ '{:,}'.format(a.fee) }}원{% endif %}
+                        {% if a.travel_allowance %}| 🚗 {{ '{:,}'.format(a.travel_allowance) }}원{% endif %}
+                        <span class="text-success"> ✅ 승인</span>
+                    </div>
+                    {% else %}<p class="text-muted text-center py-2">승인된 예약이 없습니다.</p>{% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="schedule">
+            <div class="card border-0 shadow-sm" style="border-radius: 16px;">
+                <div class="card-body">
+                    <form method="post" action="/psycho/admin/schedule">
+                        {% for day_id, day_name in [('0','월'),('1','화'),('2','수'),('3','목'),('4','금'),('5','토'),('6','일')] %}
+                        <div class="row g-2 align-items-center mb-2">
+                            <div class="col-1">
+                                <input type="checkbox" name="day_{{ day_id }}" value="1" {% if schedules.get(day_id,{}).get('is_available',False) %}checked{% endif %}>
+                            </div>
+                            <div class="col-1 fw-bold">{{ day_name }}</div>
+                            <div class="col-3">
+                                <select name="start_{{ day_id }}" class="form-select form-select-sm">
+                                    {% for h in range(8,20) %}
+                                    <option value="{{ h }}" {% if schedules.get(day_id,{}).get('start_hour',10)==h %}selected{% endif %}>{{ h }}:00</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-3">
+                                <select name="end_{{ day_id }}" class="form-select form-select-sm">
+                                    {% for h in range(8,21) %}
+                                    <option value="{{ h }}" {% if schedules.get(day_id,{}).get('end_hour',16)==h %}selected{% endif %}>{{ h }}:00</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-2 text-muted small">~ 까지</div>
+                        </div>
+                        {% endfor %}
+                        <button type="submit" class="btn btn-success mt-2">시간 설정 저장</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="google">
+            <div class="card border-0 shadow-sm" style="border-radius: 16px;">
+                <div class="card-body">
+                    <h6 class="fw-bold mb-2">🔗 구글 캘린더 연동</h6>
+                    <p class="text-muted small">상담사의 구글 캘린더 일정이 없는 날만 예약을 받을 수 있습니다.</p>
+                    {% if gc and gc.is_connected %}
+                    <div class="alert alert-success">✅ 캘린더 연동 완료 ({{ gc.calendar_id }})</div>
+                    {% endif %}
+                    <form method="post" action="/psycho/admin/google-calendar" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Google 서비스 계정 JSON 파일</label>
+                            <input type="file" name="service_account_json" class="form-control form-control-sm" accept=".json">
+                            <div class="form-text">Google Cloud Console > 서비스 계정 > 키 > JSON 다운로드</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">캘린더 ID</label>
+                            <input type="text" name="calendar_id" class="form-control" value="{{ gc.calendar_id if gc else '' }}" placeholder="예: abc@group.calendar.google.com">
+                            <div class="form-text">구글 캘린더 설정 > 캘린더 ID</div>
+                        </div>
+                        <button type="submit" class="btn btn-success">확인 (연동 저장)</button>
+                    </form>
+                    <hr>
+                    <div class="small text-muted">
+                        <strong>설정 방법:</strong>
+                        <ol class="mt-1 mb-0">
+                            <li><a href="https://console.cloud.google.com" target="_blank">Google Cloud Console</a> → 새 프로젝트 생성</li>
+                            <li>API 라이브러리 → Google Calendar API 사용 설정</li>
+                            <li>서비스 계정 생성 → 키 → JSON 키 다운로드</li>
+                            <li>구글 캘린더 → 설정 → 캘린더 공유 → 서비스 계정 이메일을 공유 사용자로 추가</li>
+                            <li>위 JSON 파일 업로드 + 캘린더 ID 입력 → 확인</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="text-center mt-3">
+        <a href="/service/psycho" class="btn btn-sm btn-outline-secondary">← 심리상담소</a>
+    </div>
+</div>
+{% endblock %}

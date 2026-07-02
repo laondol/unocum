@@ -396,6 +396,7 @@ class LegalPost(db.Model):
     status = db.Column(db.String(20), default='pending')
     labor_approved = db.Column(db.Boolean, default=False)
     viewed_at = db.Column(db.DateTime)
+    flagged_decision_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.now)
 
 class LegalAppointment(db.Model):
@@ -448,6 +449,7 @@ class PsychoPost(db.Model):
     ai_score = db.Column(db.Integer, default=0)
     ai_reason = db.Column(db.Text)
     status = db.Column(db.String(20), default='pending')
+    flagged_decision_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.now)
 
 class PsychoAppointment(db.Model):
@@ -589,3 +591,23 @@ class VillageWish(db.Model):
     replied_by = db.Column(db.Integer, db.ForeignKey('user.id'))
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+
+class AiFeedback(db.Model):
+    __tablename__ = 'ai_feedback'
+    id = db.Column(db.Integer, primary_key=True)
+    post_type = db.Column(db.String(20), nullable=False)
+    post_id = db.Column(db.Integer, nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    admin_decision = db.Column(db.String(10), nullable=False)
+    ai_score = db.Column(db.Integer, default=0)
+    ai_reason = db.Column(db.Text)
+    title = db.Column(db.Text)
+    content = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+class BlockedEmail(db.Model):
+    __tablename__ = 'blocked_email'
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(100), nullable=False, unique=True)
+    reason = db.Column(db.String(200))
+    created_at = db.Column(db.DateTime, default=datetime.now)

@@ -3604,7 +3604,26 @@ def register_routes(app):
         return render_template('service_legal_edit.html', page=page)
 
     @app.route('/service/psycho')
-    def service_psycho(): return render_template('service_psycho.html')
+    def service_psycho():
+        from models import VillagePage
+        page = VillagePage.query.filter_by(myeon='psycho', ri='service').first()
+        return render_template('service_psycho.html', page=page)
+
+    @app.route('/service/psycho/edit', methods=['GET','POST'])
+    def service_psycho_edit():
+        if session.get('role') not in ('admin','leader'):
+            return "<script>alert('관리자 전용입니다.'); history.back();</script>"
+        from models import VillagePage
+        page = VillagePage.query.filter_by(myeon='psycho', ri='service').first()
+        if not page:
+            page = VillagePage(myeon='psycho', ri='service', title='숨상담심리연구소', content='', visibility='public', created_by=session.get('user_id'))
+            db.session.add(page)
+            db.session.flush()
+        if request.method == 'POST':
+            page.content = request.form.get('content', page.content)
+            db.session.commit()
+            return redirect(url_for('service_psycho'))
+        return render_template('service_psycho_edit.html', page=page)
 
     # --- [법률상담 게시판] ---
     @app.route('/legal/list')
@@ -3624,6 +3643,10 @@ def register_routes(app):
             # 이메일 인증 확인 (비로그인 시 필수)
             email = request.form['email']
             uid = session.get('user_id')
+            # 차단된 이메일 체크
+            from models import BlockedEmail
+            if BlockedEmail.query.filter_by(email=email).first():
+                return "<script>alert('이 이메일은 상담 이용이 제한되었습니다.'); history.back();</script>"
             if not uid:
                 # 로컬 개발환경에서는 이메일 인증 우회
                 if 'localhost' not in request.host and '127.0.0.1' not in request.host:
@@ -3665,6 +3688,15 @@ def register_routes(app):
                     return "<script>alert('닢이 부족합니다 (100닢 필요).'); history.back();</script>"
             db.session.add(post)
             db.session.commit()
+            # 3회 이상 보류 → 이메일 차단
+            if post.status == 'flagged':
+                flagged_count = LegalPost.query.filter(LegalPost.email == email, LegalPost.status == 'flagged').count()
+                if flagged_count >= 3:
+                    from models import BlockedEmail
+                    if not BlockedEmail.query.filter_by(email=email).first():
+                        blocked = BlockedEmail(email=email, reason=f'보류 3회 초과 ({flagged_count}회)')
+                        db.session.add(blocked)
+                        db.session.commit()
             if not uid and post.status == 'flagged':
                 from services.email_service import EmailService
                 EmailService.send(email, '[양평마을] 상담글 검토 필요',
@@ -3719,6 +3751,38 @@ def register_routes(app):
             db.session.commit()
             return redirect(url_for('legal_post', post_id=post.id))
         return render_template('legal_post_edit.html', post=post)
+
+    @app.route('/legal/admin/ai-decision/<int:post_id>', methods=['POST'])
+    def legal_ai_decision(post_id):
+        if session.get('role') not in ('admin','leader'):
+            return jsonify({"error":"권한 없음"}), 403
+        from models import AiFeedback, BlockedEmail
+        post = LegalPost.query.get_or_404(post_id)
+        decision = request.form.get('decision')
+        if decision not in ('yes','no'):
+            return jsonify({"error":"올바른 결정이 아닙니다."})
+        # 피드백 저장 (AI 학습용)
+        feedback = AiFeedback(
+            post_type='legal', post_id=post.id,
+            admin_id=session.get('user_id'), admin_decision=decision,
+            ai_score=post.ai_score, ai_reason=post.ai_reason,
+            title=post.title, content=post.content[:1000]
+        )
+        db.session.add(feedback)
+        if decision == 'yes':
+            # 24시간 수정 요청
+            post.flagged_decision_at = datetime.now()
+            from services.email_service import EmailService
+            EmailService.send(post.email, '[양평마을] 상담글 수정 요청',
+                f'{post.author_name}님, 귀하의 상담글 "{post.title}"이(가) 부적절한 내용으로 보류되었습니다.\n\n'
+                f'24시간 이내에 게시글을 수정해 주세요.\n수정하지 않으면 글이 자동 삭제되며, '
+                f'추후 상담 이용이 제한될 수 있습니다.\n\n게시글: https://unocum.kr/legal/post/{post.id}')
+        else:
+            # 보류 해제
+            post.status = 'pending'
+            post.flagged_decision_at = None
+        db.session.commit()
+        return jsonify({"status":"success"})
 
     @app.route('/legal/post/<int:post_id>/toggle-status', methods=['POST'])
     def legal_post_toggle_status(post_id):
@@ -3845,6 +3909,17 @@ def register_routes(app):
         gc = GoogleCalendarConfig.query.first()
         return render_template('legal_admin.html', pending_posts=pending_posts, answered_posts=answered_posts, pending_appointments=pending_appts, approved_appointments=approved_appts, schedules=schedules, gc=gc)
 
+    @app.route('/legal/admin/appointments')
+    def legal_admin_appointments():
+        if session.get('role') not in ('admin', 'leader'):
+            return "<script>alert('관리자 전용입니다.'); location.href='/service/legal';</script>"
+        pending_appts = LegalAppointment.query.filter_by(status='pending').order_by(LegalAppointment.created_at.desc()).all()
+        approved_appts = LegalAppointment.query.filter_by(status='approved').order_by(LegalAppointment.date.desc()).all()
+        schedule_rows = LawyerSchedule.query.all()
+        schedules = {str(s.day_of_week): {'is_available': s.is_available, 'start_hour': s.start_hour, 'end_hour': s.end_hour, 'slot_hours': s.slot_hours} for s in schedule_rows}
+        gc = GoogleCalendarConfig.query.first()
+        return render_template('legal_admin_appointments.html', pending_appointments=pending_appts, approved_appointments=approved_appts, schedules=schedules, gc=gc)
+
     @app.route('/legal/admin/answer/<int:post_id>', methods=['POST'])
     def legal_admin_answer(post_id):
         if session.get('role') not in ('admin', 'leader'):
@@ -3946,7 +4021,7 @@ def register_routes(app):
         booked_dates = {b[0] for b in booked}
         available_dates = []
         today = date.today()
-        for i in range(60):
+        for i in range(2, 62):
             d = today + timedelta(days=i)
             if d.weekday() in available_day_ids and d not in booked_dates:
                 available_dates.append(d.isoformat())
@@ -3966,6 +4041,9 @@ def register_routes(app):
     def legal_appointment_book():
         name = request.form['name']
         email = request.form['email']
+        from models import BlockedEmail
+        if BlockedEmail.query.filter_by(email=email).first():
+            return "<script>alert('이 이메일은 예약이 제한되었습니다.'); history.back();</script>"
         phone = request.form.get('phone', '')
         date_str = request.form['date']
         time_slot = request.form['time_slot']
@@ -4798,20 +4876,40 @@ def register_routes(app):
             naver_id = current_app.config.get('NAVER_SEARCH_CLIENT_ID','')
             naver_secret = current_app.config.get('NAVER_SEARCH_CLIENT_SECRET','')
             if naver_id and naver_secret:
-                resp = req_lib.get('https://openapi.naver.com/v1/search/news.json',
-                    headers={'X-Naver-Client-Id':naver_id,'X-Naver-Client-Secret':naver_secret},
-                    params={'query':'노동','display':10,'sort':'date'}, timeout=10)
-                items = resp.json().get('items',[])
-                for item in items:
+                # 여러 키워드로 검색
+                keywords = ['노동법', '임금체불', '부당해고', '노동위원회']
+                all_items = []
+                for kw in keywords:
+                    try:
+                        resp = req_lib.get('https://openapi.naver.com/v1/search/news.json',
+                            headers={'X-Naver-Client-Id':naver_id,'X-Naver-Client-Secret':naver_secret},
+                            params={'query':kw,'display':5,'sort':'date'}, timeout=10)
+                        items = resp.json().get('items',[])
+                        all_items.extend(items)
+                    except:
+                        pass
+                # 중복 제거 (link 기준)
+                seen_links = set()
+                unique_items = []
+                for item in all_items:
+                    link = item.get('link','')
+                    if link not in seen_links:
+                        seen_links.add(link)
+                        unique_items.append(item)
+                # 최대 10개
+                for item in unique_items[:10]:
                     title = item.get('title','').replace('<b>','').replace('</b>','')
                     desc = item.get('description','').replace('<b>','').replace('</b>','')
                     link = item.get('link','')
-                    content = f'{desc}\n\n[원문링크]({link})'
+                    content = f'{desc}\n\n<a href="{link}" target="_blank">원문보기</a>'
                     post = LegalPost(title=title, content=content, email=session.get('email',''),
                                     author_name=session.get('real_name','이훈노무사'),
                                     user_id=session.get('user_id'), password='', labor_approved=False)
                     db.session.add(post)
                     count += 1
+                db.session.commit()
+                if count == 0:
+                    return jsonify({"status":"error","error":"검색 결과를 찾지 못했습니다."})
             else:
                 # Naver API 없는 경우 AI로 대체
                 from openai import OpenAI
@@ -4819,7 +4917,7 @@ def register_routes(app):
                 resp = client.chat.completions.create(
                     model="llama-3.1-8b-instant",
                     messages=[{"role":"system","content":"한국 최신 노동 이슈 10개. JSON: [{\"title\":\"...\",\"content\":\"...\"}]"},
-                              {"role":"user","content":"노동"}],
+                              {"role":"user","content":"노동법 임금체불 부당해고"}],
                     temperature=0.7, max_tokens=2000
                 )
                 import json as _json
@@ -4830,9 +4928,11 @@ def register_routes(app):
                                     user_id=session.get('user_id'), password='', labor_approved=False)
                     db.session.add(post)
                     count += 1
-            db.session.commit()
+                db.session.commit()
+                if count == 0:
+                    return jsonify({"status":"error","error":"AI 생성 결과를 찾지 못했습니다."})
         except Exception as e:
-            return jsonify({"status":"error","error":str(e)[:100]})
+            return jsonify({"status":"error","error":f"오류: {str(e)[:80]}"})
         return jsonify({"status":"success","count":count})
 
     @app.route('/legal/issues/import-url', methods=['POST'])
@@ -4970,12 +5070,18 @@ def register_routes(app):
             return "<script>alert('관리자 전용입니다.'); location.href='/service/psycho';</script>"
         pending_posts = PsychoPost.query.filter_by(answer=None).order_by(PsychoPost.created_at.desc()).all()
         answered_posts = PsychoPost.query.filter(PsychoPost.answer.isnot(None)).order_by(PsychoPost.answered_at.desc()).all()
+        return render_template('psycho_admin.html', pending_posts=pending_posts, answered_posts=answered_posts)
+
+    @app.route('/psycho/admin/appointments')
+    def psycho_admin_appointments():
+        if session.get('role') not in ('admin', 'leader'):
+            return "<script>alert('관리자 전용입니다.'); location.href='/service/psycho';</script>"
         pending_appts = PsychoAppointment.query.filter_by(status='pending').order_by(PsychoAppointment.created_at.desc()).all()
         approved_appts = PsychoAppointment.query.filter_by(status='approved').order_by(PsychoAppointment.date.desc()).all()
         schedule_rows = PsychoDoctorSchedule.query.all()
         schedules = {str(s.day_of_week): {'is_available': s.is_available, 'start_hour': s.start_hour, 'end_hour': s.end_hour, 'slot_hours': s.slot_hours} for s in schedule_rows}
         gc = PsychoGoogleCalendarConfig.query.first()
-        return render_template('psycho_admin.html', pending_posts=pending_posts, answered_posts=answered_posts, pending_appointments=pending_appts, approved_appointments=approved_appts, schedules=schedules, gc=gc)
+        return render_template('psycho_admin_appointments.html', pending_appointments=pending_appts, approved_appointments=approved_appts, schedules=schedules, gc=gc)
 
     @app.route('/psycho/admin/answer/<int:post_id>', methods=['POST'])
     def psycho_admin_answer(post_id):
@@ -5005,7 +5111,7 @@ def register_routes(app):
         db.session.commit()
         EmailService.send(appt.email, "[양평마을] 심리상담 예약이 승인되었습니다",
             f"심리상담 예약이 승인되었습니다.\n\n일시: {appt.date} {appt.time_slot}\n\nhttps://test.unocum.kr/psycho/schedule")
-        return "<script>alert('예약이 승인되었습니다.'); location.href='/psycho/admin';</script>"
+        return "<script>alert('예약이 승인되었습니다.'); location.href='/psycho/admin/appointments';</script>"
 
     @app.route('/psycho/admin/appointment/<int:appt_id>/reject', methods=['POST'])
     def psycho_appointment_reject(appt_id):
@@ -5014,7 +5120,7 @@ def register_routes(app):
         appt = PsychoAppointment.query.get_or_404(appt_id)
         appt.status = 'rejected'
         db.session.commit()
-        return "<script>alert('예약이 거절되었습니다.'); location.href='/psycho/admin';</script>"
+        return "<script>alert('예약이 거절되었습니다.'); location.href='/psycho/admin/appointments';</script>"
 
     @app.route('/psycho/admin/schedule', methods=['POST'])
     def psycho_admin_schedule():
@@ -5038,7 +5144,7 @@ def register_routes(app):
                 if schedule:
                     schedule.is_available = False
         db.session.commit()
-        return "<script>alert('상담시간이 저장되었습니다.'); location.href='/psycho/admin';</script>"
+        return "<script>alert('상담시간이 저장되었습니다.'); location.href='/psycho/admin/appointments';</script>"
 
     @app.route('/psycho/admin/google-calendar', methods=['POST'])
     def psycho_admin_google_calendar():
@@ -5059,7 +5165,7 @@ def register_routes(app):
         gc.updated_at = datetime.now()
         db.session.commit()
         msg = '연동 저장 완료' if gc.is_connected else 'JSON 파일과 캘린더 ID를 모두 입력해야 합니다.'
-        return f"<script>alert('{msg}'); location.href='/psycho/admin';</script>"
+        return f"<script>alert('{msg}'); location.href='/psycho/admin/appointments';</script>"
 
     @app.route('/psycho/schedule')
     def psycho_schedule():
@@ -5072,7 +5178,7 @@ def register_routes(app):
         booked_dates = {b[0] for b in booked}
         available_dates = []
         today = date.today()
-        for i in range(60):
+        for i in range(2, 62):
             d = today + timedelta(days=i)
             if d.weekday() in available_day_ids and d not in booked_dates:
                 available_dates.append(d.isoformat())
@@ -5080,12 +5186,19 @@ def register_routes(app):
         for s in schedule_rows:
             for h in range(s.start_hour, s.end_hour, s.slot_hours):
                 all_slots.append(f"{h:02d}:00-{h+s.slot_hours:02d}:00")
-        return render_template('psycho_schedule.html', available_dates=available_dates, time_slots=all_slots)
+        uid = session.get('user_id')
+        my_appointments = []
+        if uid:
+            my_appointments = PsychoAppointment.query.filter_by(user_id=uid).order_by(PsychoAppointment.date.desc()).limit(10).all()
+        return render_template('psycho_schedule.html', available_dates=available_dates, time_slots=all_slots, my_appointments=my_appointments)
 
     @app.route('/psycho/appointment/book', methods=['POST'])
     def psycho_appointment_book():
         name = request.form['name']
         email = request.form['email']
+        from models import BlockedEmail
+        if BlockedEmail.query.filter_by(email=email).first():
+            return "<script>alert('이 이메일은 예약이 제한되었습니다.'); history.back();</script>"
         phone = request.form.get('phone', '')
         date_str = request.form['date']
         time_slot = request.form['time_slot']

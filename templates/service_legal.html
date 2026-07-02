@@ -2,7 +2,7 @@
 {% block content %}
 <div class="container py-4" style="max-width: 800px;">
     {% if page and page.content %}
-    <div class="d-flex justify-content-end mb-2">
+    <div class="d-flex justify-content-end mb-2 gap-1">
         {% if session.get('role') in ('admin','leader') %}
         <a href="/service/legal/edit" class="btn btn-sm btn-outline-info">⚙️ 관리</a>
         {% endif %}
@@ -15,7 +15,7 @@
     {% else %}
     <div class="card border-0 shadow-sm" style="border-radius: 18px;">
         <div class="card-body p-4 text-center">
-            <div class="d-flex justify-content-end">
+            <div class="d-flex justify-content-end gap-1">
                 {% if session.get('role') == 'leader' or 'legal' in (session.get('managed_pages','')) %}
                 <a href="/service/legal/edit" class="btn btn-sm btn-outline-info">⚙️ 관리</a>
                 {% endif %}
