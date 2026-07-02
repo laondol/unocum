@@ -4763,6 +4763,20 @@ def register_routes(app):
                 pw_hash = generate_password_hash(request.form.get('password',''))
             author_name = request.form.get('author_name', '익명') or '익명'
             post = PsychoPost(title=title, content=content, password=pw_hash, email=email, author_name=author_name, user_id=uid)
+            try:
+                ai_res = call_ai_judge(title, content)
+                post.ai_score = ai_res.get('score', 0)
+                post.ai_reason = ai_res.get('reason', '')
+                if post.ai_score < -20:
+                    post.status = 'flagged'
+            except:
+                pass
+            if uid:
+                user_obj = User.query.get(uid)
+                if user_obj and (user_obj.points or 0) >= 100:
+                    add_points(uid, -100, 'psycho_consult', f'심리상담: {title[:30]}')
+                elif user_obj:
+                    return "<script>alert('닢이 부족합니다 (100닢 필요).'); history.back();</script>"
             db.session.add(post)
             db.session.commit()
             session.pop('email_verified_for_psycho', None)

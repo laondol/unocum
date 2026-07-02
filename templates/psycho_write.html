@@ -2,7 +2,21 @@
 {% block content %}
 <div class="container py-4" style="max-width: 700px;">
     <h4 class="fw-bold mb-3">📝 심리상담 글쓰기</h4>
-    <form method="post" action="/psycho/write" onsubmit="this.querySelector('button[type=submit]').disabled=true;return true;">
+    {% if not session.get('user_id') %}
+    <div id="verifySection" class="card border-0 shadow-sm p-3 mb-3" style="border-radius:12px;">
+        <p class="small text-muted mb-2"><strong>📧 이메일 인증이 먼저 필요합니다.</strong></p>
+        <div class="input-group input-group-sm">
+            <input type="email" id="verifyEmail" class="form-control" placeholder="이메일">
+            <button type="button" class="btn btn-success" onclick="sendVerify('psycho')">인증코드 받기</button>
+        </div>
+        <div class="input-group input-group-sm mt-1" id="codeSection" style="display:none;">
+            <input type="text" id="verifyCode" class="form-control" placeholder="인증코드 6자리" maxlength="6">
+            <button type="button" class="btn btn-outline-success" onclick="checkVerify('psycho')">확인</button>
+        </div>
+        <div id="verifyStatus" class="small mt-1"></div>
+    </div>
+    {% endif %}
+    <form method="post" action="/psycho/write" onsubmit="return checkSubmit()">
         <div class="card border-0 shadow-sm p-4" style="border-radius: 16px;">
             <div class="mb-3">
                 <label class="form-label small fw-bold">제목</label>
@@ -19,7 +33,7 @@
                 </div>
                 <div class="col-4">
                     <label class="form-label small fw-bold">이메일 <span class="text-danger">*</span></label>
-                    <input type="email" name="email" class="form-control" value="{{ session.get('email','') }}" {{ 'readonly' if session.get('email') else '' }} required>
+                    <input type="email" name="email" id="postEmail" class="form-control" value="{{ session.get('email','') }}" {{ 'readonly' if session.get('email') else '' }} required>
                 </div>
                 <div class="col-4">
                     <label class="form-label small fw-bold">비밀번호 <span class="text-danger">*</span></label>
@@ -40,9 +54,10 @@
     </div>
 </div>
 <script>
-function togglePw() {
-    var i = document.getElementById('pwInput');
-    i.type = i.type === 'password' ? 'text' : 'password';
-}
+var verified = {{ 'true' if session.get('user_id') else 'false' }};
+function sendVerify(p){var email=document.getElementById('verifyEmail').value.trim();if(!email)return alert('이메일 입력');var fd=new FormData();fd.append('email',email);fd.append('purpose',p||'psycho');fetch('/register/send-code',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{document.getElementById('verifyStatus').innerHTML=d.msg;if(d.status==='success')document.getElementById('codeSection').style.display='';});}
+function checkVerify(p){var code=document.getElementById('verifyCode').value.trim();var fd=new FormData();fd.append('code',code);fd.append('purpose',p||'psycho');fetch('/register/verify-code',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status==='success'){verified=true;document.getElementById('postEmail').value=document.getElementById('verifyEmail').value;document.getElementById('verifyStatus').innerHTML='✅ 인증완료';}else alert(d.msg);});}
+function checkSubmit(){if(!verified&&!{{ 'true' if session.get('user_id') else 'false' }}){alert('이메일 인증을 먼저 완료해 주세요.');return false;}return true;}
+function togglePw(){var i=document.getElementById('pwInput');i.type=i.type==='password'?'text':'password';}
 </script>
 {% endblock %}
