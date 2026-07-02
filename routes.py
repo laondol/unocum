@@ -4536,7 +4536,7 @@ def register_routes(app):
 
     @app.route('/legal/issues')
     def legal_issues():
-        posts = LegalPost.query.order_by(LegalPost.created_at.desc()).limit(20).all()
+        posts = LegalPost.query.filter(LegalPost.password == '').order_by(LegalPost.created_at.desc()).limit(30).all()
         return render_template('labor_board.html', posts=posts)
 
     @app.route('/legal/issues/write', methods=['GET','POST'])
