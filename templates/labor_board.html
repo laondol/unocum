@@ -4,24 +4,51 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h4 class="fw-bold mb-0">📋 노동이슈</h4>
         {% if session.get('role') in ('admin','leader') %}
-        <a href="/legal/issues/write" class="btn btn-success btn-sm">글쓰기</a>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-info btn-sm" onclick="aiImport()">🤖 AI 노동뉴스 가져오기</button>
+            <a href="/legal/issues/write" class="btn btn-success btn-sm">글쓰기</a>
+        </div>
         {% endif %}
     </div>
 
     {% if posts %}
-    <div class="list-group list-group-flush">
-        {% for p in posts %}
-        <a href="/legal/issues/{{ p.id }}" class="list-group-item list-group-item-action">
-            <div class="d-flex justify-content-between">
-                <strong>{{ p.title }}</strong>
-                <small class="text-muted">{{ p.created_at.strftime('%m/%d') if p.created_at else '' }}</small>
+    {% for p in posts %}
+    <a href="/legal/issues/{{ p.id }}" class="text-decoration-none">
+        <div class="card border-0 shadow-sm mb-2" style="border-radius:12px;">
+            <div class="card-body p-3">
+                <div class="d-flex justify-content-between">
+                    <strong class="text-dark">{{ p.title }}</strong>
+                    <small class="text-muted">{{ p.created_at.strftime('%m/%d') if p.created_at else '' }}</small>
+                </div>
+                <div class="small text-muted mt-1">
+                    {{ p.author_name }} | 댓글 {{ (p.comments or '').split('\n')|length - 1 if p.comments else 0 }}
+                </div>
             </div>
-            <small class="text-muted">{{ p.author_name }} | 댓글 {{ (p.comments or '').split('\n')|length - 1 }}</small>
-        </a>
-        {% endfor %}
-    </div>
+        </div>
+    </a>
+    {% endfor %}
     {% else %}
-    <div class="text-center py-5 text-muted">등록된 이슈가 없습니다.</div>
+    <div class="text-center py-5 text-muted">
+        <div class="fs-1 mb-2">📋</div>
+        <p>등록된 이슈가 없습니다.<br>관리자가 노동 관련 이슈를 등록하면 여기에 표시됩니다.</p>
+    </div>
     {% endif %}
 </div>
+
+{% if session.get('role') in ('admin','leader') %}
+<script>
+function aiImport() {
+    var q = prompt('검색할 노동 키워드를 입력하세요 (예: 최저임금, 노동법 개정):');
+    if (!q) return;
+    var fd = new FormData();
+    fd.append('keyword', q);
+    fd.append('title', q);
+    fd.append('content', '');
+    fetch('/legal/issues/write', {method:'POST', body:fd}).then(r=>{
+        if(r.redirected) location.reload();
+        else if(r.ok) location.reload();
+    });
+}
+</script>
+{% endif %}
 {% endblock %}

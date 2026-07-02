@@ -4545,8 +4545,23 @@ def register_routes(app):
             return "<script>alert('관리자만 작성할 수 있습니다.'); history.back();</script>"
         if request.method == 'POST':
             title = request.form['title']
-            content = request.form['content']
-            post = LegalPost(title=title, content=content, email=session.get('email',''), 
+            content = request.form.get('content','').strip()
+            # AI로 노동 관련 내용 가져오기
+            if not content:
+                keyword = request.form.get('keyword', title)
+                try:
+                    from openai import OpenAI
+                    client = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=current_app.config.get('GROQ_API_KEY',''))
+                    resp = client.chat.completions.create(
+                        model="llama-3.1-8b-instant",
+                        messages=[{"role":"system","content":"한국의 최신 노동 관련 이슈에 대해 500자 내외로 정리해줘. 마크다운 없이 일반 텍스트로."},
+                                  {"role":"user","content":keyword}],
+                        temperature=0.5, max_tokens=600
+                    )
+                    content = resp.choices[0].message.content
+                except Exception as e:
+                    content = f'AI 콘텐츠 생성 실패: {e}'
+            post = LegalPost(title=title, content=content, email=session.get('email',''),
                            author_name=session.get('real_name') or session.get('username','이훈노무사'),
                            user_id=session.get('user_id'), password='')
             db.session.add(post)
