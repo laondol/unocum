@@ -63,6 +63,28 @@
     </div>
     {% endif %}
 
+    <!-- 상담 예약 -->
+    {% if is_own and appointments %}
+    <div class="card border-0 shadow-sm mb-3" style="border-radius: 18px;">
+        <div class="card-header bg-white fw-bold" style="border-radius: 18px 18px 0 0;">📅 법률상담 예약</div>
+        <div class="card-body p-0">
+            {% for a in appointments %}
+            <div class="p-2 border-bottom small">
+                <div class="d-flex justify-content-between">
+                    <a href="/legal/schedule" class="text-decoration-none"><strong>{{ a.title or '상담' }}</strong></a>
+                    <span class="badge bg-{{ 'success' if a.status=='approved' else 'warning' if a.status=='pending' else 'secondary' }}">{{ a.status }}</span>
+                </div>
+                <div class="text-muted">{{ a.date }} {{ a.time_slot }} | {{ a.location }}</div>
+                <div class="mt-1">
+                    <a href="{{ a.edit_url }}" class="btn btn-sm btn-outline-secondary py-0 px-1">✏️</a>
+                    <button class="btn btn-sm btn-outline-danger py-0 px-1" onclick="if(confirm('삭제하시겠습니까?')){fetch('/legal/appointment/{{ a.id }}/delete',{method:'POST'}).then(r=>r.json()).then(d=>{if(d.status==='success')location.reload();})}">🗑️</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
     <!-- 통벗 활동 -->
     {% if is_own and (bot_memory or bot_drafts) %}
     <div class="card border-0 shadow-sm mb-3" style="border-radius: 18px;">

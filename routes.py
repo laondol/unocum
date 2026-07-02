@@ -1933,6 +1933,20 @@ def register_routes(app):
         legal_posts = LegalPost.query.filter_by(user_id=user.id).order_by(LegalPost.created_at.desc()).all() if hasattr(LegalPost, 'user_id') else []
         for l in legal_posts:
             posts.append({'title': l.title, 'date': l.created_at.strftime('%Y-%m-%d %H:%M') if l.created_at else '', 'type': '법률', 'url': f'/legal/post/{l.id}', 'id': l.id})
+        # 상담 예약
+        appointments = LegalAppointment.query.filter_by(user_id=user.id).order_by(LegalAppointment.date.desc()).limit(10).all()
+        appt_list = []
+        for a in appointments:
+            appt_list.append({
+                'title': a.content or '상담예약',
+                'date': a.date.isoformat() if a.date else '',
+                'time_slot': a.time_slot,
+                'location': a.location or '',
+                'status': a.status,
+                'url': f'/legal/schedule',
+                'edit_url': f'/legal/appointment/{a.id}/edit',
+                'id': a.id
+            })
         # 통벗 초안
         drafts = TongBotDraft.query.filter_by(user_id=user.id).order_by(TongBotDraft.updated_at.desc()).all()
         for d in drafts:
@@ -2037,6 +2051,7 @@ def register_routes(app):
             bot_name=bot_name,
             posts=posts,
             share_images=share_images,
+            appointments=appt_list,
             bot_memory=bot_memory,
             bot_drafts=bot_drafts,
             curr_location=curr_location,
