@@ -3762,9 +3762,10 @@ def register_routes(app):
         if not content: return jsonify({"error":"내용을 입력하세요."})
         existing = (post.comments or '').count(f'[{uid}]')
 
-        from services.ai_service import moderate_comment
-        ok, reason = moderate_comment(content)
-        if not ok: return jsonify({"error":reason})
+        from services.ai_service import call_ai_judge
+        ai_res = call_ai_judge('', content, is_comment=True)
+        if ai_res.get('score', 0) < -20:
+            return jsonify({"error":"부적절한 내용으로 차단되었습니다."})
         name = session.get('real_name') or session.get('username','')
         post.comments = (post.comments or '') + f'\n[{name}] {content} ({datetime.now().strftime("%m/%d %H:%M")})'
         db.session.commit()
@@ -3779,9 +3780,10 @@ def register_routes(app):
         if not content: return jsonify({"error":"내용을 입력하세요."})
         existing = (post.comments or '').count(f'[{uid}]')
 
-        from services.ai_service import moderate_comment
-        ok, reason = moderate_comment(content)
-        if not ok: return jsonify({"error":reason})
+        from services.ai_service import call_ai_judge
+        ai_res = call_ai_judge('', content, is_comment=True)
+        if ai_res.get('score', 0) < -20:
+            return jsonify({"error":"부적절한 내용으로 차단되었습니다."})
         name = session.get('real_name') or session.get('username','')
         post.comments = (post.comments or '') + f'\n[{name}] {content} ({datetime.now().strftime("%m/%d %H:%M")})'
         db.session.commit()
