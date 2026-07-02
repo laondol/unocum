@@ -5,12 +5,27 @@
     <div class="card border-0 shadow-sm p-4" style="border-radius: 16px;">
         <h5 class="fw-bold text-center">🔒 비밀번호를 입력하세요</h5>
         {% if error %}<div class="alert alert-danger py-2">비밀번호가 틀렸습니다.</div>{% endif %}
-        <form method="post">
+        <form method="post" class="mb-3">
             <div class="input-group">
                 <input type="password" name="password" class="form-control" placeholder="비밀번호" required>
                 <button class="btn btn-success" type="submit">확인</button>
             </div>
         </form>
+        <hr>
+        <p class="small text-muted text-center">비밀번호를 잊으셨나요?</p>
+        <div id="forgotSection">
+            <div class="input-group input-group-sm mb-1">
+                <input type="email" id="forgotEmail" class="form-control" placeholder="작성 시 입력한 이메일">
+                <button class="btn btn-outline-success" onclick="sendForgot()">인증코드 받기</button>
+            </div>
+            <div id="codeSection" style="display:none;" class="mt-1">
+                <div class="input-group input-group-sm">
+                    <input type="text" id="forgotCode" class="form-control" placeholder="인증코드 6자리" maxlength="6">
+                    <button class="btn btn-success" onclick="verifyForgot()">인증하고 보기</button>
+                </div>
+            </div>
+            <div id="forgotStatus" class="small mt-1"></div>
+        </div>
     </div>
 
     {% else %}
@@ -59,6 +74,24 @@
 function toggleStatus(id) {
     fetch('/legal/post/'+id+'/toggle-status', {method:'POST'}).then(r=>r.json()).then(d=>{
         if(d.status==='success') location.reload();
+    });
+}
+function sendForgot() {
+    var email = document.getElementById('forgotEmail').value.trim();
+    if(!email) return alert('이메일을 입력하세요.');
+    var fd = new FormData(); fd.append('email', email);
+    fetch('/legal/forgot-password', {method:'POST', body:fd}).then(r=>r.json()).then(d=>{
+        document.getElementById('forgotStatus').innerHTML = '<span class="text-success">'+d.msg+'</span>';
+        if(d.status==='success') document.getElementById('codeSection').style.display='';
+        else alert(d.error);
+    });
+}
+function verifyForgot() {
+    var code = document.getElementById('forgotCode').value.trim();
+    var fd = new FormData(); fd.append('code', code);
+    fetch('/legal/verify-forgot', {method:'POST', body:fd}).then(r=>r.json()).then(d=>{
+        if(d.status==='success') location.reload();
+        else alert(d.error);
     });
 }
 </script>

@@ -3648,6 +3648,8 @@ def register_routes(app):
             return render_template('legal_post.html', post=post, need_password=True, error=True)
         if is_author or is_admin:
             return render_template('legal_post.html', post=post, need_password=False, error=False)
+        if session.get('email_verified_for_legal') and session.get('verify_email') == post.email:
+            return render_template('legal_post.html', post=post, need_password=False, error=False)
         return render_template('legal_post.html', post=post, need_password=True, error=False)
 
     @app.route('/legal/post/<int:post_id>/edit', methods=['GET','POST'])
@@ -3682,6 +3684,32 @@ def register_routes(app):
         post.status = 'flagged' if post.status != 'flagged' else 'pending'
         db.session.commit()
         return jsonify({"status":"success","new_status":post.status})
+
+    @app.route('/legal/forgot-password', methods=['POST'])
+    def legal_forgot_password():
+        email = request.form.get('email','').strip()
+        if not email:
+            return jsonify({"error":"이메일을 입력하세요."})
+        post = LegalPost.query.filter_by(email=email).order_by(LegalPost.created_at.desc()).first()
+        if not post:
+            return jsonify({"error":"등록된 상담글이 없습니다."})
+        import secrets
+        code = secrets.token_hex(3)[:6].upper()
+        session['verify_email'] = email
+        session['email_verified_for_legal'] = False
+        from services.email_service import EmailService
+        EmailService.send(email, '[양평마을] 상담글 인증코드',
+            f'인증코드: {code}\n\n이 코드로 상담글을 확인하실 수 있습니다.')
+        session['forgot_code'] = code
+        return jsonify({"status":"success","msg":"인증코드를 이메일로 발송했습니다."})
+
+    @app.route('/legal/verify-forgot', methods=['POST'])
+    def legal_verify_forgot():
+        code = request.form.get('code','').strip()
+        if code == session.get('forgot_code',''):
+            session['email_verified_for_legal'] = True
+            return jsonify({"status":"success"})
+        return jsonify({"error":"인증코드가 일치하지 않습니다."})
         if request.method == 'POST':
             post.title = request.form.get('title', post.title)
             post.content = request.form.get('content', post.content)
@@ -4749,6 +4777,8 @@ def register_routes(app):
                 return render_template('psycho_post.html', post=post, need_password=False, error=False)
             return render_template('psycho_post.html', post=post, need_password=True, error=True)
         if is_author or is_admin:
+            return render_template('psycho_post.html', post=post, need_password=False, error=False)
+        if session.get('email_verified_for_legal') and session.get('verify_email') == post.email:
             return render_template('psycho_post.html', post=post, need_password=False, error=False)
         return render_template('psycho_post.html', post=post, need_password=True, error=False)
 
