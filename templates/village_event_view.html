@@ -12,6 +12,7 @@
                 <div class="text-end small text-muted">
                     <div>{{ event.event_date.strftime('%Y-%m-%d %H:%M') if event.event_date else '' }}</div>
                     <div>📍 {{ event.location or '미정' }}</div>
+                    <a href="/village/event/{{ event.id }}/qr" class="btn btn-sm btn-outline-secondary py-0 px-1 mt-1">📱 QR</a>
                 </div>
             </div>
             <p class="mt-2">{{ event.description or '' }}</p>

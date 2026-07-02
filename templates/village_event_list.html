@@ -2,7 +2,7 @@
 {% block content %}
 <div class="container py-4" style="max-width: 800px;">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="fw-bold mb-0"><span class="badge bg-success me-2">마</span>마을 행사·회의</h4>
+        <h4 class="fw-bold mb-0"><span class="badge bg-success me-2">마</span>활동</h4>
         <a href="/village/event/create" class="btn btn-sm btn-success">+ 새로 만들기</a>
     </div>
 
@@ -24,12 +24,13 @@
                                 <span class="badge {{ 'bg-info' if etype=='meeting' else 'bg-warning' }} me-1">{{ label }}</span>
                                 <strong class="text-dark">{{ e.title }}</strong>
                             </div>
-                            <small class="text-muted">{{ e.event_date.strftime('%m/%d %H:%M') if e.event_date else '' }}</small>
-                        </div>
-                        <div class="small text-muted mt-1">
-                            📍 {{ e.location or '미정' }} |
-                            {{ {'upcoming':'예정','ongoing':'진행중','completed':'완료','afterparty':'뒤풀이'}.get(e.status,'') }}
-                        </div>
+                    <small class="text-muted">{{ e.event_date.strftime('%m/%d %H:%M') if e.event_date else '' }}</small>
+                </div>
+                <div class="small text-muted mt-1">
+                    📍 {{ e.location or '미정' }} |
+                    {{ {'upcoming':'예정','ongoing':'진행중','completed':'완료','afterparty':'뒤풀이'}.get(e.status,'') }}
+                    <a href="/village/event/{{ e.id }}/qr" class="btn btn-sm btn-outline-secondary py-0 px-1 ms-2">📱 QR</a>
+                </div>
                     </div>
                 </div>
             </a>

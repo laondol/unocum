@@ -4446,6 +4446,15 @@ def register_routes(app):
         db.session.commit()
         return jsonify({"status":"success"})
 
+    @app.route('/village/event/<int:event_id>/qr')
+    def village_event_qr(event_id):
+        if not has_page_access('village'):
+            return "권한 없음", 403
+        ev = VillageEvent.query.get_or_404(event_id)
+        site_url = current_app.config.get('SITE_URL', request.host_url.rstrip('/'))
+        qr_url = f'{site_url}/village/event/{ev.id}'
+        return render_template('village_event_qr.html', event=ev, qr_url=qr_url)
+
     @app.route('/village/event/<int:event_id>/ping', methods=['POST'])
     def village_event_ping(event_id):
         uid = session.get('user_id')
