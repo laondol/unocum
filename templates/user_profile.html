@@ -20,7 +20,10 @@
                     <div class="d-flex gap-1 flex-wrap mb-2">
                         <span class="badge bg-light text-dark small">{{ profile_user.town }} {{ profile_user.village }}</span>
                         {% if profile_user.is_neighbor %}<span class="badge bg-success small">이웃</span>{% endif %}
-                        {% if profile_user.role == 'admin' %}<span class="badge bg-danger small">관</span>{% elif profile_user.role == 'leader' %}<span class="badge bg-primary small">책</span>{% endif %}
+                        {% set p_is_village = 'village' in (profile_user.managed_pages or '') or ((profile_user.managed_pages or '')[:3] == 'vi_') %}
+                        {% if profile_user.role == 'leader' %}<span class="badge bg-primary small">책</span>{% endif %}
+                        {% if profile_user.role == 'admin' or profile_user.managed_pages %}<span class="badge bg-danger small">관</span>{% endif %}
+                        {% if p_is_village %}<span class="badge bg-success small">마</span>{% endif %}
                     </div>
                     <a href="#" onclick="document.getElementById('nipSection').classList.toggle('d-none'); return false;" class="text-decoration-none">
                         <span class="fw-bold text-success fs-5">{{ profile_user.points | comma }}</span>

@@ -21,9 +21,9 @@
                 </div>
                 <strong>{{ u.real_name or u.username or '이름없음' }}</strong>
                 {% set is_village = 'village' in (u.managed_pages or '') or (u.managed_pages or '')[:3] == 'vi_' %}
-                {% set badge_class = 'bg-primary' if u.role == 'leader' else ('bg-success' if is_village else 'bg-danger') %}
-                {% set badge_text = '책' if u.role == 'leader' else ('마' if is_village else '관') %}
-                <span class="badge {{ badge_class }}">{{ badge_text }}</span>
+                {% if u.role == 'leader' %}<span class="badge bg-primary">책</span>{% endif %}
+                {% if u.role == 'admin' or u.managed_pages %}<span class="badge bg-danger">관</span>{% endif %}
+                {% if is_village %}<span class="badge bg-success">마</span>{% endif %}
                 <span class="text-muted small">ID:{{ u.id }}</span>
                 <span class="text-muted small">{{ u.email }}</span>
                 <span class="text-muted small">📍{{ u.town or '-' }} {{ u.village or '' }}</span>

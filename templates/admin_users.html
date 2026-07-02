@@ -48,7 +48,7 @@
                             {% set is_admin = u.role == 'admin' or u.managed_pages %}
                             {% set is_village = 'village' in (u.managed_pages or '') or ((u.managed_pages or '')[:3] == 'vi_') %}
                             {% if is_leader %}<a href="/admin/page-managers?user_id={{ u.id }}" class="badge bg-primary text-decoration-none me-1">책</a>{% endif %}
-                            {% if is_admin and not is_leader %}<a href="/admin/page-managers?user_id={{ u.id }}" class="badge bg-danger text-decoration-none me-1">관</a>{% endif %}
+                            {% if is_admin %}<a href="/admin/page-managers?user_id={{ u.id }}" class="badge bg-danger text-decoration-none me-1">관</a>{% endif %}
                             {% if is_village %}<a href="/admin/page-managers?user_id={{ u.id }}" class="badge bg-success text-decoration-none me-1">마</a>{% endif %}
                             {% if not is_leader and not is_admin and not is_village %}
                             <a href="/admin/page-managers?user_id={{ u.id }}" class="text-muted text-decoration-none small">+역할</a>
