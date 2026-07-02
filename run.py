@@ -54,6 +54,16 @@ def create_app():
                             print('[OK] legal_post.labor_approved column added')
                 except:
                     pass
+            # message.attachment 컬럼
+            try:
+                msg_cols = [c['name'] for c in _inspector.get_columns('message')]
+                if 'attachment' not in msg_cols:
+                    with db.engine.connect() as conn:
+                        conn.execute(db.text('ALTER TABLE message ADD COLUMN attachment VARCHAR(500)'))
+                        conn.commit()
+                        print('[OK] message.attachment column added')
+            except:
+                pass
         except Exception as e:
             print(f'[SKIP] critical column migration: {e}')
     
