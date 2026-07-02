@@ -4795,49 +4795,6 @@ def register_routes(app):
         db.session.commit()
         return jsonify({"status":"success","approved":post.labor_approved})
 
-    @app.route('/legal/post/<int:post_id>/comment', methods=['POST'])
-    def legal_post_comment(post_id):
-        uid = session.get('user_id')
-        if not uid: return jsonify({"error":"로그인 필요"}), 401
-        post = LegalPost.query.get_or_404(post_id)
-        content = request.form.get('content','').strip()
-        if not content: return jsonify({"error":"내용을 입력하세요."})
-        existing = (post.comments or '').count(f'[{uid}]')
-        if existing >= 3: return jsonify({"error":"댓글은 3회까지만 가능합니다."})
-        from services.ai_service import moderate_comment
-        ok, reason = moderate_comment(content)
-        if not ok: return jsonify({"error":reason})
-        name = session.get('real_name') or session.get('username','')
-        post.comments = (post.comments or '') + f'\n[{name}] {content} ({datetime.now().strftime("%m/%d %H:%M")})'
-        db.session.commit()
-        return jsonify({"status":"success"})
-
-    @app.route('/legal/admin/answer/edit/<int:post_id>', methods=['POST'])
-    def legal_admin_answer_edit(post_id):
-        if session.get('role') not in ('admin', 'leader'):
-            return jsonify({"error":"권한 없음"}), 403
-        post = LegalPost.query.get_or_404(post_id)
-        post.answer = request.form.get('answer', post.answer)
-        post.fee = int(request.form.get('fee')) if request.form.get('fee') else post.fee
-        post.travel_allowance = int(request.form.get('travel_allowance')) if request.form.get('travel_allowance') else post.travel_allowance
-        db.session.commit()
-        return jsonify({"status":"success"})
-        # AI 필터링
-        from services.ai_service import moderate_comment
-        ok, reason = moderate_comment(content)
-        if not ok:
-            return f"<script>alert('{reason}'); history.back();</script>"
-        post = LegalPost.query.get_or_404(post_id)
-        comments = post.comments or ''
-        name = session.get('real_name') or session.get('username','익명')
-        comments += f'\n[{name}] {content} ({datetime.now().strftime("%m/%d %H:%M")})'
-        post.comments = comments
-        db.session.commit()
-        from services.email_service import EmailService
-        EmailService.send('daerilee@gmail.com', f'[노동이슈 댓글] {post.title}',
-            f'작성자: {name}\n내용: {content}\n게시글: {post.title}')
-        return redirect(url_for('legal_issue_detail', post_id=post_id))
-
     # --- [심리상담소] ---
     @app.route('/psycho/list')
     def psycho_list():
