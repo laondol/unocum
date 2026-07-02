@@ -3844,7 +3844,7 @@ def register_routes(app):
         appt = LegalAppointment(
             user_id=uid, name=name, email=email, phone=phone,
             date=appt_date,
-            time_slot=time_slot, location=location, content=content, title=title
+            time_slot=time_slot, location=location, content=content
         )
         db.session.add(appt)
         db.session.commit()
@@ -3860,6 +3860,30 @@ def register_routes(app):
         EmailService.send('daerilee@gmail.com', f'[법률상담] {title}',
             f'신청자: {name}\n이메일: {email}\n연락처: {phone}\n날짜: {date_str} {time_slot}\n장소: {location}\n내용: {content}')
         return "<script>alert('예약이 신청되었습니다. 승인 후 이메일로 안내드립니다.'); location.href='/service/legal';</script>"
+
+    @app.route('/legal/appointment/<int:appt_id>/edit', methods=['GET','POST'])
+    def legal_appointment_edit(appt_id):
+        appt = LegalAppointment.query.get_or_404(appt_id)
+        uid = session.get('user_id')
+        if not uid or (appt.user_id != uid and session.get('role') not in ('admin','leader')):
+            return "<script>alert('권한이 없습니다.'); history.back();</script>"
+        if request.method == 'POST':
+            appt.location = request.form.get('location', appt.location)
+            appt.content = request.form.get('content', appt.content)
+            appt.phone = request.form.get('phone', appt.phone)
+            db.session.commit()
+            return "<script>alert('수정되었습니다.'); location.href='/service/legal';</script>"
+        return render_template('legal_appointment_edit.html', appt=appt)
+
+    @app.route('/legal/appointment/<int:appt_id>/delete', methods=['POST'])
+    def legal_appointment_delete(appt_id):
+        appt = LegalAppointment.query.get_or_404(appt_id)
+        uid = session.get('user_id')
+        if not uid or (appt.user_id != uid and session.get('role') not in ('admin','leader')):
+            return jsonify({"error":"권한 없음"}), 403
+        db.session.delete(appt)
+        db.session.commit()
+        return jsonify({"status":"success","msg":"삭제되었습니다."})
 
     # --- [노동이슈 게시판] ---
     @app.route('/api/news/summarize', methods=['POST'])

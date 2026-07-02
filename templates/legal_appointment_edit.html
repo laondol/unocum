@@ -1,0 +1,25 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container py-4" style="max-width: 500px;">
+    <h4 class="fw-bold mb-3">✏️ 예약 수정</h4>
+    <form method="post" class="card border-0 shadow-sm p-4" style="border-radius:16px;">
+        <div class="mb-2">
+            <label class="small fw-bold">연락처</label>
+            <input type="tel" name="phone" class="form-control form-control-sm" value="{{ appt.phone or '' }}">
+        </div>
+        <div class="mb-2">
+            <label class="small fw-bold">장소</label>
+            <input type="text" name="location" class="form-control form-control-sm" value="{{ appt.location or '' }}">
+        </div>
+        <div class="mb-2">
+            <label class="small fw-bold">상담 내용</label>
+            <textarea name="content" class="form-control form-control-sm" rows="3">{{ appt.content or '' }}</textarea>
+        </div>
+        <div class="text-muted small mb-2">날짜: {{ appt.date }} {{ appt.time_slot }}</div>
+        <button type="submit" class="btn btn-success w-100">저장</button>
+    </form>
+    <div class="text-center mt-3">
+        <a href="/legal/schedule" class="btn btn-sm btn-outline-secondary">&larr; 돌아가기</a>
+    </div>
+</div>
+{% endblock %}
