@@ -3731,7 +3731,7 @@ def register_routes(app):
         content = request.form.get('content','').strip()
         if not content: return jsonify({"error":"내용을 입력하세요."})
         existing = (post.comments or '').count(f'[{uid}]')
-        if existing >= 3: return jsonify({"error":"댓글은 3회까지만 가능합니다."})
+
         from services.ai_service import moderate_comment
         ok, reason = moderate_comment(content)
         if not ok: return jsonify({"error":reason})
@@ -3748,7 +3748,7 @@ def register_routes(app):
         content = request.form.get('content','').strip()
         if not content: return jsonify({"error":"내용을 입력하세요."})
         existing = (post.comments or '').count(f'[{uid}]')
-        if existing >= 3: return jsonify({"error":"댓글은 3회까지만 가능합니다."})
+
         from services.ai_service import moderate_comment
         ok, reason = moderate_comment(content)
         if not ok: return jsonify({"error":reason})
