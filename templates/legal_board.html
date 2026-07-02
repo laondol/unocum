@@ -4,9 +4,7 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h4 class="fw-bold mb-0">📋 법률상담 게시판</h4>
         <div class="d-flex gap-2">
-            {% if session.get('user_id') %}
             <a href="/legal/write" class="btn btn-sm btn-success">상담 글쓰기</a>
-            {% endif %}
         </div>
     </div>
 
