@@ -4803,7 +4803,7 @@ def register_routes(app):
         appt = PsychoAppointment(
             user_id=uid, name=name, email=email, phone=phone,
             date=appt_date,
-            time_slot=time_slot, location=location, content=content, title=title
+            time_slot=time_slot, location=location, content=content
         )
         db.session.add(appt)
         db.session.commit()
