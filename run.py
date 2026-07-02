@@ -673,6 +673,21 @@ def create_app():
     except Exception as e:
         print(f'[SKIP] expired post cleanup: {e}')
 
+    # 상담게시판 보류글 1일 자동 삭제
+    try:
+        from models import LegalPost, PsychoPost
+        flagged_legal = LegalPost.query.filter(LegalPost.status == 'flagged', LegalPost.created_at < datetime.now() - timedelta(days=1)).all()
+        for p in flagged_legal:
+            db.session.delete(p)
+        flagged_psycho = PsychoPost.query.filter(PsychoPost.status == 'flagged', PsychoPost.created_at < datetime.now() - timedelta(days=1)).all()
+        for p in flagged_psycho:
+            db.session.delete(p)
+        if flagged_legal or flagged_psycho:
+            db.session.commit()
+            print(f'[OK] {len(flagged_legal)+len(flagged_psycho)} flagged consultation post(s) auto-deleted')
+    except Exception as e:
+        print(f'[SKIP] flagged post cleanup: {e}')
+
     # User 테이블 social_id 등 신규 컬럼 별도 마이그레이션 (기존 migrate_news_article 스킵 방지)
     try:
         with app.app_context():

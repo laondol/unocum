@@ -3644,6 +3644,20 @@ def register_routes(app):
         role = session.get('role','')
         if not uid or (post.user_id != uid and role not in ('admin','leader')):
             return "<script>alert('수정 권한이 없습니다.'); history.back();</script>"
+        if post.answer and role not in ('admin','leader'):
+            return "<script>alert('관리자가 답변한 글은 수정할 수 없습니다.'); history.back();</script>"
+        if post.status == 'flagged' and role not in ('admin','leader'):
+            pass  # flagged는 수정 허용
+
+    @app.route('/legal/post/<int:post_id>/toggle-status', methods=['POST'])
+    def legal_post_toggle_status(post_id):
+        role = session.get('role','')
+        if role not in ('admin','leader'):
+            return jsonify({"error":"권한 없음"}), 403
+        post = LegalPost.query.get_or_404(post_id)
+        post.status = 'flagged' if post.status != 'flagged' else 'pending'
+        db.session.commit()
+        return jsonify({"status":"success","new_status":post.status})
         if request.method == 'POST':
             post.title = request.form.get('title', post.title)
             post.content = request.form.get('content', post.content)
