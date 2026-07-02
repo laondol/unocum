@@ -571,6 +571,13 @@ def create_app():
                         )
                     '''))
                     print('[OK] psycho_doctor_schedule table created')
+            with db.engine.connect() as conn:
+                existing = conn.execute(db.text('SELECT COUNT(*) FROM psycho_doctor_schedule')).scalar()
+                if not existing:
+                    for day in range(5):
+                        conn.execute(db.text('INSERT INTO psycho_doctor_schedule (day_of_week, is_available, start_hour, end_hour, slot_hours) VALUES (:day, 1, 10, 16, 2)'), {'day': day})
+                    conn.commit()
+                    print('[OK] psycho_doctor_schedule default data inserted')
 
             # PsychoGoogleCalendarConfig 테이블 생성
             try:
