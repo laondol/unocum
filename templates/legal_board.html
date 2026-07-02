@@ -3,9 +3,14 @@
 <div class="container py-4" style="max-width: 800px;">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h4 class="fw-bold mb-0">📋 법률상담 게시판</h4>
-        {% if session.get('user_id') %}
-        <a href="/legal/write" class="btn btn-sm btn-success">상담 글쓰기</a>
-        {% endif %}
+        <div class="d-flex gap-2">
+            {% if session.get('role') in ('admin','leader') %}
+            <a href="/legal/admin" class="btn btn-sm btn-outline-info">⚙️ 상담관리</a>
+            {% endif %}
+            {% if session.get('user_id') %}
+            <a href="/legal/write" class="btn btn-sm btn-success">상담 글쓰기</a>
+            {% endif %}
+        </div>
     </div>
     {% if not session.get('user_id') %}
     <div id="verifySection" class="card border-0 shadow-sm p-3 mb-3" style="border-radius:12px;">
