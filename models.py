@@ -394,6 +394,7 @@ class LegalPost(db.Model):
     ai_score = db.Column(db.Integer, default=0)
     ai_reason = db.Column(db.Text)
     status = db.Column(db.String(20), default='pending')
+    labor_approved = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.now)
 
 class LegalAppointment(db.Model):
