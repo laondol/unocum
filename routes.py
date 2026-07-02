@@ -3638,16 +3638,27 @@ def register_routes(app):
         return render_template('legal_post.html', post=post, need_password=True, error=False)
 
     @app.route('/legal/post/<int:post_id>/edit', methods=['GET','POST'])
-    def legal_post_edit(post_id):
-        post = LegalPost.query.get_or_404(post_id)
-        uid = session.get('user_id')
-        role = session.get('role','')
-        if not uid or (post.user_id != uid and role not in ('admin','leader')):
-            return "<script>alert('수정 권한이 없습니다.'); history.back();</script>"
-        if post.answer and role not in ('admin','leader'):
-            return "<script>alert('관리자가 답변한 글은 수정할 수 없습니다.'); history.back();</script>"
-        if post.status == 'flagged' and role not in ('admin','leader'):
-            pass  # flagged는 수정 허용
+     def legal_post_edit(post_id):
+         post = LegalPost.query.get_or_404(post_id)
+         uid = session.get('user_id')
+         role = session.get('role','')
+         if not uid or (post.user_id != uid and role not in ('admin','leader')):
+             return "<script>alert('수정 권한이 없습니다.'); history.back();</script>"
+         if post.answer and role not in ('admin','leader'):
+             return "<script>alert('관리자가 답변한 글은 수정할 수 없습니다.'); history.back();</script>"
+         if request.method == 'POST':
+             post.title = request.form.get('title', post.title)
+             post.content = request.form.get('content', post.content)
+             try:
+                 ai_res = call_ai_judge(post.title, post.content)
+                 post.ai_score = ai_res.get('score', 0)
+                 post.ai_reason = ai_res.get('reason', '')
+                 post.status = 'flagged' if post.ai_score < -20 else 'pending'
+             except:
+                 pass
+             db.session.commit()
+             return redirect(url_for('legal_post', post_id=post.id))
+         return render_template('legal_post_edit.html', post=post)
 
     @app.route('/legal/post/<int:post_id>/toggle-status', methods=['POST'])
     def legal_post_toggle_status(post_id):
