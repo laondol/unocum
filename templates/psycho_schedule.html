@@ -37,7 +37,7 @@
                     </div>
                     <div class="col-6">
                         <label class="form-label small fw-bold">이메일</label>
-                        <input type="email" name="email" id="bookEmail" class="form-control" value="{{ session.get('email','') }}" required readonly>
+                        <input type="email" name="email" id="bookEmail" class="form-control" value="{{ session.get('verify_email') or session.get('email','') }}" required readonly>
                         <label class="form-label small fw-bold">연락처</label>
                         <input type="tel" name="phone" class="form-control" placeholder="010-1234-5678">
                     </div>

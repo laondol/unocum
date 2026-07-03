@@ -24,7 +24,7 @@
         </div>
         <div class="mb-2">
             <label class="small fw-bold">이메일</label>
-            <input type="email" name="email" id="postEmail" class="form-control form-control-sm" value="{{ session.get('email','') }}" {{ 'readonly' if session.get('email') else '' }} required>
+            <input type="email" name="email" id="postEmail" class="form-control form-control-sm" value="{{ session.get('verify_email') or session.get('email','') }}" {{ 'readonly' if session.get('email') or session.get('verify_email') else '' }} required>
         </div>
         <div class="mb-2">
             <label class="small fw-bold">제목</label>
