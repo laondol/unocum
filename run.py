@@ -832,6 +832,22 @@ def create_app():
         except Exception as e:
             print(f'[SKIP] pg migration: {e}')
 
+    # temp_email_verify.redirect 컬럼 마이그레이션
+    try:
+        with app.app_context():
+            from sqlalchemy import inspect
+            inspector = inspect(db.engine)
+            tbl_names = inspector.get_table_names()
+            if 'temp_email_verify' in tbl_names:
+                tev_cols = [c['name'] for c in inspector.get_columns('temp_email_verify')]
+                if 'redirect' not in tev_cols:
+                    with db.engine.connect() as conn:
+                        conn.execute(db.text('ALTER TABLE temp_email_verify ADD COLUMN redirect VARCHAR(200) DEFAULT "/legal/list"'))
+                        conn.commit()
+                        print('[OK] temp_email_verify.redirect column added')
+    except Exception as e:
+        print(f'[SKIP] temp_email_verify migration: {e}')
+
     # gunicorn에서도 실행되도록 초기화 보장
     with app.app_context():
         db.create_all()
