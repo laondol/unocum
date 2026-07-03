@@ -724,7 +724,7 @@ def create_app():
     # 낙제 게시물 30일 deadline 초과 자동 삭제
     try:
         from models import Post
-        from datetime import datetime
+        from datetime import datetime, timedelta
         expired = Post.query.filter(Post.total_score <= -50, Post.deadline != None, Post.deadline < datetime.now()).all()
         for p in expired:
             db.session.delete(p)
@@ -811,8 +811,8 @@ def create_app():
                     # legal_post, psycho_post AI 컬럼
                     for tbl_name in ['legal_post', 'psycho_post']:
                         try:
-                            tbl_cols = [c['name'] for c in sa_insp(db.engine).get_columns(tbl_name)]
-                            for col, col_type in [('ai_score','INTEGER DEFAULT 0'),('ai_reason','TEXT'),('status',"VARCHAR(20) DEFAULT 'pending'"),('flagged_decision_at','TIMESTAMP')]:
+                            tbl_cols = [c['name'] for c in sa_inspect(db.engine).get_columns(tbl_name)]
+                            for col, col_type in [('ai_score','INTEGER DEFAULT 0'),('ai_reason','TEXT'),('status',"VARCHAR(20) DEFAULT 'pending'"),('viewed_at','TIMESTAMP'),('flagged_decision_at','TIMESTAMP')]:
                                 if col not in tbl_cols:
                                     conn.execute(db.text(f'ALTER TABLE {tbl_name} ADD COLUMN {col} {col_type}'))
                                     conn.commit()
@@ -820,8 +820,7 @@ def create_app():
                         except:
                             pass
                     # village_page 테이블 생성
-                    from sqlalchemy import inspect as sa_insp
-                    tables = sa_insp(db.engine).get_table_names()
+                    tables = sa_inspect(db.engine).get_table_names()
                     if 'village_page' not in tables:
                         db.create_all()
                         print('[OK] village_page table created')
