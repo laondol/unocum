@@ -44,20 +44,20 @@
                 {% if session.get('user_id') %}
                 {% if 'village' in (session.get('managed_pages','')) or session.get('role') == 'leader' %}
                 {% set mp = session.get('managed_pages','') %}
-            {% set tooltip_text = '마을' %}
-            {% for vp in mp.split(',') %}{% if vp.startswith('vi_') %}{% set parts = vp[3:].split('_') %}{% set tooltip_text = parts[1] + ' 마을' %}{% endif %}{% endfor %}
-                <div class="d-inline-flex align-items-center ms-1 position-relative" id="villageIconWrap">
-                    <a href="/village" class="text-decoration-none" title="{{ tooltip_text }}" style="font-size:1.2rem;" onclick="event.preventDefault();document.getElementById('villageMenu').classList.toggle('d-none')">🏘️</a>
-                    <div class="position-absolute bg-white border rounded shadow-sm p-2 d-none" id="villageMenu" style="z-index:1050;min-width:130px;top:100%;left:0;">
-                        <a class="d-block small py-1 px-2 text-dark text-decoration-none rounded" href="/village">📝 봉사</a>
-                                                {% set mp2 = session.get('managed_pages','') %}
-                        {% set ns = namespace(myeon='', ri2='') %}
-                        {% for vp in mp2.split(',') %}{% if vp.startswith('vi_') %}{% set parts = vp[3:].split('_') %}{% set ns.myeon = parts[0] %}{% set ns.ri2 = parts[1] %}{% endif %}{% endfor %}
-                        {% if ns.ri2 %}
-                        <a class="d-block small py-1 px-2 text-dark text-decoration-none rounded" href="/village/view/{{ ns.myeon }}/{{ ns.ri2 }}">📖 홍보</a>
-                        {% endif %}
-                    </div>
-                </div>
+                    {% set tooltip_text = '마을' %}
+                    {% for vp in mp.split(',') %}{% if vp.startswith('vi_') %}{% set parts = vp[3:].split('_') %}{% set tooltip_text = parts[1] + ' 마을' %}{% endif %}{% endfor %}
+                        <div class="d-inline-flex align-items-center ms-1 position-relative" id="villageIconWrap">
+                            <a href="/village" class="text-decoration-none" title="{{ tooltip_text }}" style="font-size:1.2rem;" onclick="event.preventDefault();document.getElementById('villageMenu').classList.toggle('d-none')">🏘️</a>
+                            <div class="position-absolute bg-white border rounded shadow-sm p-2 d-none" id="villageMenu" style="z-index:1050;min-width:130px;top:100%;left:0;">
+                                <a class="d-block small py-1 px-2 text-dark text-decoration-none rounded" href="/village">📝 봉사</a>
+                                                        {% set mp2 = session.get('managed_pages','') %}
+                                {% set ns = namespace(myeon='', ri2='') %}
+                                {% for vp in mp2.split(',') %}{% if vp.startswith('vi_') %}{% set parts = vp[3:].split('_') %}{% set ns.myeon = parts[0] %}{% set ns.ri2 = parts[1] %}{% endif %}{% endfor %}
+                                {% if ns.ri2 %}
+                                <a class="d-block small py-1 px-2 text-dark text-decoration-none rounded" href="/village/view/{{ ns.myeon }}/{{ ns.ri2 }}">📖 홍보</a>
+                                {% endif %}
+                            </div>
+                        </div>
                 {% endif %}
                 {% endif %}
                 <div class="position-absolute bg-white border rounded shadow-sm p-2 d-none" id="quickMenu" style="z-index:1050;min-width:140px;top:100%;left:0;" onclick="event.stopPropagation()">
@@ -66,7 +66,7 @@
                     <a class="d-block small py-1 px-2 text-dark text-decoration-none rounded" href="#" onclick="window.open('/user/my?popup=1','tongbotPopup','width=700,height=700,left=100,top=50');return false;">🤖 통벗채팅</a>
                 </div>
             </div>
-            </div>
+        </div>
 
             <!-- 가운데: 검색 (넓을 때) -->
             <div class="d-none d-lg-flex mx-auto flex-shrink-0">
@@ -79,7 +79,7 @@
             <div class="collapse navbar-collapse" id="navbarNav" style="background:white;z-index:1020;">
                 <ul class="navbar-nav mx-auto align-items-center">
                     <li class="nav-item dropdown mx-1"><a class="nav-link dropdown-toggle px-2" href="#" data-bs-toggle="dropdown">소개</a>
-                        <ul class="dropdown-menu border-0 shadow"><li class="dropdown-header-custom">소개</li><li><a class="dropdown-item" href="/presentation">사업소개</a></li><li><a class="dropdown-item" href="/presentation">운영계획</a></li><li><hr class="dropdown-divider"></li><li><a class="dropdown-item" href="/terms">회원약관</a></li><li><a class="dropdown-item" href="/charter">정관</a></li></ul></li>
+                        <ul class="dropdown-menu border-0 shadow"><li class="dropdown-header-custom">소개</li><li><a class="dropdown-item" href="/proposal">사업소개</a></li><li><a class="dropdown-item" href="/presentation">운영계획</a></li><li><hr class="dropdown-divider"></li><li><a class="dropdown-item" href="/terms">회원약관</a></li><li><a class="dropdown-item" href="/charter">정관</a></li></ul></li>
                     <li class="nav-item dropdown"><a class="nav-link dropdown-toggle px-2" href="#" data-bs-toggle="dropdown">소식</a>
                         <ul class="dropdown-menu"><li class="dropdown-header-custom">소식</li><li><a class="dropdown-item" href="/kr-yp-news">대한민국과양평</a></li><li><a class="dropdown-item" href="/world-news">세계와양평</a></li><li><a class="dropdown-item" href="/share">공유마당</a></li><li><a class="dropdown-item" href="/construction">📍 위치기반안내</a></li></ul></li>
                     <li class="nav-item dropdown mx-1"><a class="nav-link dropdown-toggle px-2" href="#" data-bs-toggle="dropdown">하는일</a>
@@ -101,19 +101,19 @@
                 </form>
             </div>
             <script>
-                function expandSearch(e) {
-                    var el = document.getElementById('mobileSearchInput');
-                    el.style.width = '180px';
-                    el.placeholder = '검색어 입력';
-                    return false;
+            function expandSearch(e) {
+                var el = document.getElementById('mobileSearchInput');
+                el.style.width = '180px';
+                el.placeholder = '검색어 입력';
+                return false;
+            }
+            function collapseSearch(e) {
+                var el = document.getElementById('mobileSearchInput');
+                if (!el.value) {
+                    el.style.width = '44px';
+                    el.placeholder = '🔍';
                 }
-                function collapseSearch(e) {
-                    var el = document.getElementById('mobileSearchInput');
-                    if (!el.value) {
-                        el.style.width = '36px';
-                        el.placeholder = '🔍';
-                    }
-                }
+            }
             </script>
             <!-- 오른쪽: AI + 회원정보 + 삼선 -->
             <div class="d-flex align-items-center flex-shrink-0 position-relative">

@@ -149,11 +149,15 @@ def register_routes(app):
             except:
                 pass
         return jsonify({"reply": reply})
+    
 
     @app.route('/presentation')
     def presentation():
         return render_template('presentation.html', selected_news=None)
-
+    @app.route('/proposal')
+    def proposal():
+        return render_template('proposal.html')
+    
     @app.route('/terms')
     def terms():
         return render_template('terms.html')
@@ -993,6 +997,8 @@ def register_routes(app):
                     else:
                         pages.append(page)
                     user.managed_pages = ','.join(filter(None, pages))
+                    if uid == session.get('user_id'):
+                        session['managed_pages'] = user.managed_pages
                 # 마을지기 임명 시 5만닢 일회성 지급
                 if page == 'village' and page in pages and not had_village:
                     already_got = PointHistory.query.filter_by(user_id=uid, change_type='village_appointment').first()
