@@ -13,8 +13,20 @@
             <h3 class="fw-bold mb-3">{{ report.title }}</h3>
             
             {% if report.image_path %}
-            <img src="{{ report.image_path }}" class="img-fluid rounded mb-3" style="max-height: 400px;" alt="공유 사진">
+            <div class="row g-2 mb-3">
+                <div class="col-12">
+                    <img src="{{ report.image_path }}" class="img-fluid rounded" style="max-height:400px;width:100%;object-fit:cover;" alt="공유 사진">
+                </div>
+                {% if report.extra_images %}
+                {% for img in report.extra_images.split(',') %}
+                <div class="col-4 col-md-3">
+                    <img src="{{ img }}" class="img-fluid rounded" style="height:120px;object-fit:cover;width:100%;" alt="공유 사진">
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
             {% endif %}
+
             {% if report.drawing_path %}
             <img src="{{ report.drawing_path }}" class="img-fluid rounded mb-3" style="max-height: 400px;" alt="공유 그림">
             {% endif %}
@@ -141,6 +153,10 @@
         <a href="#" onclick="openExternal('https://www.google.com/maps/dir/?api=1&destination={{ report.latitude }},{{ report.longitude }}','🗺️ 길찾기'); return false;" class="btn btn-outline-primary">🗺️ 길찾기</a>
         <a href="#" onclick="openExternal('https://maps.google.com/?q={{ report.latitude }},{{ report.longitude }}','📍 구글맵'); return false;" class="btn btn-outline-secondary">📍 구글맵</a>
     </div>
+    {% endif %}
+
+    {% if session.get('user_id') == report.user_id %}
+    <a href="/share-report/edit/{{ report.id }}" class="btn btn-sm btn-outline-primary">✏️ 수정</a>
     {% endif %}
 
     <!-- AI 모자이크 (작성자/관리자 전용) -->

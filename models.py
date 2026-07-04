@@ -205,6 +205,7 @@ class ShareReport(db.Model):
     title = db.Column(db.String(200))
     description = db.Column(db.Text)
     image_path = db.Column(db.String(300))
+    extra_images = db.Column(db.Text, default='')
     drawing_path = db.Column(db.String(300))
     video_path = db.Column(db.String(300))
     latitude = db.Column(db.Float)

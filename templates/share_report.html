@@ -25,7 +25,7 @@
                 <!-- 파일 업로드 -->
                 <div class="mb-3">
                     <span class="fw-bold small d-block mb-1">📁 파일 업로드</span>
-                    <input type="file" name="image" class="form-control" accept="image/*" onchange="previewFile(this)">
+                    <input type="file" name="image" class="form-control" accept="image/*" multiple onchange="previewFiles(this)">
                     <div id="fileUploadPreview" class="mt-2" style="display:none;"></div>
                 </div>
 
@@ -133,24 +133,19 @@ function previewVideo(input) {
     }
 }
 
-function previewFile(input) {
+function previewFiles(input) {
     const preview = document.getElementById('fileUploadPreview');
-    if (!input.files || !input.files[0]) return;
-    const file = input.files[0];
+    if (!input.files || input.files.length === 0) return;
     hasImage = true;
     checkReady();
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        if (file.type.startsWith('image/')) {
-            preview.innerHTML = `<img src="${e.target.result}" style="width:100%; border-radius:12px; border:1px solid #eee;">`;
-        } else if (file.type.startsWith('video/')) {
-            preview.innerHTML = `<video src="${e.target.result}" controls style="width:100%; border-radius:12px; border:1px solid #eee;"></video>`;
-        } else {
-            preview.innerHTML = `<div class="alert alert-info py-2 small">✅ ${file.name} 선택됨</div>`;
+    let html = '';
+    for (let f of input.files) {
+        if (f.type.startsWith('image/')) {
+            html += `<div class="d-inline-block me-1 mb-1"><img src="${URL.createObjectURL(f)}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid #eee;"></div>`;
         }
-        preview.style.display = 'block';
-    };
-    reader.readAsDataURL(file);
+    }
+    preview.innerHTML = html;
+    preview.style.display = 'block';
 }
 
 function autoGetLocation() {
@@ -217,15 +212,22 @@ function checkReady() {
 // 카메라 지원 감지
 function checkCamera() {
     const btn = document.getElementById('cameraBtn');
-    const unsupported = document.getElementById('cameraUnsupported');
-    const isMobile = /Mobi|Android|iPhone|iPad|iPod|webOS/i.test(navigator.userAgent);
-    if (!isMobile && !navigator.mediaDevices?.enumerateDevices) {
+    if (!navigator.mediaDevices?.getUserMedia) {
         btn.disabled = true;
         btn.className = 'btn btn-secondary w-100 py-3 fw-bold';
         btn.style.cssText = 'border-radius:12px; font-size:1.1rem;';
-        btn.textContent = '📸 사진촬영 (사용불가)';
-        unsupported.style.display = 'block';
+        btn.textContent = '📸 카메라 기능이 없습니다';
+        return;
     }
+    // 웹캠 직접 열기
+    navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+            stream.getTracks().forEach(t => t.stop());
+            btn.textContent = '📸 카메라 켜기';
+        })
+        .catch(() => {
+            btn.textContent = '📸 카메라를 켜주세요';
+        });
 }
 
 document.addEventListener('DOMContentLoaded', () => { autoGetLocation(); checkCamera(); });
@@ -233,22 +235,30 @@ document.addEventListener('DOMContentLoaded', () => { autoGetLocation(); checkCa
 document.getElementById('shareForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     const btn = document.getElementById('submitBtn');
-    
     btn.disabled = true;
     btn.textContent = '접수 중...';
     
-    const formData = new FormData(this);
-    const camInput = document.getElementById('cameraInput');
-    if (camInput.files && camInput.files[0] && !formData.has('image')) {
-        formData.set('image', camInput.files[0]);
+    const formData = new FormData();
+    // 파일 업로드(input)에서 모든 파일 추가
+    const fileInput = document.querySelector('input[name="image"]');
+    for (let f of fileInput.files) {
+        formData.append('image', f);
     }
+    // 카메라 사진 추가
+    const camInput = document.getElementById('cameraInput');
+    if (camInput.files && camInput.files[0]) {
+        formData.append('image', camInput.files[0]);
+    }
+    // 나머지 필드
+    formData.append('title', document.querySelector('input[name="title"]').value);
+    formData.append('description', document.querySelector('textarea[name="description"]').value);
+    formData.append('latitude', document.getElementById('latitude').value);
+    formData.append('longitude', document.getElementById('longitude').value);
     
     const drawingData = canvas.toDataURL('image/png');
     if(drawingData.length > 2000) {
         formData.set('drawing_data', drawingData);
     }
-
-
     
     try {
         const response = await fetch('/share-report', {

@@ -2339,18 +2339,27 @@ def register_routes(app):
             if not latitude or not longitude:
                 return jsonify({"status": "error", "msg": "위치 수집이 필요합니다. 새로고침 후 위치 허용해주세요."}), 400
             
-            image_path = None
-            for field in ['image', 'camera_image']:
-                if field in request.files:
-                    file = request.files[field]
-                    if file and file.filename:
-                        img_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'share_reports')
-                        if not os.path.exists(img_dir): os.makedirs(img_dir)
-                        fname = f"share_{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(file.filename)}"
-                        file.save(os.path.join(img_dir, fname))
-                        image_path = f"/static/uploads/share_reports/{fname}"
-                        break
-            
+            image_paths = []
+            img_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'share_reports')
+            if not os.path.exists(img_dir): os.makedirs(img_dir)
+
+            for file in request.files.getlist('image'):
+                if file and file.filename:
+                    fname = f"share_{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(file.filename)}"
+                    file.save(os.path.join(img_dir, fname))
+                    image_paths.append(f"/static/uploads/share_reports/{fname}")
+
+            # camera_image도 추가
+            if 'camera_image' in request.files:
+                file = request.files['camera_image']
+                if file and file.filename:
+                    fname = f"share_{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(file.filename)}"
+                    file.save(os.path.join(img_dir, fname))
+                    image_paths.append(f"/static/uploads/share_reports/{fname}")
+
+            image_path = image_paths[0] if image_paths else None
+            extra_images = ','.join(image_paths[1:]) if len(image_paths) > 1 else ''
+                
             drawing_path = None
             drawing = request.form.get('drawing_data')
             if drawing and len(drawing) > 2000:
@@ -2384,6 +2393,7 @@ def register_routes(app):
                 title=title or '공유',
                 description=description,
                 image_path=image_path,
+                extra_images=extra_images,
                 drawing_path=drawing_path,
                 video_path=video_path,
                 latitude=latitude,
@@ -2530,6 +2540,46 @@ def register_routes(app):
         user = User.query.get(session['user_id'])
         reports = ShareReport.query.filter_by(town=user.town, village=user.village).order_by(ShareReport.created_at.desc()).all()
         return render_template('leader_share_reports.html', reports=reports, town=user.town, village=user.village)
+
+    @app.route('/share-report/edit/<int:report_id>', methods=['GET', 'POST'])
+    def share_report_edit(report_id):
+        report = ShareReport.query.get_or_404(report_id)
+        if report.user_id != session.get('user_id'):
+            return jsonify({"status": "error", "msg": "권한 없음"}), 403
+        if request.method == 'POST':
+            report.title = request.form.get('title', '').strip()
+            report.description = request.form.get('description', '').strip()
+            db.session.commit()
+            return jsonify({"status": "success", "msg": "수정되었습니다."})
+        return render_template('share_report_edit.html', report=report)
+    
+    @app.route('/share-report/delete-image/<int:report_id>', methods=['POST'])
+    def share_report_delete_image(report_id):
+        report = ShareReport.query.get_or_404(report_id)
+        if report.user_id != session.get('user_id'):
+            return jsonify({"status": "error", "msg": "권한 없음"}), 403
+        data = request.get_json()
+        path = data.get('image_path', '')
+        if not path:
+            return jsonify({"status": "error", "msg": "경로 없음"}), 400
+                
+        paths = [report.image_path] + (report.extra_images.split(',') if report.extra_images else [])
+        if path not in paths:
+            return jsonify({"status": "error", "msg": "해당 사진이 없습니다"}), 400
+        if len(paths) <= 1:
+            return jsonify({"status": "error", "msg": "최소 1장은 남겨야 합니다"}), 400
+                
+        paths.remove(path)
+        report.image_path = paths[0]
+        report.extra_images = ','.join(paths[1:]) if len(paths) > 1 else ''
+        db.session.commit()
+                
+            # 실제 파일 삭제
+        abs_path = os.path.join(current_app.root_path, path.lstrip('/'))
+        if os.path.exists(abs_path):
+            os.remove(abs_path)
+                
+        return jsonify({"status": "success", "msg": "삭제되었습니다."})
 
     # --- [공개] 공유 페이지 ---
     @app.route('/share')

@@ -229,7 +229,7 @@ def create_app():
             else:
                 # 기존 테이블에 누락 컬럼 추가
                 with db.engine.connect() as conn:
-                    for col in ['video_path', 'address', 'admin_score', 'leader_score', 'member_score', 'total_score', 'is_moderated', 'moderation_result', 'moderation_reason', 'moderation_at', 'canonical_name', 'canonical_source', 'smartplace_url']:
+                    for col in ['video_path', 'address', 'admin_score', 'leader_score', 'member_score', 'total_score', 'is_moderated', 'moderation_result', 'moderation_reason', 'moderation_at', 'canonical_name', 'canonical_source', 'smartplace_url', 'extra_images']:
                         if col not in sr_cols:
                             if col in ('admin_score', 'leader_score', 'member_score', 'total_score'):
                                 conn.execute(db.text(f'ALTER TABLE share_report ADD COLUMN {col} INTEGER DEFAULT 0'))
@@ -241,6 +241,8 @@ def create_app():
                                 conn.execute(db.text(f'ALTER TABLE share_report ADD COLUMN {col} VARCHAR(20) DEFAULT "pending"'))
                             elif col in ('moderation_reason',):
                                 conn.execute(db.text(f'ALTER TABLE share_report ADD COLUMN {col} TEXT'))
+                            elif col in ('extra_images',):
+                                conn.execute(db.text(f'ALTER TABLE share_report ADD COLUMN {col} TEXT DEFAULT ""'))
                             elif col in ('moderation_at',):
                                 conn.execute(db.text(f'ALTER TABLE share_report ADD COLUMN {col} DATETIME'))
                             elif col in ('canonical_name',):
