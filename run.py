@@ -10,7 +10,10 @@ import time
 
 # 한국 시간 (KST, UTC+9) 사용
 os.environ['TZ'] = 'Asia/Seoul'
-time.tzset()
+try:
+    time.tzset()
+except AttributeError:
+    pass  # Windows는 tzset() 미지원
         
 # 🎯 [경로 패치]: 이 파일(run.py)이 있는 폴더를 파이썬 탐색 경로 1순위로 강제 지정합니다.
 # 이 코드가 있으면 이중 폴더 구조에서도 절대 에러가 나지 않습니다.
