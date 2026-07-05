@@ -16,7 +16,7 @@
             <form id="shareForm" enctype="multipart/form-data">
                 <!-- 사진촬영 (모바일 카메라 / 데스크탑 파일선택) -->
                 <div class="mb-3">
-                    <input type="file" name="camera_image" id="cameraInput" accept="image/*" capture="environment" onchange="previewFile(this)" style="display:none;">
+                    <input type="file" name="camera_image" id="cameraInput" accept="image/*" capture="environment" onchange="hasImage=true; checkReady();" style="display:none;">
                     <button type="button" id="cameraBtn" class="btn btn-success w-100 py-3 fw-bold" style="border-radius:12px; font-size:1.1rem;" onclick="document.getElementById('cameraInput').click()">
                         📸 사진촬영
                     </button>
@@ -97,7 +97,10 @@ function draw(e) {
     const y = e.clientY - rect.top;
     ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.strokeStyle = '#333';
     ctx.lineTo(x, y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x, y);
-    if (!hasDrawing) { hasDrawing = true; checkReady(); }
+    if (!hasImage) {
+        hasImage = true;
+        checkReady();
+    }
 }
 
 function toggleCanvas() { 
@@ -119,6 +122,7 @@ function previewImage(input, previewId) {
             preview.style.display = 'block';
         };
         reader.readAsDataURL(input.files[0]);
+        if (!input.files || input.files.length === 0) return;        
     }
 }
 
@@ -136,9 +140,7 @@ function previewVideo(input) {
 
 function previewFiles(input) {
     const preview = document.getElementById('fileUploadPreview');
-    if (!input.files || input.files.length === 0) return;
-    hasFiles  = true;
-    checkReady();
+    if (!input.files || input.files.length === 0) return;    
     let html = '';
     for (let f of input.files) {
         if (f.type.startsWith('image/')) {
@@ -194,21 +196,16 @@ function autoGetLocation() {
     );
 }
 
-let hasCamera = false;
-let hasDrawing = false;
-let hasFiles = false;
-
+let hasImage = false;
 function checkReady() {
     const btn = document.getElementById('submitBtn');
     const hasLoc = document.getElementById('latitude').value !== '';
-    // 파일 OR 카메라 OR 그림 중 하나라도 있으면 OK
-    const hasContent = hasFiles || hasCamera || hasDrawing;
-    if (hasContent && hasLoc) {
+    if (hasImage && hasLoc) {
         btn.disabled = false;
         btn.textContent = '📤 공유 접수하기';
-    } else if (!hasContent) {
+    } else if (!hasImage) {
         btn.disabled = true;
-        btn.textContent = '📸 사진을 찍거나 파일을 선택해 주세요';
+        btn.textContent = '📸 이미지를 선택해 주세요';
     } else {
         btn.disabled = true;
         btn.textContent = '📍 위치 확인 중...';
@@ -254,14 +251,9 @@ document.getElementById('shareForm').addEventListener('submit', async function(e
     const camInput = document.getElementById('cameraInput');
     if (camInput.files && camInput.files[0]) {
         formData.append('image', camInput.files[0]);
-    }
-    
-    document.getElementById('cameraInput').addEventListener('change', function() {
-    if (this.files && this.files[0]) {
-        hasCamera = true;
+        hasImage = true;
         checkReady();
     }
-});
     // 나머지 필드
     formData.append('title', document.querySelector('input[name="title"]').value);
     formData.append('description', document.querySelector('textarea[name="description"]').value);
