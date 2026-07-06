@@ -94,6 +94,7 @@ function toggleVerifyBtn() {
 }
 
 function sendCode() {
+    document.getElementById('verifyBtn').disabled = true;
     if (!document.getElementById('agreeTerms').checked) return alert('약관에 동의해 주세요.');
     var email = document.getElementById('emailInput').value.trim();
     if (!email) return alert('이메일을 입력하세요.');
@@ -103,6 +104,9 @@ function sendCode() {
         document.getElementById('verifyStatus').innerHTML = '<span class="text-success">'+d.msg+'</span>';
         if (d.status==='success') document.getElementById('codeSection').style.display='';
     });
+    var domain = email.split('@')[1];
+    var urls = {'gmail.com':'https://mail.google.com','naver.com':'https://mail.naver.com','daum.net':'https://mail.daum.net','hanmail.net':'https://mail.daum.net'};
+    if (urls[domain]) window.open(urls[domain], '_blank');
 }
 
 function verifyCode() {
@@ -114,6 +118,7 @@ function verifyCode() {
             verifiedEmail = document.getElementById('emailInput').value;
             document.getElementById('locationSection').style.display='';
             document.getElementById('verifyStatus').innerHTML = '<span class="text-success">✅ 인증완료</span>';
+            document.getElementById('codeSection').style.display = 'none';
             getGPS();
         } else {
             alert(d.msg);
