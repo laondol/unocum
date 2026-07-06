@@ -2626,6 +2626,36 @@ def register_routes(app):
             selected_category=category
         )
 
+    @app.route('/api/share/reports')
+    def api_share_reports():
+        town = request.args.get('town', '')
+        village = request.args.get('village', '')
+        category = request.args.get('category', '')
+        uid = session.get('user_id')
+        
+        if uid:
+            query = ShareReport.query.filter(
+                db.or_(ShareReport.status == 'approved', ShareReport.user_id == uid)
+            )
+        else:
+            query = ShareReport.query.filter_by(status='approved')
+        if town: query = query.filter_by(town=town)
+        if village: query = query.filter_by(village=village)
+        if category: query = query.filter_by(ai_category=category)
+        
+        reports = query.order_by(ShareReport.created_at.desc()).limit(50).all()
+        return jsonify([{
+            "id": r.id, "title": r.title, "description": r.description,
+            "image_path": r.image_path, "drawing_path": r.drawing_path,
+            "video_path": r.video_path, "latitude": r.latitude,
+            "longitude": r.longitude, "town": r.town, "village": r.village,
+            "address": r.address, "author_name": r.author_name,
+            "ai_category": r.ai_category, "ai_summary": r.ai_summary,
+            "like_count": r.like_count, "dislike_count": r.dislike_count,
+            "status": r.status, "user_id": r.user_id,
+            "created_at": r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else None
+        } for r in reports])
+
     @app.route('/share/map')
     def share_map():
         category = request.args.get('category', '')
@@ -2847,6 +2877,24 @@ def register_routes(app):
                         nearby_construction.append(n)
         return render_template('share_detail.html', report=report, comments=comments, nearby_shares=nearby_shares, local_news=local_news, local_links=local_links, nearby_construction=nearby_construction)
 
+    @app.route('/api/share/report/<int:report_id>')
+    def api_share_detail(report_id):
+        r = ShareReport.query.get_or_404(report_id)
+        return jsonify({
+            "id": r.id, "title": r.title, "description": r.description,
+            "image_path": r.image_path, "extra_images": r.extra_images,
+            "drawing_path": r.drawing_path, "video_path": r.video_path,
+            "latitude": r.latitude, "longitude": r.longitude,
+            "town": r.town, "village": r.village, "address": r.address,
+            "author_name": r.author_name,
+            "ai_category": r.ai_category, "ai_summary": r.ai_summary,
+            "ai_confidence": r.ai_confidence, "ai_region_news": r.ai_region_news,
+            "ai_news_links": r.ai_news_links, "ai_danger_alert": r.ai_danger_alert,
+            "like_count": r.like_count, "dislike_count": r.dislike_count,
+            "status": r.status, "user_id": r.user_id,
+            "created_at": r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else None
+        })
+
     @app.route('/share/comment/<int:report_id>', methods=['POST'])
     def share_add_comment(report_id):
         if not session.get('username'):
@@ -2917,7 +2965,7 @@ def register_routes(app):
             return f"<p>번역을 불러올 수 없습니다. <a href='{url}' target='_blank'>원문보기</a></p>"
         except Exception as e:
             return f"<p>오류: {str(e)[:100]}</p>"
-    @app.route('/construction')
+    
     @app.route('/construction')
     def construction():
         six_months_ago = datetime.now() - timedelta(days=180)
