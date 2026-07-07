@@ -251,6 +251,7 @@ def background_process_share(app, report_id, title, description, latitude, longi
         report.ai_news_links = news_links or '[]'
 
         # 동영상은 무조건 보류
+        flagged = False
         v_path = getattr(report, 'video_path', None)
         if v_path and not flagged:
             flagged = True
