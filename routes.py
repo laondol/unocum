@@ -2656,6 +2656,19 @@ def register_routes(app):
             "created_at": r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else None
         } for r in reports])
 
+    @app.route('/api/share/towns')
+    def api_share_towns():
+        town = request.args.get('town', '')
+        query = ShareReport.query.filter_by(status='approved')
+        base = query
+        if town:
+            villages = base.filter_by(town=town).with_entities(ShareReport.village).distinct().all()
+            villages = [v[0] for v in villages if v[0]]
+            return jsonify({"villages": villages})
+        towns = base.with_entities(ShareReport.town).distinct().all()
+        towns = [t[0] for t in towns if t[0]]
+        return jsonify({"towns": towns})
+
     @app.route('/share/map')
     def share_map():
         category = request.args.get('category', '')
@@ -2880,20 +2893,86 @@ def register_routes(app):
     @app.route('/api/share/report/<int:report_id>')
     def api_share_detail(report_id):
         r = ShareReport.query.get_or_404(report_id)
+        uid = session.get('user_id')
+        
+        # 가까운 공유
+        nearby_shares = []
+        if r.latitude and r.longitude and r.town:
+            from services.geocode import haversine
+            all_approved = ShareReport.query.filter(
+                ShareReport.status == 'approved',
+                ShareReport.id != report_id,
+                ShareReport.latitude.isnot(None),
+                ShareReport.longitude.isnot(None)
+            ).all()
+            scored = []
+            for s in all_approved:
+                try:
+                    d = haversine(r.latitude, r.longitude, s.latitude, s.longitude)
+                    if d > 20: continue
+                    scored.append((d, s))
+                except: pass
+            scored.sort(key=lambda x: x[0])
+            nearby_shares = [{"id": s.id, "title": s.title, "town": s.town, "village": s.village, "image_path": s.image_path, "ai_category": s.ai_category, "distance": round(d, 1)} for d, s in scored[:10]]
+        
+        # 지역 소식
+        local_news = []
+        local_links = []
+        try:
+            from services.local_sources import get_local_news, get_quick_links
+            local_news = get_local_news(town=r.town, village=r.village)
+            local_links = get_quick_links(town=r.town, village=r.village)
+        except: pass
+        
+        # 주변 공사
+        nearby_construction = []
+        if r.latitude and r.longitude:
+            from services.geocode import haversine
+            from models import ConstructionNotice
+            notices = ConstructionNotice.query.filter_by(is_active=True).all()
+            for n in notices:
+                if n.latitude and n.longitude:
+                    if haversine(r.latitude, r.longitude, n.latitude, n.longitude) < 10:
+                        nearby_construction.append({"title": n.title, "location": n.location, "notice_type": n.notice_type, "start_date": n.start_date.strftime('%Y-%m-%d') if n.start_date else None, "end_date": n.end_date.strftime('%Y-%m-%d') if n.end_date else None})
+        
+        # 댓글
+        from models import ShareComment
+        comments_data = []
+        comments = ShareComment.query.filter_by(share_id=report_id, parent_id=None).order_by(ShareComment.created_at.asc()).all()
+        for c in comments:
+            c_item = {"id": c.id, "author": c.author, "content": c.content, "user_id": c.user_id, "created_at": c.created_at.strftime('%m/%d %H:%M') if c.created_at else None, "replies": []}
+            for rc in c.replies:
+                c_item["replies"].append({"id": rc.id, "author": rc.author, "content": rc.content, "user_id": rc.user_id, "created_at": rc.created_at.strftime('%m/%d %H:%M') if rc.created_at else None})
+            comments_data.append(c_item)
+        
         return jsonify({
             "id": r.id, "title": r.title, "description": r.description,
             "image_path": r.image_path, "extra_images": r.extra_images,
             "drawing_path": r.drawing_path, "video_path": r.video_path,
             "latitude": r.latitude, "longitude": r.longitude,
             "town": r.town, "village": r.village, "address": r.address,
-            "author_name": r.author_name,
+            "author_name": r.author_name, "user_id": r.user_id,
             "ai_category": r.ai_category, "ai_summary": r.ai_summary,
             "ai_confidence": r.ai_confidence, "ai_region_news": r.ai_region_news,
             "ai_news_links": r.ai_news_links, "ai_danger_alert": r.ai_danger_alert,
             "like_count": r.like_count, "dislike_count": r.dislike_count,
-            "status": r.status, "user_id": r.user_id,
-            "created_at": r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else None
+            "status": r.status,
+            "created_at": r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else None,
+            "nearby_shares": nearby_shares,
+            "local_news": local_news,
+            "local_links": local_links,
+            "nearby_construction": nearby_construction,
+            "comments": comments_data
         })
+
+        @app.route('/api/me')
+        def api_me():
+            uid = session.get('user_id')
+            if uid:
+                user = User.query.get(uid)
+                if user:
+                    return jsonify({"id": user.id, "username": user.username, "role": user.role})
+            return jsonify({"id": None})
 
     @app.route('/share/comment/<int:report_id>', methods=['POST'])
     def share_add_comment(report_id):
