@@ -86,15 +86,6 @@ export default function ShareList() {
       }).catch(e => alert('오류: ' + e))
   }
 
-  const deleteShare = (id: number) => {
-    if (!confirm('정말 삭제하시겠습니까?')) return
-    fetch(`/share-report/delete/${id}`, { method: 'POST' })
-      .then(r => r.json()).then(d => {
-        if (d.status === 'success') setItems(prev => prev.filter(r => r.id !== id))
-        else alert(d.msg || '오류')
-      }).catch(e => alert('오류: ' + e))
-  }
-
   const loadNearby = () => {
     if (!navigator.geolocation) return alert('GPS를 지원하지 않습니다')
     setNearbyLoading(true)

@@ -5,7 +5,6 @@ export default function ShareReport() {
   const [description, setDescription] = useState('')
   const [lat, setLat] = useState('')
   const [lon, setLon] = useState('')
-  const [hasImage, setHasImage] = useState(false)
   const [locationStatus, setLocationStatus] = useState('위치 수집 중... (브라우저 권한 허용 필요)')
   const [submitting, setSubmitting] = useState(false)
   const [cameraReady, setCameraReady] = useState(true)
@@ -142,7 +141,7 @@ export default function ShareReport() {
     const ctx = c.getContext('2d')
     if (!ctx) return
 
-    function getPos(e: MouseEvent | Touch) { const r = c.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top } }
+    function getPos(e: MouseEvent | Touch) { const r = c!.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top } }
 
     const onStart = (e: any) => {
       drawingRef.current = true
