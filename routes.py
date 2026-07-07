@@ -1,4 +1,4 @@
-from flask import render_template, request, redirect, url_for, jsonify, session, current_app, send_file
+from flask import render_template, request, redirect, url_for, jsonify, session, current_app, send_file, send_from_directory
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -67,6 +67,16 @@ def register_routes(app):
         if _os.path.exists(_react_index):
             return send_file(_react_index)
         return render_template('intro.html')
+
+    _react_dist = _os.path.join(app.root_path, 'frontend', 'dist')
+
+    @app.route('/assets/<path:filename>')
+    def react_assets(filename):
+        return send_from_directory(_os.path.join(_react_dist, 'assets'), filename)
+
+    @app.route('/favicon.svg')
+    def react_favicon():
+        return send_from_directory(_react_dist, 'favicon.svg')
 
     @app.route('/share')
     @app.route('/share/report')
