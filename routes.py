@@ -1,4 +1,4 @@
-from flask import render_template, request, redirect, url_for, jsonify, session, current_app
+from flask import render_template, request, redirect, url_for, jsonify, session, current_app, send_file
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -65,7 +65,7 @@ def register_routes(app):
 
     def _serve_react_share():
         if _os.path.exists(_react_index):
-            return app.send_file(_react_index)
+            return send_file(_react_index)
         return render_template('intro.html')
 
     @app.route('/share')
