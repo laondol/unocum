@@ -60,6 +60,21 @@ def register_routes(app):
             return app.send_static_file('spa/index.html')
         return render_template('intro.html')
 
+    # React 공유마당 SPA (frontend/dist/index.html)
+    _react_index = _os.path.join(app.root_path, 'frontend', 'dist', 'index.html')
+
+    def _serve_react_share():
+        if _os.path.exists(_react_index):
+            return app.send_file(_react_index)
+        return render_template('intro.html')
+
+    @app.route('/share')
+    @app.route('/share/report')
+    @app.route('/share/detail/<path:path>')
+    @app.route('/share/edit/<path:path>')
+    def share_spa(path=''):
+        return _serve_react_share()
+
     @app.route('/')
     @app.route('/intro')
     def intro():
@@ -2329,119 +2344,118 @@ def register_routes(app):
     # --- [공유하기 시스템] ---
     @app.route('/share-report', methods=['GET', 'POST'])
     def share_report():
+        if request.method == 'GET':
+            return redirect('/share/report')
         user = User.query.get(session.get('user_id')) if session.get('username') else None
-        if request.method == 'POST':
-            title = request.form.get('title', '').strip()
-            description = request.form.get('description', '').strip()
-            latitude = request.form.get('latitude', type=float)
-            longitude = request.form.get('longitude', type=float)
-            
-            if not latitude or not longitude:
-                return jsonify({"status": "error", "msg": "위치 수집이 필요합니다. 새로고침 후 위치 허용해주세요."}), 400
-            
-            image_paths = []
-            img_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'share_reports')
-            if not os.path.exists(img_dir): os.makedirs(img_dir)
-            IMAGE_EXT = {'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'}
+        title = request.form.get('title', '').strip()
+        description = request.form.get('description', '').strip()
+        latitude = request.form.get('latitude', type=float)
+        longitude = request.form.get('longitude', type=float)
 
-            for file in request.files.getlist('image'):
-                if file and file.filename and '.' in file.filename:
-                    ext = file.filename.rsplit('.', 1)[1].lower()
-                    if ext in IMAGE_EXT:
-                        fname = f"share_{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(file.filename)}"
-                        file.save(os.path.join(img_dir, fname))
-                        image_paths.append(f"/static/uploads/share_reports/{fname}")
+        if not latitude or not longitude:
+            return jsonify({"status": "error", "msg": "위치 수집이 필요합니다. 새로고침 후 위치 허용해주세요."}), 400
 
-            image_path = image_paths[0] if image_paths else None
-            extra_images = ','.join(image_paths[1:]) if len(image_paths) > 1 else ''
-                
-            drawing_path = None
-            drawing = request.form.get('drawing_data')
-            if drawing and len(drawing) > 2000:
-                data = base64.b64decode(drawing.split(",")[1])
-                fname = f"draw_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
-                target_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'share_reports')
-                if not os.path.exists(target_dir): os.makedirs(target_dir)
-                with open(os.path.join(target_dir, fname), "wb") as f: f.write(data)
-                drawing_path = f"/static/uploads/share_reports/{fname}"
-            
-            video_path = None
-            if 'video' in request.files:
-                file = request.files['video']
-                if file and file.filename and '.' in file.filename:
-                    ext = file.filename.rsplit('.', 1)[1].lower()
-                    if ext in ('mp4', 'avi', 'mov', 'mkv', 'webm'):
-                        img_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'share_reports')
-                        fname = f"video_{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(file.filename)}"
-                        file.save(os.path.join(img_dir, fname))
-                        video_path = f"/static/uploads/share_reports/{fname}"
-            
-            from services.geocode import gps_to_town_village
-            resolved_town, resolved_village = gps_to_town_village(latitude, longitude)
-            share_town = resolved_town or (user.town if user else '')
-            share_village = resolved_village or (user.village if user else '')
-            share_address = f"경기도 양평군 {share_town} {share_village}".strip()
+        image_paths = []
+        img_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'share_reports')
+        if not os.path.exists(img_dir): os.makedirs(img_dir)
+        IMAGE_EXT = {'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'}
 
-            report = ShareReport(
-                user_id=user.id if user else 0,
-                author_name=user.username if user else '익명',
-                title=title or '공유',
-                description=description,
-                image_path=image_path,
-                extra_images=extra_images,
-                drawing_path=drawing_path,
-                video_path=video_path,
-                latitude=latitude,
-                longitude=longitude,
-                town=share_town,
-                village=share_village,
-                address=share_address,
-                ai_category='분석중',
-                ai_summary='',
-                ai_confidence=0.5,
-                ai_region_news='',
-                ai_news_links='[]',
-                ai_danger_alert=False
-            )
-            if video_path:
-                report.status = 'pending_review'
-                report.moderation_result = 'video'
-                report.moderation_reason = '동영상은 승인 후 공개됩니다'
-            else:
-                report.status = 'approved'
-                _resolve_canonical_store_name(report)
-                # 실시간 이미지 검사 (모든 이미지)
-                all_imgs = [image_path] if image_path else []
-                if extra_images:
-                    all_imgs += [e.strip() for e in extra_images.split(',') if e.strip()]
-                for img_rel in all_imgs:
-                    try:
-                        from services.ai_service import moderate_image
-                        abs_path = os.path.join(current_app.root_path, img_rel.lstrip('/'))
-                        flagged, reason, cat = moderate_image(abs_path)
-                        if cat == 'unanalyzable':
-                            report.status = 'pending'
-                            report.moderation_result = 'unanalyzable'
-                            report.moderation_reason = reason
-                            report.is_moderated = True
-                            break
-                        if flagged:
-                            report.status = 'pending_person' if cat == 'person' else 'flagged'
-                            report.moderation_result = cat
-                            report.moderation_reason = reason
-                            break
-                    except:
-                        pass
-            db.session.add(report)
-            db.session.commit()
+        for file in request.files.getlist('image'):
+            if file and file.filename and '.' in file.filename:
+                ext = file.filename.rsplit('.', 1)[1].lower()
+                if ext in IMAGE_EXT:
+                    fname = f"share_{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(file.filename)}"
+                    file.save(os.path.join(img_dir, fname))
+                    image_paths.append(f"/static/uploads/share_reports/{fname}")
 
-            app_obj = current_app._get_current_object()
-            uid = user.id if user else 0
-            threading.Thread(target=background_process_share,
-                args=(app_obj, report.id, title, description, latitude, longitude, image_path, drawing_path, uid)).start()
+        image_path = image_paths[0] if image_paths else None
+        extra_images = ','.join(image_paths[1:]) if len(image_paths) > 1 else ''
 
-            return jsonify({"status": "success", "msg": "공유가 접수되었습니다.", "report_id": report.id})
-        return render_template('share_report.html', user=user)
+        drawing_path = None
+        drawing = request.form.get('drawing_data')
+        if drawing and len(drawing) > 2000:
+            data = base64.b64decode(drawing.split(",")[1])
+            fname = f"draw_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
+            target_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'share_reports')
+            if not os.path.exists(target_dir): os.makedirs(target_dir)
+            with open(os.path.join(target_dir, fname), "wb") as f: f.write(data)
+            drawing_path = f"/static/uploads/share_reports/{fname}"
+
+        video_path = None
+        if 'video' in request.files:
+            file = request.files['video']
+            if file and file.filename and '.' in file.filename:
+                ext = file.filename.rsplit('.', 1)[1].lower()
+                if ext in ('mp4', 'avi', 'mov', 'mkv', 'webm'):
+                    img_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'share_reports')
+                    fname = f"video_{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(file.filename)}"
+                    file.save(os.path.join(img_dir, fname))
+                    video_path = f"/static/uploads/share_reports/{fname}"
+
+        from services.geocode import gps_to_town_village
+        resolved_town, resolved_village = gps_to_town_village(latitude, longitude)
+        share_town = resolved_town or (user.town if user else '')
+        share_village = resolved_village or (user.village if user else '')
+        share_address = f"경기도 양평군 {share_town} {share_village}".strip()
+
+        report = ShareReport(
+            user_id=user.id if user else 0,
+            author_name=user.username if user else '익명',
+            title=title or '공유',
+            description=description,
+            image_path=image_path,
+            extra_images=extra_images,
+            drawing_path=drawing_path,
+            video_path=video_path,
+            latitude=latitude,
+            longitude=longitude,
+            town=share_town,
+            village=share_village,
+            address=share_address,
+            ai_category='분석중',
+            ai_summary='',
+            ai_confidence=0.5,
+            ai_region_news='',
+            ai_news_links='[]',
+            ai_danger_alert=False
+        )
+        if video_path:
+            report.status = 'pending_review'
+            report.moderation_result = 'video'
+            report.moderation_reason = '동영상은 승인 후 공개됩니다'
+        else:
+            report.status = 'approved'
+            _resolve_canonical_store_name(report)
+            all_imgs = [image_path] if image_path else []
+            if extra_images:
+                all_imgs += [e.strip() for e in extra_images.split(',') if e.strip()]
+            for img_rel in all_imgs:
+                try:
+                    from services.ai_service import moderate_image
+                    abs_path = os.path.join(current_app.root_path, img_rel.lstrip('/'))
+                    flagged, reason, cat = moderate_image(abs_path)
+                    if cat == 'unanalyzable':
+                        report.status = 'pending'
+                        report.moderation_result = 'unanalyzable'
+                        report.moderation_reason = reason
+                        report.is_moderated = True
+                        break
+                    if flagged:
+                        report.status = 'pending_person' if cat == 'person' else 'flagged'
+                        report.moderation_result = cat
+                        report.moderation_reason = reason
+                        break
+                except:
+                    pass
+        db.session.add(report)
+        db.session.commit()
+
+        app_obj = current_app._get_current_object()
+        uid = user.id if user else 0
+        threading.Thread(target=background_process_share,
+            args=(app_obj, report.id, title, description, latitude, longitude, image_path, drawing_path, uid)).start()
+
+        return jsonify({"status": "success", "msg": "공유가 접수되었습니다.", "report_id": report.id})
 
     @app.route('/admin/share-reports')
     def admin_share_reports():
