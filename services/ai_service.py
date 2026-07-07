@@ -157,7 +157,7 @@ def background_ai_judge(app, post_id):
 def moderate_image(image_path, app=None):
     b64 = _image_to_base64(image_path)
     if not b64:
-        return False, "", "clean"
+        return False, "AI 분석 불가 - 지원하지 않는 파일 형식이거나 손상된 파일입니다.", "unanalyzable"
     system = "당신은 양평군 공유 이미지 방역관입니다. 개인정보보호법을 엄격히 적용합니다."
     user = """다음 이미지가 아래 기준에 하나라도 해당하면 반드시 flagged=true로 판단하세요.
 1. 인물 사진 (얼굴, 신체 일부, 실루엣, 뒷모습 포함 모든 인물)
@@ -167,6 +167,8 @@ def moderate_image(image_path, app=None):
 ※ 조금이라도 의심되면 flagged=true로 판단하세요. 확실한 풍경/사물/음식/동물만 false입니다.
 JSON: {"flagged": true/false, "reason": "이유", "category": "person/privacy/violence/adult/illegal/spam/clean"}"""
     data = _groq_vision(system, user, b64)
+    if not data:
+        return False, "AI 분석 불가 - 서버 분석 중 오류가 발생했습니다.", "unanalyzable"
     flagged = data.get('flagged', False)
     category = data.get('category', 'clean')
     return flagged, data.get('reason', '') if flagged else "", category
@@ -259,10 +261,16 @@ def background_process_share(app, report_id, title, description, latitude, longi
             mod_category = "video"
 
         if not flagged:
-            for path_key in ['image_path', 'drawing_path']:
-                rel_path = getattr(report, path_key, None)
+            paths_to_check = ['image_path', 'drawing_path']
+            if getattr(report, 'extra_images', None):
+                for ei in report.extra_images.split(','):
+                    ei = ei.strip()
+                    if ei:
+                        paths_to_check.append(ei)
+            for rel_path in paths_to_check:
                 if not rel_path: continue
-                abs_path = os.path.join(app.root_path, '..', rel_path.lstrip('/')).replace('/', os.sep)
+                abs_path = os.path.join(app.root_path, rel_path.lstrip('/')).replace('/', os.sep)
+                if not os.path.exists(abs_path): continue
                 f, r, c = moderate_image(abs_path, app)
                 if f:
                     flagged = True
@@ -278,7 +286,11 @@ def background_process_share(app, report_id, title, description, latitude, longi
 
         report.is_moderated = True
         report.moderation_at = datetime.now()
-        if flagged and mod_category == 'person':
+        if flagged and mod_category == 'unanalyzable':
+            report.moderation_result = 'unanalyzable'
+            report.moderation_reason = reason
+            report.status = 'pending'
+        elif flagged and mod_category == 'person':
             report.moderation_result = 'person'
             report.moderation_reason = reason
             report.status = 'pending_person'

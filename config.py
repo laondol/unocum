@@ -19,7 +19,7 @@ class Config:
     SESSION_COOKIE_SAMESITE = 'Lax'
     SESSION_COOKIE_SECURE = bool(os.getenv('SESSION_COOKIE_SECURE', os.getenv('SITE_URL','').startswith('https')))
     UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
-    MAX_CONTENT_LENGTH = 10 * 1024 * 1024
+    MAX_CONTENT_LENGTH = 100 * 1024 * 1024
     JUSO_API_KEY = os.getenv('JUSO_API_KEY', '')
     DATA_GO_KR_API_KEY = os.getenv('DATA_GO_KR_API_KEY', '')
     GG_TRAFFIC_API_KEY = os.getenv('GG_TRAFFIC_API_KEY', '')

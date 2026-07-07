@@ -26,3 +26,68 @@ services:
 
 volumes:
   pgdata:
+services:
+  # 1. Flask 백엔드 서버
+  flask_app:
+    image: python:3.9
+    container_name: yp_flask
+    volumes:
+      - .:/yp_project
+      - ./instance:/yp_project/instance
+    working_dir: /yp_project
+    command: >
+      sh -c "pip install -r requirements.txt &&
+             python run.py"
+    ports:
+      - "5000:5000"
+    env_file: .env
+    depends_on:
+      - postgres
+    restart: always
+
+  # 2. React 프론트엔드 서버 (추가됨)
+  react_frontend:
+    image: node:20-alpine
+    container_name: yp_react
+    volumes:
+      - ./frontend:/app             # 내 컴퓨터의 frontend 폴더를 연결
+      - /app/node_modules           # 컨테이너 내부의 모듈 속도 최적화
+    working_dir: /app
+    command: >
+      sh -c "npm install &&
+             npm run dev -- --host"  # 외부 접속 허용 설정 추가
+    ports:
+      - "5173:5173"
+    depends_on:
+      - flask_app
+    restart: always
+
+  # 3. PostgreSQL 데이터베이스
+  postgres:
+    image: postgres:16-alpine
+    container_name: yp_postgres
+    environment:
+      POSTGRES_USER: yp_dev
+      POSTGRES_PASSWORD: yp_dev_pass_2026
+      POSTGRES_DB: yp_local
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # 4. DB 관리 도구 (pgAdmin)
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: yp_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@unocum.kr
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+volumes:
+  pgdata:

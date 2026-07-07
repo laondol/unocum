@@ -2342,20 +2342,15 @@ def register_routes(app):
             image_paths = []
             img_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'share_reports')
             if not os.path.exists(img_dir): os.makedirs(img_dir)
+            IMAGE_EXT = {'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'}
 
             for file in request.files.getlist('image'):
-                if file and file.filename:
-                    fname = f"share_{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(file.filename)}"
-                    file.save(os.path.join(img_dir, fname))
-                    image_paths.append(f"/static/uploads/share_reports/{fname}")
-
-            # camera_image도 추가
-            if 'camera_image' in request.files:
-                file = request.files['camera_image']
-                if file and file.filename:
-                    fname = f"share_{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(file.filename)}"
-                    file.save(os.path.join(img_dir, fname))
-                    image_paths.append(f"/static/uploads/share_reports/{fname}")
+                if file and file.filename and '.' in file.filename:
+                    ext = file.filename.rsplit('.', 1)[1].lower()
+                    if ext in IMAGE_EXT:
+                        fname = f"share_{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(file.filename)}"
+                        file.save(os.path.join(img_dir, fname))
+                        image_paths.append(f"/static/uploads/share_reports/{fname}")
 
             image_path = image_paths[0] if image_paths else None
             extra_images = ','.join(image_paths[1:]) if len(image_paths) > 1 else ''
@@ -2415,16 +2410,26 @@ def register_routes(app):
             else:
                 report.status = 'approved'
                 _resolve_canonical_store_name(report)
-                # 실시간 이미지 검사
-                if image_path:
+                # 실시간 이미지 검사 (모든 이미지)
+                all_imgs = [image_path] if image_path else []
+                if extra_images:
+                    all_imgs += [e.strip() for e in extra_images.split(',') if e.strip()]
+                for img_rel in all_imgs:
                     try:
                         from services.ai_service import moderate_image
-                        abs_path = os.path.join(current_app.root_path, image_path.lstrip('/'))
+                        abs_path = os.path.join(current_app.root_path, img_rel.lstrip('/'))
                         flagged, reason, cat = moderate_image(abs_path)
+                        if cat == 'unanalyzable':
+                            report.status = 'pending'
+                            report.moderation_result = 'unanalyzable'
+                            report.moderation_reason = reason
+                            report.is_moderated = True
+                            break
                         if flagged:
                             report.status = 'pending_person' if cat == 'person' else 'flagged'
                             report.moderation_result = cat
                             report.moderation_reason = reason
+                            break
                     except:
                         pass
             db.session.add(report)
@@ -2549,6 +2554,50 @@ def register_routes(app):
         if request.method == 'POST':
             report.title = request.form.get('title', '').strip()
             report.description = request.form.get('description', '').strip()
+            
+            # 새 이미지 업로드 처리
+            new_paths = []
+            img_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'share_reports')
+            if not os.path.exists(img_dir): os.makedirs(img_dir)
+            for file in request.files.getlist('image'):
+                if file and file.filename:
+                    fname = f"share_{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(file.filename)}"
+                    file.save(os.path.join(img_dir, fname))
+                    new_paths.append(f"/static/uploads/share_reports/{fname}")
+            
+            if new_paths:
+                # 기존 이미지 목록
+                existing = []
+                if report.image_path: existing.append(report.image_path)
+                if report.extra_images:
+                    existing += [e.strip() for e in report.extra_images.split(',') if e.strip()]
+                existing += new_paths
+                report.image_path = existing[0]
+                report.extra_images = ','.join(existing[1:]) if len(existing) > 1 else ''
+                
+                # AI 검사 (새 이미지만)
+                from services.ai_service import moderate_image
+                for np in new_paths:
+                    try:
+                        abs_path = os.path.join(current_app.root_path, np.lstrip('/'))
+                        flagged, reason, cat = moderate_image(abs_path)
+                        if cat == 'unanalyzable':
+                            report.status = 'pending'
+                            report.moderation_result = 'unanalyzable'
+                            report.moderation_reason = reason
+                            report.is_moderated = True
+                            report.moderation_at = datetime.now()
+                            break
+                        if flagged:
+                            report.status = 'pending_person' if cat == 'person' else 'flagged'
+                            report.moderation_result = cat
+                            report.moderation_reason = reason
+                            report.is_moderated = True
+                            report.moderation_at = datetime.now()
+                            break
+                    except:
+                        pass
+            
             db.session.commit()
             return jsonify({"status": "success", "msg": "수정되었습니다."})
         return render_template('share_report_edit.html', report=report)
@@ -2965,14 +3014,14 @@ def register_routes(app):
             "comments": comments_data
         })
 
-        @app.route('/api/me')
-        def api_me():
-            uid = session.get('user_id')
-            if uid:
-                user = User.query.get(uid)
-                if user:
-                    return jsonify({"id": user.id, "username": user.username, "role": user.role})
-            return jsonify({"id": None})
+    @app.route('/api/me')
+    def api_me():
+        uid = session.get('user_id')
+        if uid:
+            user = User.query.get(uid)
+            if user:
+                return jsonify({"id": user.id, "username": user.username, "role": user.role})
+        return jsonify({"id": None})
 
     @app.route('/share/comment/<int:report_id>', methods=['POST'])
     def share_add_comment(report_id):
