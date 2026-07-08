@@ -216,8 +216,16 @@ export default function ShareDetail() {
           </div>
 
           {isAuthor && (
-            <div className="mt-3">
+            <div className="mt-3 d-flex gap-2">
               <a href={`/share/edit/${r.id}`} className="btn btn-sm btn-outline-primary">✏️ 수정</a>
+              <button onClick={() => {
+                if (!confirm('정말 삭제하시겠습니까?')) return
+                fetch(`/share-report/delete/${r.id}`, { method: 'POST' })
+                  .then(r => r.json()).then(d => {
+                    if (d.status === 'success') { alert('삭제되었습니다.'); window.location.href = '/share' }
+                    else alert(d.msg || '오류')
+                  }).catch(e => alert('오류: ' + e))
+              }} className="btn btn-sm btn-outline-danger">🗑️ 삭제</button>
             </div>
           )}
         </div>
