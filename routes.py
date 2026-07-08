@@ -2579,6 +2579,19 @@ def register_routes(app):
             report.title = request.form.get('title', '').strip()
             report.description = request.form.get('description', '').strip()
             
+            latitude = request.form.get('latitude', type=float)
+            longitude = request.form.get('longitude', type=float)
+            if latitude and longitude:
+                report.latitude = latitude
+                report.longitude = longitude
+                from services.geocode import gps_to_town_village
+                resolved_town, resolved_village = gps_to_town_village(latitude, longitude)
+                if resolved_town:
+                    report.town = resolved_town
+                if resolved_village:
+                    report.village = resolved_village
+                report.address = f"경기도 양평군 {report.town} {report.village}".strip()
+            
             # 새 이미지 업로드 처리
             new_paths = []
             img_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'share_reports')

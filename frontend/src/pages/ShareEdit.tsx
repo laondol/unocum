@@ -47,6 +47,12 @@ export default function ShareEdit() {
     document.head.appendChild(script)
   }
 
+  function onMoveEnd(e: any) {
+    const pos = e.target.getLatLng()
+    setLat(pos.lat.toFixed(6))
+    setLon(pos.lng.toFixed(6))
+  }
+
   function initMap() {
     const L = (window as any).L
     if (!L || !mapRef.current || !lat || !lon) return
@@ -55,7 +61,8 @@ export default function ShareEdit() {
     if (!mapInstanceRef.current) {
       mapInstanceRef.current = L.map(mapRef.current).setView([lt, ln], 15)
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(mapInstanceRef.current)
-      L.marker([lt, ln]).addTo(mapInstanceRef.current)
+      const marker = L.marker([lt, ln], { draggable: true }).addTo(mapInstanceRef.current)
+      marker.on('dragend', onMoveEnd)
       setTimeout(() => mapInstanceRef.current?.invalidateSize(), 300)
     }
   }
@@ -100,6 +107,8 @@ export default function ShareEdit() {
     const fd = new FormData()
     fd.append('title', title)
     fd.append('description', description)
+    fd.append('latitude', lat)
+    fd.append('longitude', lon)
     for (const f of newFiles) fd.append('image', f)
     try {
       const res = await fetch(`/share-report/edit/${id}`, { method: 'POST', body: fd })
@@ -156,9 +165,11 @@ export default function ShareEdit() {
               <textarea className="form-control" rows={4} value={description} onChange={e => setDescription(e.target.value)} />
             </div>
             <div className="mb-3">
-              <label className="form-label fw-bold small">위치</label>
+              <label className="form-label fw-bold small">위치 (마커를 드래그하여 보정)</label>
               <div ref={mapRef} style={{ height: 200, borderRadius: 12 }} className="mb-2" />
-              <small className="text-muted">위치는 변경할 수 없습니다</small>
+              <div className="small text-muted text-center">
+                {lat && lon ? `${lat}, ${lon}` : ''}
+              </div>
             </div>
             <button type="submit" className="btn btn-success w-100 py-3 fw-bold" style={{ borderRadius: 12, fontSize: '1.1rem' }} disabled={submitting}>
               {submitting ? '저장 중...' : '수정 완료'}
