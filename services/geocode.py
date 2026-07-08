@@ -179,3 +179,14 @@ def get_nearby_reports(reports, user_lat, user_lon, max_count=12, max_km=20):
 
 def is_in_yangpyeong(lat, lon):
     return 37.35 <= lat <= 37.65 and 127.30 <= lon <= 127.75
+
+# 양수리 지역 GPS 보정값 (현장实测 기반)
+_YANGSU_OFFSET_LAT = -0.00013000
+_YANGSU_OFFSET_LON = -0.00013000
+
+def calibrate_gps(lat, lon):
+    """양수리(양서면) 지역에 한해 GPS 보정 적용"""
+    bounds = YANGPYEONG_BOUNDS.get('양서면')
+    if bounds and bounds['lat_min'] <= lat <= bounds['lat_max'] and bounds['lon_min'] <= lon <= bounds['lon_max']:
+        return lat + _YANGSU_OFFSET_LAT, lon + _YANGSU_OFFSET_LON
+    return lat, lon

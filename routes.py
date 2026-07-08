@@ -2365,6 +2365,9 @@ def register_routes(app):
         if not latitude or not longitude:
             return jsonify({"status": "error", "msg": "위치 수집이 필요합니다. 새로고침 후 위치 허용해주세요."}), 400
 
+        from services.geocode import calibrate_gps
+        latitude, longitude = calibrate_gps(latitude, longitude)
+
         image_paths = []
         img_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'share_reports')
         if not os.path.exists(img_dir): os.makedirs(img_dir)
@@ -2582,6 +2585,8 @@ def register_routes(app):
             latitude = request.form.get('latitude', type=float)
             longitude = request.form.get('longitude', type=float)
             if latitude and longitude:
+                from services.geocode import calibrate_gps
+                latitude, longitude = calibrate_gps(latitude, longitude)
                 report.latitude = latitude
                 report.longitude = longitude
                 from services.geocode import gps_to_town_village
