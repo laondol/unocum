@@ -82,10 +82,13 @@ export default function ShareReport() {
         setLon(ln)
         setLocationStatus('주소 변환 중...')
         setTimeout(() => initMap(), 500)
-        fetch(`/api/reverse-geocode?lat=${lt}&lon=${ln}`)
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lt}&lon=${ln}&accept-language=ko`)
           .then(r => r.json())
           .then(data => {
-            setAddressDetail(data.address || '위치 수집 완료')
+            const addr = data.display_name || ''
+            const parts = addr.split(',').map((s: string) => s.trim())
+            const short = parts.slice(0, 5).join(', ')
+            setAddressDetail(short || addr)
           })
           .catch(() => {
             setAddressDetail('위치 수집 완료')
