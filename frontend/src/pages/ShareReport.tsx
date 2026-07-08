@@ -6,6 +6,7 @@ export default function ShareReport() {
   const [lat, setLat] = useState('')
   const [lon, setLon] = useState('')
   const [locationStatus, setLocationStatus] = useState('위치 수집 중... (브라우저 권한 허용 필요)')
+  const [addressDetail, setAddressDetail] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [cameraReady, setCameraReady] = useState(true)
   const [previews, setPreviews] = useState<string[]>([])
@@ -75,10 +76,20 @@ export default function ShareReport() {
     }
     navigator.geolocation.getCurrentPosition(
       pos => {
-        setLat(pos.coords.latitude.toFixed(6))
-        setLon(pos.coords.longitude.toFixed(6))
-        setLocationStatus('위치 수집 완료')
+        const lt = pos.coords.latitude.toFixed(6)
+        const ln = pos.coords.longitude.toFixed(6)
+        setLat(lt)
+        setLon(ln)
+        setLocationStatus('주소 변환 중...')
         setTimeout(() => initMap(), 500)
+        fetch(`/api/reverse-geocode?lat=${lt}&lon=${ln}`)
+          .then(r => r.json())
+          .then(data => {
+            setAddressDetail(data.address || '위치 수집 완료')
+          })
+          .catch(() => {
+            setAddressDetail('위치 수집 완료')
+          })
       },
       err => {
         setLocationStatus('위치 수집 실패: ' + err.message)
@@ -301,7 +312,7 @@ export default function ShareReport() {
             </div>
             <div className="mb-3">
               <label className="form-label fw-bold small">현재 위치</label>
-              <div className={`mb-2 text-center small ${lat && lon ? 'text-success' : 'text-muted'}`}>{locationStatus}</div>
+              <div className={`mb-2 text-center small ${lat && lon ? 'text-success' : 'text-muted'}`}>{addressDetail || locationStatus}</div>
               <div ref={mapRef} style={{ height: 200, borderRadius: 12, display: lat && lon ? 'block' : 'none' }} className="mb-2" />
             </div>
             <button type="submit" className="btn btn-success w-100 py-3 fw-bold" style={{ borderRadius: 12, fontSize: '1.1rem' }}

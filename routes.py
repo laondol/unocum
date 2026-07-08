@@ -2467,6 +2467,27 @@ def register_routes(app):
 
         return jsonify({"status": "success", "msg": "공유가 접수되었습니다.", "report_id": report.id})
 
+    @app.route('/api/reverse-geocode')
+    def api_reverse_geocode():
+        lat = request.args.get('lat', type=float)
+        lon = request.args.get('lon', type=float)
+        if not lat or not lon:
+            return jsonify({"error": "lat/lon required"}), 400
+        try:
+            import requests as _req
+            url = f'https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&accept-language=ko'
+            r = _req.get(url, headers={'User-Agent': 'YangpyeongApp/1.0'}, timeout=10)
+            data = r.json()
+            addr = data.get('display_name', '')
+            if addr:
+                parts = [p.strip() for p in addr.split(',')]
+                short = ', '.join(parts[:5])
+            else:
+                short = ''
+            return jsonify({"address": short or addr})
+        except Exception as e:
+            return jsonify({"address": ""}), 200
+
     @app.route('/admin/share-reports')
     def admin_share_reports():
         if session.get('role') not in ['admin', 'leader']:
