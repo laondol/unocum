@@ -13,6 +13,7 @@ export default function ShareEdit() {
   const [newFiles, setNewFiles] = useState<File[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [leafletReady, setLeafletReady] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mapRef = useRef<HTMLDivElement>(null)
@@ -31,10 +32,30 @@ export default function ShareEdit() {
       }
       setPhotos(existing)
       setLoading(false)
-      setTimeout(initMap, 300)
     })
     loadLeaflet()
   }, [id])
+
+  useEffect(() => {
+    if (!lat || !lon || !leafletReady) return
+    const L = (window as any).L
+    if (!L || !mapRef.current) return
+    const lt = parseFloat(lat); const ln = parseFloat(lon)
+    if (isNaN(lt) || isNaN(ln)) return
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.setView([lt, ln], 15)
+      return
+    }
+    mapInstanceRef.current = L.map(mapRef.current).setView([lt, ln], 15)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(mapInstanceRef.current)
+    const marker = L.marker([lt, ln], { draggable: true }).addTo(mapInstanceRef.current)
+    marker.on('dragend', (e: any) => {
+      const pos = e.target.getLatLng()
+      setLat(pos.lat.toFixed(6))
+      setLon(pos.lng.toFixed(6))
+    })
+    setTimeout(() => mapInstanceRef.current?.invalidateSize(), 300)
+  }, [lat, lon, leafletReady])
 
   function loadLeaflet() {
     if (document.getElementById('leaflet-css')) return
@@ -44,28 +65,8 @@ export default function ShareEdit() {
     document.head.appendChild(link)
     const script = document.createElement('script')
     script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
-    script.onload = () => setTimeout(initMap, 100)
+    script.onload = () => { setLeafletReady(true) }
     document.head.appendChild(script)
-  }
-
-  function onMoveEnd(e: any) {
-    const pos = e.target.getLatLng()
-    setLat(pos.lat.toFixed(6))
-    setLon(pos.lng.toFixed(6))
-  }
-
-  function initMap() {
-    const L = (window as any).L
-    if (!L || !mapRef.current || !lat || !lon) return
-    const lt = parseFloat(lat); const ln = parseFloat(lon)
-    if (isNaN(lt) || isNaN(ln)) return
-    if (!mapInstanceRef.current) {
-      mapInstanceRef.current = L.map(mapRef.current).setView([lt, ln], 15)
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(mapInstanceRef.current)
-      const marker = L.marker([lt, ln], { draggable: true }).addTo(mapInstanceRef.current)
-      marker.on('dragend', onMoveEnd)
-      setTimeout(() => mapInstanceRef.current?.invalidateSize(), 300)
-    }
   }
 
   function deletePhoto(path: string) {
