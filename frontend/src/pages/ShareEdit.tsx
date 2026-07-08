@@ -18,6 +18,8 @@ export default function ShareEdit() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
+  const originalLatRef = useRef('')
+  const originalLonRef = useRef('')
 
   useEffect(() => {
     fetch(`/api/share/report/${id}`).then(r => r.json()).then(d => {
@@ -31,6 +33,8 @@ export default function ShareEdit() {
         d.extra_images.split(',').filter(Boolean).forEach((p: string) => existing.push({ path: p.trim() }))
       }
       setPhotos(existing)
+      originalLatRef.current = d.latitude || ''
+      originalLonRef.current = d.longitude || ''
       setLoading(false)
     })
     loadLeaflet()
@@ -51,8 +55,8 @@ export default function ShareEdit() {
     const marker = L.marker([lt, ln], { draggable: true }).addTo(mapInstanceRef.current)
     marker.on('dragend', (e: any) => {
       const pos = e.target.getLatLng()
-      setLat(pos.lat.toFixed(6))
-      setLon(pos.lng.toFixed(6))
+      setLat(pos.lat.toFixed(7))
+      setLon(pos.lng.toFixed(7))
     })
     setTimeout(() => mapInstanceRef.current?.invalidateSize(), 300)
   }, [lat, lon, leafletReady])
@@ -111,6 +115,8 @@ export default function ShareEdit() {
     fd.append('description', description)
     fd.append('latitude', lat)
     fd.append('longitude', lon)
+    fd.append('original_lat', originalLatRef.current)
+    fd.append('original_lon', originalLonRef.current)
     for (const f of newFiles) fd.append('image', f)
     try {
       const res = await fetch(`/share-report/edit/${id}`, { method: 'POST', body: fd })

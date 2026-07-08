@@ -841,6 +841,17 @@ def create_app():
         except Exception as e:
             print(f'[SKIP] pg migration: {e}')
 
+    # gps_calibration 테이블 생성
+    try:
+        with app.app_context():
+            from sqlalchemy import inspect
+            inspector = inspect(db.engine)
+            if 'gps_calibration' not in inspector.get_table_names():
+                db.create_all()
+                print('[OK] gps_calibration table created')
+    except Exception as e:
+        print(f'[SKIP] gps_calibration migration: {e}')
+
     # temp_email_verify.redirect 컬럼 마이그레이션
     try:
         with app.app_context():

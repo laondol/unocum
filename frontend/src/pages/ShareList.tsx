@@ -207,9 +207,7 @@ export default function ShareList() {
                     <span className="badge bg-info">{r.ai_category}</span>
                     <span className="badge bg-light text-dark">{r.town} {r.village}</span>
                     {r.status !== 'approved' && myId === r.user_id && (
-                      <span className={`badge ${r.status === 'flagged' ? 'bg-danger' : r.status === 'pending_person' ? 'bg-secondary' : 'bg-warning text-dark'}`}>
-                        {r.status === 'pending_person' ? '인물보류' : r.status === 'flagged' ? '차단됨' : '승인대기'}
-                      </span>
+                      <span className="badge bg-danger">{r.status === 'pending_person' ? '보류(인물)' : r.status === 'flagged' ? '차단됨' : '승인대기'}</span>
                     )}
                   </div>
                   <h6 className="fw-bold mb-2">{r.title}</h6>

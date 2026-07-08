@@ -621,3 +621,14 @@ class TempEmailVerify(db.Model):
     redirect = db.Column(db.String(200), default='/legal/list')
     is_verified = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.now)
+
+class GpsCalibration(db.Model):
+    """GPS 보정 데이터: 마을(리) 단위로 누적 보정값 저장"""
+    __tablename__ = 'gps_calibration'
+    id = db.Column(db.Integer, primary_key=True)
+    town = db.Column(db.String(50), nullable=False)
+    village = db.Column(db.String(50), nullable=False)
+    offset_lat = db.Column(db.Float, default=0)     # 위도 보정값 (누적 평균)
+    offset_lon = db.Column(db.Float, default=0)     # 경도 보정값 (누적 평균)
+    sample_count = db.Column(db.Integer, default=0) # 보정 횟수
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)

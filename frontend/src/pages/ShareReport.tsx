@@ -18,6 +18,7 @@ export default function ShareReport() {
   const [videoFileUpload, setVideoFileUpload] = useState<File | null>(null)
   const [videoUploadPreview, setVideoUploadPreview] = useState<string | null>(null)
   const [hasContent, setHasContent] = useState(false)
+  const [leafletReady, setLeafletReady] = useState(false)
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -26,7 +27,6 @@ export default function ShareReport() {
   const videoFileInputRef = useRef<HTMLInputElement>(null)
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
-  const markerRef = useRef<any>(null)
   const drawingRef = useRef(false)
 
   const ready = hasContent && lat !== '' && lon !== ''
@@ -41,6 +41,27 @@ export default function ShareReport() {
     if (canvasVisible) setTimeout(initCanvas, 100)
   }, [canvasVisible])
 
+  useEffect(() => {
+    if (!lat || !lon || !leafletReady) return
+    const L = (window as any).L
+    if (!L || !mapRef.current) return
+    const lt = parseFloat(lat); const ln = parseFloat(lon)
+    if (isNaN(lt) || isNaN(ln)) return
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.setView([lt, ln], 15)
+      return
+    }
+    mapInstanceRef.current = L.map(mapRef.current).setView([lt, ln], 15)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(mapInstanceRef.current)
+    const marker = L.marker([lt, ln], { draggable: true }).addTo(mapInstanceRef.current)
+    marker.on('dragend', (e: any) => {
+      const pos = e.target.getLatLng()
+      setLat(pos.lat.toFixed(7))
+      setLon(pos.lng.toFixed(7))
+    })
+    setTimeout(() => mapInstanceRef.current?.invalidateSize(), 300)
+  }, [lat, lon, leafletReady])
+
   function loadLeaflet() {
     if (document.getElementById('leaflet-css')) return
     const link = document.createElement('link')
@@ -49,24 +70,8 @@ export default function ShareReport() {
     document.head.appendChild(link)
     const script = document.createElement('script')
     script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
-    script.onload = () => { if (lat && lon) initMap() }
+    script.onload = () => { setLeafletReady(true) }
     document.head.appendChild(script)
-  }
-
-  function initMap() {
-    const L = (window as any).L
-    if (!L || !mapRef.current) return
-    const lt = parseFloat(lat); const ln = parseFloat(lon)
-    if (isNaN(lt) || isNaN(ln)) return
-    if (!mapInstanceRef.current) {
-      mapInstanceRef.current = L.map(mapRef.current).setView([lt, ln], 15)
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(mapInstanceRef.current)
-      markerRef.current = L.marker([lt, ln]).addTo(mapInstanceRef.current)
-    } else {
-      mapInstanceRef.current.setView([lt, ln], 15)
-      markerRef.current.setLatLng([lt, ln])
-    }
-    setTimeout(() => mapInstanceRef.current?.invalidateSize(), 300)
   }
 
   function getLocation() {
@@ -76,12 +81,11 @@ export default function ShareReport() {
     }
     navigator.geolocation.getCurrentPosition(
       pos => {
-        const lt = pos.coords.latitude.toFixed(6)
-        const ln = pos.coords.longitude.toFixed(6)
+        const lt = pos.coords.latitude.toFixed(7)
+        const ln = pos.coords.longitude.toFixed(7)
         setLat(lt)
         setLon(ln)
         setLocationStatus('주소 변환 중...')
-        setTimeout(() => initMap(), 500)
         fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lt}&lon=${ln}&accept-language=ko`)
           .then(r => r.json())
           .then(data => {
@@ -314,9 +318,12 @@ export default function ShareReport() {
               <textarea className="form-control" rows={3} placeholder="자세한 내용이 있으면 적어주세요." value={description} onChange={e => setDescription(e.target.value)} />
             </div>
             <div className="mb-3">
-              <label className="form-label fw-bold small">현재 위치</label>
+              <label className="form-label fw-bold small">현재 위치 <span className="text-muted fw-normal">(핀을 드래그하여 보정)</span></label>
               <div className={`mb-2 text-center small ${lat && lon ? 'text-success' : 'text-muted'}`}>{addressDetail || locationStatus}</div>
               <div ref={mapRef} style={{ height: 200, borderRadius: 12, display: lat && lon ? 'block' : 'none' }} className="mb-2" />
+              <div className="small text-muted text-center">
+                {lat && lon ? `${lat}, ${lon}` : ''}
+              </div>
             </div>
             <button type="submit" className="btn btn-success w-100 py-3 fw-bold" style={{ borderRadius: 12, fontSize: '1.1rem' }}
               disabled={!ready || submitting}>

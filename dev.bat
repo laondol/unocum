@@ -23,10 +23,13 @@ echo.
 echo 종료하려면 Ctrl+C 두 번 누르세요
 echo.
 
-:: 1. Flask 서버 실행 및 자동 재시작 환경 대응
+:: 1. Flask 서버 실행
 start "Flask" cmd /c "cd /d "%~dp0" && venv\Scripts\python run.py"
 
-:: 2. Vite 프런트엔드 실행
+:: 2. AI 검증 워커 실행 (5초 간격 폴링)
+start "AIWorker" cmd /c "cd /d "%~dp0" && venv\Scripts\python services/ai_moderation_worker.py"
+
+:: 3. Vite 프런트엔드 실행
 start "React" cmd /c "cd /d "%~dp0frontend" && npx vite --host"
 
 echo [3/3] 브라우저 자동 연결 중...

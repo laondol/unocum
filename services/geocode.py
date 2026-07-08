@@ -180,13 +180,24 @@ def get_nearby_reports(reports, user_lat, user_lon, max_count=12, max_km=20):
 def is_in_yangpyeong(lat, lon):
     return 37.35 <= lat <= 37.65 and 127.30 <= lon <= 127.75
 
-# 양수리 지역 GPS 보정값 (현장实测 기반)
-_YANGSU_OFFSET_LAT = -0.00013000
-_YANGSU_OFFSET_LON = -0.00013000
 
-def calibrate_gps(lat, lon):
-    """양수리(양서면) 지역에 한해 GPS 보정 적용"""
-    bounds = YANGPYEONG_BOUNDS.get('양서면')
-    if bounds and bounds['lat_min'] <= lat <= bounds['lat_max'] and bounds['lon_min'] <= lon <= bounds['lon_max']:
-        return lat + _YANGSU_OFFSET_LAT, lon + _YANGSU_OFFSET_LON
+
+def calibrate_gps(lat, lon, town=None, village=None):
+    """GPS 보정 적용:
+    1. town/village가 주어지면 해당 지역의 DB 누적 보정값 사용
+    2. 없으면 좌표로 읍면을 찾아서 적용
+    """
+    if not town or not village:
+        town, village = _fallback_lookup(lat, lon)
+    try:
+        from models import db, GpsCalibration
+        # village를 모르면 town 기준으로만 조회 (fallback_lookup은 village를 못 찾음)
+        if village:
+            cal = GpsCalibration.query.filter_by(town=town, village=village).order_by(GpsCalibration.sample_count.desc()).first()
+        else:
+            cal = GpsCalibration.query.filter_by(town=town).order_by(GpsCalibration.sample_count.desc()).first()
+        if cal and cal.sample_count > 0:
+            return lat + cal.offset_lat, lon + cal.offset_lon
+    except:
+        pass
     return lat, lon

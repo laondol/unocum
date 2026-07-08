@@ -85,10 +85,14 @@ def _groq_vision(system, user, b64_image, model=GROQ_VISION_MODEL, timeout=30):
                     {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64_image}"}}
                 ]
             }],
-            response_format={"type": "json_object"},
             timeout=timeout
         )
-        return json.loads(resp.choices[0].message.content)
+        text = resp.choices[0].message.content.strip()
+        start = text.find('{')
+        end = text.rfind('}')
+        if start != -1 and end != -1 and end > start:
+            text = text[start:end+1]
+        return json.loads(text)
     except Exception as e:
         print(f"[GROQ VISION] error: {e}")
         return {}
@@ -158,14 +162,23 @@ def moderate_image(image_path, app=None):
     b64 = _image_to_base64(image_path)
     if not b64:
         return False, "AI 분석 불가 - 지원하지 않는 파일 형식이거나 손상된 파일입니다.", "unanalyzable"
-    system = "당신은 양평군 공유 이미지 방역관입니다. 개인정보보호법을 엄격히 적용합니다."
-    user = """다음 이미지가 아래 기준에 하나라도 해당하면 반드시 flagged=true로 판단하세요.
-1. 인물 사진 (얼굴, 신체 일부, 실루엣, 뒷모습 포함 모든 인물)
-2. 개인정보 노출 (주민등록증, 면허증, 여권, 번호판, 신용카드, 명함)
-3. 폭력적/혐오적/선정적 내용
-4. 불법 촬영물, 스팸/광고성 이미지
-※ 조금이라도 의심되면 flagged=true로 판단하세요. 확실한 풍경/사물/음식/동물만 false입니다.
-JSON: {"flagged": true/false, "reason": "이유", "category": "person/privacy/violence/adult/illegal/spam/clean"}"""
+    system = "당신은 양평군 공유 이미지 방역관입니다. 개인정보보호법과 초상권을 엄격히 적용합니다."
+    user = """다음 이미지가 아래 기준에 하나라도 해당하면 반드시 flagged=true, category=해당항목으로 판단하세요.
+
+[반드시 차단]
+- person: 얼굴이 보이는 사진 (정면, 측면, 뒷모습, 흐릿해도 포함). 단체사진, 셀카, 프로필 사진 모두 포함
+- privacy: 자동차 번호판, 주민등록증, 면허증, 여권, 신용카드, 명함, 택배송장 등 개인정보
+
+[차단 대상]
+- violence: 폭력적/혐오적 내용
+- adult: 선정적/음란적 내용
+- illegal: 불법 촬영물
+- spam: 스팸/광고성 이미지
+
+※ 풍경, 건물 외관, 음식, 동물, 예술작품, 문서(번호판/개인정보 없는), 거리 풍경만 safe입니다.
+※ 조금이라도 의심되면 flagged=true.
+반드시 아래 JSON 형식으로만 응답하세요. 다른 말은 하지 마세요.
+{"flagged": true/false, "reason": "이유", "category": "person/privacy/violence/adult/illegal/spam/clean"}"""
     data = _groq_vision(system, user, b64)
     if not data:
         return False, "AI 분석 불가 - 서버 분석 중 오류가 발생했습니다.", "unanalyzable"
@@ -252,74 +265,4 @@ def background_process_share(app, report_id, title, description, latitude, longi
         report.ai_region_news = news_summary or ''
         report.ai_news_links = news_links or '[]'
 
-        # 동영상은 무조건 보류
-        flagged = False
-        v_path = getattr(report, 'video_path', None)
-        if v_path and not flagged:
-            flagged = True
-            reason = "동영상은 관리자 승인 후 공개됩니다"
-            mod_category = "video"
-
-        if not flagged:
-            paths_to_check = ['image_path', 'drawing_path']
-            if getattr(report, 'extra_images', None):
-                for ei in report.extra_images.split(','):
-                    ei = ei.strip()
-                    if ei:
-                        paths_to_check.append(ei)
-            for rel_path in paths_to_check:
-                if not rel_path: continue
-                abs_path = os.path.join(app.root_path, rel_path.lstrip('/')).replace('/', os.sep)
-                if not os.path.exists(abs_path): continue
-                f, r, c = moderate_image(abs_path, app)
-                if f:
-                    flagged = True
-                    reason = r
-                    mod_category = c
-                    break
-        
-        # AI danger_alert가 true이면 강제 보류
-        if not flagged and report.ai_danger_alert:
-            flagged = True
-            reason = "AI가 개인정보 위험을 감지했습니다"
-            mod_category = "privacy"
-
-        report.is_moderated = True
-        report.moderation_at = datetime.now()
-        if flagged and mod_category == 'unanalyzable':
-            report.moderation_result = 'unanalyzable'
-            report.moderation_reason = reason
-            report.status = 'pending'
-        elif flagged and mod_category == 'person':
-            report.moderation_result = 'person'
-            report.moderation_reason = reason
-            report.status = 'pending_person'
-            if user_id:
-                from models import User, Message
-                uploader = User.query.get(user_id)
-                admin_user = User.query.filter(User.role == 'admin').first()
-                if uploader and admin_user:
-                    accept_url = f"{app.config.get('SITE_URL', 'https://test.unocum.kr')}/share-report/accept-person/{report.id}"
-                    msg = Message(
-                        sender_id=admin_user.id,
-                        sender_name=admin_user.username,
-                        sender_role='admin',
-                        receiver_id=uploader.id,
-                        subject='⚠️ 공유 이미지에 인물이 포함되어 있습니다',
-                        content=f'{uploader.real_name or uploader.username}님, 올리신 공유글(#{report.id})에 인물 사진이 포함되어 있습니다.\n\n게시를 원하시면 아래 링크에서 모든 책임을 지겠다는 데 동의해 주세요.\n{accept_url}\n\n동의하지 않으시면 별도 조치 없이 게시가 보류됩니다.'
-                    )
-                    db.session.add(msg)
-        elif flagged:
-            report.moderation_result = 'flagged'
-            report.moderation_reason = reason
-            report.status = 'flagged'
-        elif user_id == 0:
-            report.moderation_result = 'pending'
-            report.status = 'pending'
-        elif report.ai_category in VALUABLE_CATEGORIES:
-            report.moderation_result = 'clean'
-            report.status = 'approved'
-        else:
-            report.moderation_result = 'clean'
-            report.status = 'pending'
         db.session.commit()

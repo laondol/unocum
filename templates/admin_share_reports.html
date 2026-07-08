@@ -24,7 +24,19 @@
     </div>
     {% endif %}
     
-    <h3 class="fw-bold mb-4">📍 전체 공유 관리</h3>
+    <h3 class="fw-bold mb-4">📍 공유 관리</h3>
+    
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <a class="nav-link {{ 'active fw-bold' if filter_type == 'all' else '' }}" href="/admin/share-reports?filter=all">전체 ({{ total_all }})</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {{ 'active fw-bold' if filter_type == 'unmoderated' else '' }}" href="/admin/share-reports?filter=unmoderated">미검증</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {{ 'active fw-bold' if filter_type == 'moderated' else '' }}" href="/admin/share-reports?filter=moderated">검증완료</a>
+        </li>
+    </ul>
     
     <div class="card border-0 shadow-sm mb-4" style="border-radius: 16px;">
         <div class="table-responsive">
@@ -37,10 +49,11 @@
                         <th style="width:7%;">공유자</th>
                         <th style="width:8%;">위치</th>
                         <th style="width:10%;">AI분류</th>
-                        <th style="width:6%;">방역</th>
-                        <th style="width:8%;">상태</th>
-                        <th style="width:8%;">일시</th>
-                        <th style="width:21%;">처리</th>
+                        <th style="width:7%;">방역</th>
+                        <th style="width:7%;">검증일시</th>
+                        <th style="width:7%;">상태</th>
+                        <th style="width:7%;">등록일시</th>
+                        <th style="width:18%;">처리</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -103,6 +116,13 @@
                             {% endif %}
                             {% if r.moderation_reason %}
                             <small class="d-block text-danger">{{ r.moderation_reason[:50] }}</small>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted">
+                            {% if r.moderation_at %}
+                            {{ r.moderation_at.strftime('%m/%d %H:%M') }}
+                            {% else %}
+                            <span class="text-secondary">-</span>
                             {% endif %}
                         </td>
                         <td>

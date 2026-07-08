@@ -2439,27 +2439,7 @@ def register_routes(app):
         else:
             report.status = 'approved'
             _resolve_canonical_store_name(report)
-            all_imgs = [image_path] if image_path else []
-            if extra_images:
-                all_imgs += [e.strip() for e in extra_images.split(',') if e.strip()]
-            for img_rel in all_imgs:
-                try:
-                    from services.ai_service import moderate_image
-                    abs_path = os.path.join(current_app.root_path, img_rel.lstrip('/'))
-                    flagged, reason, cat = moderate_image(abs_path)
-                    if cat == 'unanalyzable':
-                        report.status = 'pending'
-                        report.moderation_result = 'unanalyzable'
-                        report.moderation_reason = reason
-                        report.is_moderated = True
-                        break
-                    if flagged:
-                        report.status = 'pending_person' if cat == 'person' else 'flagged'
-                        report.moderation_result = cat
-                        report.moderation_reason = reason
-                        break
-                except:
-                    pass
+        report.is_moderated = False
         db.session.add(report)
         db.session.commit()
 
@@ -2474,14 +2454,22 @@ def register_routes(app):
     def admin_share_reports():
         if session.get('role') not in ['admin', 'leader']:
             return "권한 없음", 403
-        reports = ShareReport.query.order_by(ShareReport.created_at.desc()).all()
+        filter_type = request.args.get('filter', 'all')
+        base = ShareReport.query
+        if filter_type == 'unmoderated':
+            base = base.filter(db.or_(ShareReport.is_moderated == False, ShareReport.is_moderated == None))
+        elif filter_type == 'moderated':
+            base = base.filter(ShareReport.is_moderated == True)
+        reports = base.order_by(ShareReport.created_at.desc()).all()
         
-        # 위험 알림 별도 표시
         danger_reports = [r for r in reports if r.ai_danger_alert]
         
+        total_all = ShareReport.query.count()
         return render_template('admin_share_reports.html', 
             reports=reports, 
-            danger_reports=danger_reports)
+            danger_reports=danger_reports,
+            filter_type=filter_type,
+            total_all=total_all)
 
     @app.route('/admin/ramp-applications')
     def admin_ramp_applications():
@@ -2585,17 +2573,45 @@ def register_routes(app):
             latitude = request.form.get('latitude', type=float)
             longitude = request.form.get('longitude', type=float)
             if latitude and longitude:
-                from services.geocode import calibrate_gps
-                latitude, longitude = calibrate_gps(latitude, longitude)
+                original_lat = request.form.get('original_lat', type=float)
+                original_lon = request.form.get('original_lon', type=float)
                 report.latitude = latitude
                 report.longitude = longitude
-                from services.geocode import gps_to_town_village
                 resolved_town, resolved_village = gps_to_town_village(latitude, longitude)
+                if not resolved_town:
+                    from services.geocode import _fallback_lookup
+                    resolved_town, resolved_village = _fallback_lookup(latitude, longitude)
                 if resolved_town:
                     report.town = resolved_town
                 if resolved_village:
                     report.village = resolved_village
                 report.address = f"경기도 양평군 {report.town} {report.village}".strip()
+                # 사용자가 마커를 드래그해서 위치 보정한 경우 → GPS 보정값 누적
+                if original_lat and original_lon and (abs(original_lat - latitude) > 1e-8 or abs(original_lon - longitude) > 1e-8):
+                    try:
+                        from models import GpsCalibration
+                        cal_town = resolved_town or report.town or ''
+                        cal_village = resolved_village or report.village or ''
+                        cal = GpsCalibration.query.filter_by(town=cal_town, village=cal_village).first()
+                        if not cal and cal_village:
+                            cal = GpsCalibration.query.filter_by(town=cal_town).order_by(GpsCalibration.sample_count.desc()).first()
+                        delta_lat = latitude - original_lat
+                        delta_lon = longitude - original_lon
+                        if cal:
+                            cal.offset_lat += delta_lat / (cal.sample_count + 1)
+                            cal.offset_lon += delta_lon / (cal.sample_count + 1)
+                            cal.sample_count += 1
+                        else:
+                            cal = GpsCalibration(
+                                town=cal_town or '',
+                                village=cal_village or '',
+                                offset_lat=delta_lat,
+                                offset_lon=delta_lon,
+                                sample_count=1
+                            )
+                            db.session.add(cal)
+                    except:
+                        pass
             
             # 새 이미지 업로드 처리
             new_paths = []
