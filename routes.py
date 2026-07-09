@@ -2688,51 +2688,6 @@ def register_routes(app):
                 
         return jsonify({"status": "success", "msg": "삭제되었습니다."})
 
-    # --- [공개] 공유 페이지 ---
-    @app.route('/share')
-    def share():
-        """공개 공유 페이지 - 사건/풍경/장소 모두 표시"""
-        town = request.args.get('town', '')
-        village = request.args.get('village', '')
-        category = request.args.get('category', '')
-        role = session.get('role', '')
-        uid = session.get('user_id')
-        
-        if uid:
-            query = ShareReport.query.filter(
-                db.or_(ShareReport.status == 'approved', ShareReport.user_id == uid)
-            )
-        else:
-            query = ShareReport.query.filter_by(status='approved')
-        if town:
-            query = query.filter_by(town=town)
-        if village:
-            query = query.filter_by(village=village)
-        if category:
-            query = query.filter_by(ai_category=category)
-        
-        reports = query.order_by(ShareReport.created_at.desc()).limit(50).all()
-        
-        towns = db.session.query(ShareReport.town).filter_by(status='approved').distinct().all()
-        towns = [t[0] for t in towns if t[0]]
-        
-        villages = []
-        if town:
-            villages = db.session.query(ShareReport.village).filter_by(status='approved', town=town).distinct().all()
-            villages = [v[0] for v in villages if v[0]]
-        
-        categories = ['사건', '풍경', '장소', '맛집', '기타']
-        
-        return render_template('share.html', 
-            reports=reports, 
-            towns=towns, 
-            villages=villages,
-            categories=categories,
-            selected_town=town,
-            selected_village=village,
-            selected_category=category
-        )
-
     @app.route('/api/share/reports')
     def api_share_reports():
         town = request.args.get('town', '')
@@ -2934,69 +2889,6 @@ def register_routes(app):
         return jsonify({'status':'success','msg':'AI 모자이크 처리 완료, 재검토 대기 중입니다.'})
 
     # --- [공유 댓글] ---
-    @app.route('/share/detail/<int:report_id>')
-    def share_detail(report_id):
-        report = ShareReport.query.get_or_404(report_id)
-        role = session.get('role', '')
-        uid = session.get('user_id')
-        if report.status != 'approved' and role not in ('admin', 'leader') and report.user_id != uid:
-            return "승인된 공유만 볼 수 있습니다.", 403
-        comments = ShareComment.query.filter_by(share_id=report_id, parent_id=None).order_by(ShareComment.created_at.asc()).all()
-        # 위치 기반 가까운 공유 (정렬: 내글→같은리→같은면→같은군)
-        nearby_shares = []
-        if report.latitude and report.longitude and report.town:
-            from services.geocode import haversine
-            all_approved = ShareReport.query.filter(
-                ShareReport.status == 'approved',
-                ShareReport.id != report_id,
-                ShareReport.latitude.isnot(None),
-                ShareReport.longitude.isnot(None),
-                ShareReport.town.isnot(None)
-            ).all()
-            scored = []
-            cat_order = {'사건': 0, '풍경': 1, '맛집': 2, '장소': 3, '기타': 4}
-            for s in all_approved:
-                try:
-                    d = haversine(report.latitude, report.longitude, s.latitude, s.longitude)
-                    if d > 20:
-                        continue
-                    same_village = s.town == report.town and s.village and s.village == report.village
-                    same_town = s.town == report.town
-                    me_first = (s.user_id == uid)
-                    if me_first:
-                        priority = 0
-                    elif same_village:
-                        priority = 1
-                    elif same_town:
-                        priority = 2
-                    else:
-                        priority = 3
-                    cat_pri = cat_order.get(s.ai_category, 4)
-                    scored.append((priority, cat_pri, d, s))
-                except:
-                    pass
-            scored.sort(key=lambda x: (x[0], x[1], x[2]))
-            nearby_shares = [(s, round(d, 1)) for p, cp, d, s in scored[:10]]
-        # 지역 소식 (외부 사이트 스크래핑)
-        local_news = []
-        local_links = []
-        try:
-            from services.local_sources import get_local_news, get_quick_links
-            local_news = get_local_news(town=report.town, village=report.village)
-            local_links = get_quick_links(town=report.town, village=report.village)
-        except:
-            pass
-        # 주변 건축/공사 정보
-        nearby_construction = []
-        if report.latitude and report.longitude:
-            from services.geocode import haversine
-            notices = ConstructionNotice.query.filter_by(is_active=True).all()
-            for n in notices:
-                if n.latitude and n.longitude:
-                    if haversine(report.latitude, report.longitude, n.latitude, n.longitude) < 10:
-                        nearby_construction.append(n)
-        return render_template('share_detail.html', report=report, comments=comments, nearby_shares=nearby_shares, local_news=local_news, local_links=local_links, nearby_construction=nearby_construction)
-
     @app.route('/api/share/report/<int:report_id>')
     def api_share_detail(report_id):
         r = ShareReport.query.get_or_404(report_id)
