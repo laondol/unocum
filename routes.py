@@ -2970,7 +2970,7 @@ def register_routes(app):
         if uid:
             user = User.query.get(uid)
             if user:
-                return jsonify({"id": user.id, "username": user.username, "role": user.role})
+                return jsonify({"id": user.id, "username": user.username, "role": user.role, "managed_pages": (user.managed_pages or '').split(',')})
         return jsonify({"id": None})
 
     @app.route('/share/comment/<int:report_id>', methods=['POST'])
