@@ -60,6 +60,14 @@ def register_routes(app):
             return app.send_static_file('spa/index.html')
         return render_template('intro.html')
 
+    @app.after_request
+    def security_headers(resp):
+        resp.headers['X-Content-Type-Options'] = 'nosniff'
+        resp.headers['X-Frame-Options'] = 'SAMEORIGIN'
+        resp.headers['X-XSS-Protection'] = '1; mode=block'
+        resp.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        return resp
+
     # React 공유마당 SPA (frontend/dist/index.html)
     _react_index = _os.path.join(app.root_path, 'frontend', 'dist', 'index.html')
 
@@ -492,12 +500,16 @@ def register_routes(app):
             # 프로필 이미지 저장
             profile_img = request.files.get('profile_img')
             if profile_img and profile_img.filename:
-                from werkzeug.utils import secure_filename
-                fn = secure_filename(f"{username}_{int(now.timestamp())}_{profile_img.filename}")
-                img_path = os.path.join(current_app.root_path, 'static', 'uploads', 'profiles')
-                os.makedirs(img_path, exist_ok=True)
-                profile_img.save(os.path.join(img_path, fn))
-                new_user.profile_image = f'/static/uploads/profiles/{fn}'
+                from services.security import validate_upload, secure_save
+                ok, msg = validate_upload(profile_img, max_mb=5)
+                if ok:
+                    profile_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'profiles')
+                    os.makedirs(profile_dir, exist_ok=True)
+                    try:
+                        path = secure_save(profile_img, profile_dir, max_mb=5)
+                        new_user.profile_image = path
+                    except Exception:
+                        pass
             db.session.add(new_user)
             db.session.flush()
             new_user.last_payout = now
@@ -2368,18 +2380,19 @@ def register_routes(app):
         from services.geocode import calibrate_gps
         latitude, longitude = calibrate_gps(latitude, longitude)
 
+        from services.security import validate_upload, secure_save
         image_paths = []
         img_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'share_reports')
         if not os.path.exists(img_dir): os.makedirs(img_dir)
-        IMAGE_EXT = {'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'}
 
         for file in request.files.getlist('image'):
-            if file and file.filename and '.' in file.filename:
-                ext = file.filename.rsplit('.', 1)[1].lower()
-                if ext in IMAGE_EXT:
-                    fname = f"share_{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(file.filename)}"
-                    file.save(os.path.join(img_dir, fname))
-                    image_paths.append(f"/static/uploads/share_reports/{fname}")
+            ok, msg = validate_upload(file)
+            if ok:
+                try:
+                    path = secure_save(file, img_dir)
+                    image_paths.append(path)
+                except Exception:
+                    pass
 
         image_path = image_paths[0] if image_paths else None
         extra_images = ','.join(image_paths[1:]) if len(image_paths) > 1 else ''
@@ -2614,14 +2627,18 @@ def register_routes(app):
                         pass
             
             # 새 이미지 업로드 처리
+            from services.security import validate_upload, secure_save
             new_paths = []
             img_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'share_reports')
             if not os.path.exists(img_dir): os.makedirs(img_dir)
             for file in request.files.getlist('image'):
-                if file and file.filename:
-                    fname = f"share_{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(file.filename)}"
-                    file.save(os.path.join(img_dir, fname))
-                    new_paths.append(f"/static/uploads/share_reports/{fname}")
+                ok, msg = validate_upload(file)
+                if ok:
+                    try:
+                        path = secure_save(file, img_dir)
+                        new_paths.append(path)
+                    except Exception:
+                        pass
             
             if new_paths:
                 # 기존 이미지 목록
