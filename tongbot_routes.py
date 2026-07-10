@@ -1392,15 +1392,17 @@ def bot_upload():
     f = request.files.get('file')
     if not f:
         return jsonify({"error": "파일이 없습니다."})
-    ext = os.path.splitext(f.filename)[1].lower()
-    if request.form.get('type') == 'image' and ext not in ('.jpg','.jpeg','.png','.gif','.webp'):
-        return jsonify({"error": "지원하지 않는 이미지 형식입니다."})
-    fname = f"{uuid.uuid4().hex}{ext}"
-    upload_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'tongbot')
-    os.makedirs(upload_dir, exist_ok=True)
-    f.save(os.path.join(upload_dir, fname))
-    url = f"/static/uploads/tongbot/{fname}"
-    return jsonify({"url": url, "filename": fname})
+    from services.security import validate_upload, secure_save
+    ok, msg = validate_upload(f)
+    if not ok:
+        return jsonify({"error": msg})
+    try:
+        upload_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'tongbot')
+        os.makedirs(upload_dir, exist_ok=True)
+        url = secure_save(f, upload_dir)
+        return jsonify({"url": url, "filename": os.path.basename(url)})
+    except Exception as e:
+        return jsonify({"error": str(e)})
 
 # ─── 벗 채팅 ───
 

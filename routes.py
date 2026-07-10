@@ -831,15 +831,7 @@ def register_routes(app):
         if 'file' in request.files:
             file = request.files['file']
             if file and file.filename != '':
-                ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
-                if ext in ('mp4', 'avi', 'mov', 'mkv', 'webm'):
-                    fname = f"video_{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(file.filename)}"
-                    target_dir = os.path.join(app.config['UPLOAD_FOLDER'], f"{user.town}_{user.village}")
-                    if not os.path.exists(target_dir): os.makedirs(target_dir)
-                    file.save(os.path.join(target_dir, fname))
-                    file_url = f"/static/uploads/{user.town}_{user.village}/{fname}"
-                else:
-                    file_url = save_village_file(file, app.config['UPLOAD_FOLDER'], user.town, user.village)
+                file_url = save_village_file(file, app.config['UPLOAD_FOLDER'], user.town, user.village)
 
         # 그림판 드로잉 저장
         drawing = request.form.get('drawing_data')
@@ -1394,15 +1386,18 @@ def register_routes(app):
             title = request.form.get('title', '').strip()
             if not title:
                 return "<script>alert('제목을 입력하세요.'); history.back();</script>"
+            from services.security import validate_upload, secure_save
             img_path = None
             if 'image' in request.files:
                 file = request.files['image']
-                if file and file.filename:
-                    img_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'news')
-                    if not os.path.exists(img_dir): os.makedirs(img_dir)
-                    fname = f"news_{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(file.filename)}"
-                    file.save(os.path.join(img_dir, fname))
-                    img_path = f"/static/uploads/news/{fname}"
+                ok, msg = validate_upload(file)
+                if ok:
+                    try:
+                        img_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'news')
+                        if not os.path.exists(img_dir): os.makedirs(img_dir)
+                        img_path = secure_save(file, img_dir)
+                    except Exception:
+                        pass
             article = NewsArticle(
                 title=title,
                 summary=request.form.get('summary', ''),
@@ -1467,12 +1462,15 @@ def register_routes(app):
             article.updated_at = datetime.now()
             if 'image' in request.files:
                 file = request.files['image']
-                if file and file.filename:
-                    img_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'news')
-                    if not os.path.exists(img_dir): os.makedirs(img_dir)
-                    fname = f"news_{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(file.filename)}"
-                    file.save(os.path.join(img_dir, fname))
-                    article.image_path = f"/static/uploads/news/{fname}"
+                from services.security import validate_upload, secure_save
+                ok, msg = validate_upload(file)
+                if ok:
+                    try:
+                        img_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'news')
+                        if not os.path.exists(img_dir): os.makedirs(img_dir)
+                        article.image_path = secure_save(file, img_dir)
+                    except Exception:
+                        pass
             try:
                 ai_res = call_ai_judge(article.title, article.content[:500])
                 article.ai_score = ai_res.get('score', 0)
@@ -3784,13 +3782,15 @@ def register_routes(app):
         photo_path = None
         if 'photo' in request.files:
             file = request.files['photo']
-            if file and file.filename:
-                from werkzeug.utils import secure_filename
-                fname = f"ramp_{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(file.filename)}"
-                target_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'ramp')
-                if not os.path.exists(target_dir): os.makedirs(target_dir)
-                file.save(os.path.join(target_dir, fname))
-                photo_path = f"/static/uploads/ramp/{fname}"
+            from services.security import validate_upload, secure_save
+            ok, msg = validate_upload(file)
+            if ok:
+                try:
+                    target_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'ramp')
+                    if not os.path.exists(target_dir): os.makedirs(target_dir)
+                    photo_path = secure_save(file, target_dir)
+                except Exception:
+                    pass
 
         appt = RampApplication(
             name=name, email=email, phone=phone, location=location,
@@ -4499,13 +4499,16 @@ def register_routes(app):
         attachment_path = None
         file = request.files.get('attachment')
         if file and file.filename:
-            import os as _os
-            upload_dir = _os.path.join(current_app.config['UPLOAD_FOLDER'], 'village_msg')
-            _os.makedirs(upload_dir, exist_ok=True)
-            fname = f"{uid}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{file.filename}"
-            fpath = _os.path.join(upload_dir, fname)
-            file.save(fpath)
-            attachment_path = '/static/uploads/village_msg/' + fname
+            from services.security import validate_upload, secure_save
+            ok, msg = validate_upload(file)
+            if ok:
+                try:
+                    import os as _os
+                    upload_dir = _os.path.join(current_app.config['UPLOAD_FOLDER'], 'village_msg')
+                    _os.makedirs(upload_dir, exist_ok=True)
+                    attachment_path = secure_save(file, upload_dir)
+                except Exception:
+                    pass
         from sqlalchemy import or_
         conditions = [User.village == ri for ri in village_ris]
         receivers = User.query.filter(User.id != uid, or_(*conditions)).all() if conditions else []
@@ -4596,13 +4599,16 @@ def register_routes(app):
         # 사진 처리
         photo = request.files.get('photo')
         if photo and photo.filename:
-            import os as _os
-            upload_dir = _os.path.join(current_app.config['UPLOAD_FOLDER'], 'village_members')
-            _os.makedirs(upload_dir, exist_ok=True)
-            fname = f'{member.id}_{datetime.now().strftime("%Y%m%d%H%M%S")}.jpg'
-            fpath = _os.path.join(upload_dir, fname)
-            photo.save(fpath)
-            member.photo_path = '/static/uploads/village_members/' + fname
+            from services.security import validate_upload, secure_save
+            ok, msg = validate_upload(photo)
+            if ok:
+                try:
+                    import os as _os
+                    upload_dir = _os.path.join(current_app.config['UPLOAD_FOLDER'], 'village_members')
+                    _os.makedirs(upload_dir, exist_ok=True)
+                    member.photo_path = secure_save(photo, upload_dir)
+                except Exception:
+                    pass
         # 마을지기의 managed_pages에 등록
         cp = (caretaker.managed_pages or '').split(',')
         member_key = f'member_{member.id}'
