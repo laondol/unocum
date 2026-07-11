@@ -755,14 +755,29 @@ export default function UserMyPage() {
                 ))}
                 {routeModal.route?.from_lat && routeModal.route?.to_lat && (
                   <div className="d-flex gap-1 mt-2 flex-wrap">
-                    <a className="btn btn-sm btn-outline-success" target="_blank" rel="noopener noreferrer"
-                      href={`https://map.kakao.com/link/by/traffic/${encodeURIComponent(routeModal.schedule?.departure_location || '출발')},${routeModal.route.from_lat},${routeModal.route.from_lng}/${encodeURIComponent(routeModal.schedule?.return_location || routeModal.schedule?.location || '도착')},${routeModal.route.to_lat},${routeModal.route.to_lng}`}>
-                      📱 카카오맵
-                    </a>
-                    <a className="btn btn-sm btn-outline-info" target="_blank" rel="noopener noreferrer"
-                      href={`https://map.naver.com/p/directions/${routeModal.route.from_lng},${routeModal.route.from_lat},${encodeURIComponent(routeModal.schedule?.departure_location || '출발')}/${routeModal.route.to_lng},${routeModal.route.to_lat},${encodeURIComponent(routeModal.schedule?.return_location || routeModal.schedule?.location || '도착')}`}>
-                      🗺️ 네이버 지도
-                    </a>
+                    {(() => {
+                      const isOverseas = routeModal.route.from_lat > 43 || routeModal.route.from_lat < 33 || routeModal.route.from_lng > 132 || routeModal.route.from_lng < 124
+                      return (
+                        <>
+                          {!isOverseas && (
+                            <>
+                              <a className="btn btn-sm btn-outline-success" target="_blank" rel="noopener noreferrer"
+                                href={`https://map.kakao.com/link/by/traffic/${encodeURIComponent(routeModal.schedule?.departure_location || '출발')},${routeModal.route.from_lat},${routeModal.route.from_lng}/${encodeURIComponent(routeModal.schedule?.return_location || routeModal.schedule?.location || '도착')},${routeModal.route.to_lat},${routeModal.route.to_lng}`}>
+                                📱 카카오맵
+                              </a>
+                              <a className="btn btn-sm btn-outline-info" target="_blank" rel="noopener noreferrer"
+                                href={`https://map.naver.com/p/directions/${routeModal.route.from_lng},${routeModal.route.from_lat},${encodeURIComponent(routeModal.schedule?.departure_location || '출발')}/${routeModal.route.to_lng},${routeModal.route.to_lat},${encodeURIComponent(routeModal.schedule?.return_location || routeModal.schedule?.location || '도착')}`}>
+                                🗺️ 네이버 지도
+                              </a>
+                            </>
+                          )}
+                          <a className="btn btn-sm btn-outline-danger" target="_blank" rel="noopener noreferrer"
+                            href={`https://www.google.com/maps/dir/?api=1&origin=${routeModal.route.from_lat},${routeModal.route.from_lng}&destination=${routeModal.route.to_lat},${routeModal.route.to_lng}&travelmode=transit${isOverseas ? '&hl=ko' : ''}`}>
+                            🌐 Google Maps
+                          </a>
+                        </>
+                      )
+                    })()}
                   </div>
                 )}
 

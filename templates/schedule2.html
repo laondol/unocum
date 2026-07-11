@@ -47,11 +47,15 @@ body{background:#f8f9fa;font-size:0.9rem;}
         <h6 class="mb-3">새 일정</h6>
         <input id="addTitle" class="form-control form-control-sm mb-2" placeholder="제목">
         <div class="row g-2 mb-2">
-            <div class="col-6"><label class="small">날짜</label><input type="date" id="addDate" class="form-control form-control-sm"></div>
-            <div class="col-3"><label class="small">시작</label><input type="time" id="addStart" class="form-control form-control-sm"></div>
-            <div class="col-3"><label class="small">종료</label><input type="time" id="addEnd" class="form-control form-control-sm"></div>
+            <div class="col-4"><label class="small">시작일</label><input type="date" id="addDate" class="form-control form-control-sm"></div>
+            <div class="col-4"><label class="small">종료일</label><input type="date" id="addEndDate" class="form-control form-control-sm" onchange="toggleAccommodation()"></div>
+            <div class="col-2"><label class="small">시작</label><input type="time" id="addStart" class="form-control form-control-sm"></div>
+            <div class="col-2"><label class="small">종료</label><input type="time" id="addEnd" class="form-control form-control-sm"></div>
         </div>
         <input id="addLoc" class="form-control form-control-sm mb-2" placeholder="장소">
+        <div id="accommodationSection" style="display:none;">
+            <input id="addAccommodation" class="form-control form-control-sm mb-2" placeholder="임시숙소 주소">
+        </div>
         <textarea id="addMemo" class="form-control form-control-sm mb-2" rows="2" placeholder="메모"></textarea>
         <div class="mb-2">
             <label class="small">👥 참석자</label>
@@ -98,7 +102,10 @@ function switchTab(t) {
         document.getElementById('editId').value = '';
         document.getElementById('saveBtn').textContent = '저장';
         document.querySelector('#tabAdd h6').textContent = '새 일정';
-        document.getElementById('addDate').value = new Date().toISOString().slice(0,10);
+        var today = new Date().toISOString().slice(0,10);
+        document.getElementById('addDate').value = today;
+        document.getElementById('addEndDate').value = today;
+        document.getElementById('accommodationSection').style.display = 'none';
     }
 }
 
