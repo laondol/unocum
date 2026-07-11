@@ -51,25 +51,7 @@ body{background:#f8f9fa;font-size:0.9rem;}
             <div class="col-3"><label class="small">시작</label><input type="time" id="addStart" class="form-control form-control-sm"></div>
             <div class="col-3"><label class="small">종료</label><input type="time" id="addEnd" class="form-control form-control-sm"></div>
         </div>
-        <input id="addLoc" class="form-control form-control-sm mb-2" placeholder="장소" onchange="calcTravelTime()">
-        <div id="travelSection">
-        <div class="mb-2 small">
-            <span class="me-1">이동:</span>
-            <label class="me-2"><input type="radio" name="transport" value="walk" onchange="calcTravelTime()"> 🚶도보</label>
-            <label class="me-2"><input type="radio" name="transport" value="bike" onchange="calcTravelTime()"> 🚲자전거</label>
-            <label><input type="radio" name="transport" value="transit" onchange="calcTravelTime()"> 🚌대중교통</label>
-        </div>
-        <div id="calcError" class="small text-danger mb-2" style="display:none;"></div>
-        <div id="lastTransitInfo" class="small text-muted mb-2" style="display:none;"></div>
-        <div class="row g-2 mb-2">
-            <div class="col-6"><label class="small">출발장소</label><input id="addDepLoc" class="form-control form-control-sm" placeholder="기본주소"></div>
-            <div class="col-3"><label class="small">출발시간</label><input id="addDepTime" class="form-control form-control-sm" type="time"></div>
-        </div>
-        <div class="row g-2 mb-2">
-            <div class="col-6"><label class="small">귀가장소</label><input id="addRetLoc" class="form-control form-control-sm" placeholder="기본주소"></div>
-            <div class="col-3"><label class="small">귀가가능시간</label><input id="addRetTime" class="form-control form-control-sm" type="time"></div>
-        </div>
-        </div>
+        <input id="addLoc" class="form-control form-control-sm mb-2" placeholder="장소">
         <textarea id="addMemo" class="form-control form-control-sm mb-2" rows="2" placeholder="메모"></textarea>
         <div class="mb-2">
             <label class="small">👥 참석자</label>
@@ -90,11 +72,8 @@ body{background:#f8f9fa;font-size:0.9rem;}
 </div>
 
 <script>
-let calYear, calMonth, schedules = [], userHome = '', friends = [];
+let calYear, calMonth, schedules = [], friends = [];
 
-fetch('/api/user/location').then(r=>r.json()).then(d => {
-    userHome = d.address || (d.town+' '+d.village);
-});
 fetch('/api/chat/friends').then(r=>r.json()).then(d => {
     friends = d.friends || [];
     renderFriendCheckboxes();
@@ -120,18 +99,6 @@ function switchTab(t) {
         document.getElementById('saveBtn').textContent = '저장';
         document.querySelector('#tabAdd h6').textContent = '새 일정';
         document.getElementById('addDate').value = new Date().toISOString().slice(0,10);
-        document.getElementById('addDepLoc').value = userHome;
-        document.getElementById('addRetLoc').value = userHome;
-        // 이전 일정의 장소를 출발장소로
-        var todayScheds = schedules.filter(function(s){
-            return s.event_date && s.event_date.startsWith(d) && s.location;
-        }).sort(function(a,b){
-            return a.event_date.localeCompare(b.event_date);
-        });
-        if (todayScheds.length > 0) {
-            var last = todayScheds[todayScheds.length-1];
-            document.getElementById('addDepLoc').value = last.location;
-        }
     }
 }
 
@@ -176,13 +143,8 @@ function showDay(date) {
     evts.forEach(s => {
         const badge = {'red':'🔴','blue':'🔵','green':'🟢','gray':'⚪'}[s.color||'gray']||'⚪';
         const time = s.event_date ? s.event_date.split(' ')[1].substring(0,5) : '';
-        let extra = '';
-        if (s.departure_time) extra += '<br>🚶 출발: '+s.departure_time+' ('+s.travel_min+'분)';
-        if (s.return_time) extra += '<br>🏠 귀가가능: '+s.return_time;
         let loc = s.location ? '<br>📍 '+s.location : '';
-        if (s.departure_location) loc += '<br>↗ 출발지: '+s.departure_location;
-        if (s.return_location) loc += '<br>↙ 귀가지: '+s.return_location;
-        h += '<div class="border-bottom py-1 mb-1 small"><strong>'+badge+' '+s.title+'</strong><br>🕐 '+time+loc+extra+'<br><button class="btn btn-sm btn-outline-secondary py-0 mt-1 me-1" onclick="editEvent('+s.id+')">✏️</button><button class="btn btn-sm btn-outline-danger py-0 mt-1" onclick="deleteEvent('+s.id+')">✕</button></div>';
+        h += '<div class="border-bottom py-1 mb-1 small"><strong>'+badge+' '+s.title+'</strong><br>🕐 '+time+loc+'<br><button class="btn btn-sm btn-outline-secondary py-0 mt-1 me-1" onclick="editEvent('+s.id+')">✏️</button><button class="btn btn-sm btn-outline-danger py-0 mt-1" onclick="deleteEvent('+s.id+')">✕</button></div>';
     });
     el.innerHTML = h;
 }
@@ -193,10 +155,7 @@ function renderEventList() {
     el.innerHTML = schedules.map(s => {
         const badge = {'red':'🔴','blue':'🔵','green':'🟢','gray':'⚪'}[s.color||'gray']||'⚪';
         const time = s.event_date ? s.event_date.split(' ')[1].substring(0,5) : '';
-        let extra = '';
-        if (s.departure_time) extra += '<br>🚶 출발: '+s.departure_time;
-        if (s.return_time) extra += '<br>🏠 귀가가능: '+s.return_time;
-        return '<div class="border-bottom py-1"><strong>'+badge+' '+s.title+'</strong><br><small>🕐 '+time+'</small>'+(s.location?'<br><small>📍 '+s.location+'</small>':'')+extra+'<br><button class="btn btn-sm btn-outline-secondary mt-1 me-1" onclick="editEvent('+s.id+')">✏️</button><button class="btn btn-sm btn-outline-danger mt-1" onclick="deleteEvent('+s.id+')">✕</button></div>';
+        return '<div class="border-bottom py-1"><strong>'+badge+' '+s.title+'</strong><br><small>🕐 '+time+'</small>'+(s.location?'<br><small>📍 '+s.location+'</small>':'')+'<br><button class="btn btn-sm btn-outline-secondary mt-1 me-1" onclick="editEvent('+s.id+')">✏️</button><button class="btn btn-sm btn-outline-danger mt-1" onclick="deleteEvent('+s.id+')">✕</button></div>';
     }).join('');
 }
 
@@ -222,8 +181,6 @@ function editEvent(id) {
         }
     }
     document.getElementById('addLoc').value = s.location || '';
-    document.getElementById('addDepLoc').value = s.departure_location || userHome;
-    document.getElementById('addRetLoc').value = s.return_location || userHome;
     document.getElementById('addMemo').value = s.memo || s.description || '';
     document.getElementById('saveBtn').textContent = '수정';
     switchTab('add');
@@ -236,15 +193,13 @@ function saveEvent() {
     var start = document.getElementById('addStart').value;
     var end = document.getElementById('addEnd').value;
     var loc = document.getElementById('addLoc').value.trim();
-    var depLoc = document.getElementById('addDepLoc').value.trim();
-    var retLoc = document.getElementById('addRetLoc').value.trim();
     var memo = document.getElementById('addMemo').value.trim();
     if (!title || !date) return alert('제목과 날짜를 입력하세요.');
     var evt = start ? date+'T'+start : date+'T09:00';
     var cbs = document.querySelectorAll('.friend-cb:checked');
     var invited = [];
     cbs.forEach(function(cb){ invited.push(parseInt(cb.value)); });
-    var data = {title, event_date: evt, location: loc, memo, departure_location: depLoc, return_location: retLoc, invited: JSON.stringify(invited)};
+    var data = {title, event_date: evt, location: loc, memo, invited: JSON.stringify(invited)};
     if (end) data.end_date = date+'T'+end;
     if (id) data.id = parseInt(id);
     var url = id ? '/api/bot/schedule/update' : '/api/bot/schedule';
@@ -253,7 +208,7 @@ function saveEvent() {
         if (d.success) {
             document.getElementById('editId').value = '';
             document.getElementById('saveBtn').textContent = '저장';
-            ['addTitle','addLoc','addMemo','addStart','addEnd','addDepTime','addRetTime'].forEach(function(x){document.getElementById(x).value='';});
+            ['addTitle','addLoc','addMemo','addStart','addEnd'].forEach(function(x){document.getElementById(x).value='';});
             alert(id?'수정 완료':'등록 완료');
             loadEvents();
             switchTab('view');
@@ -267,38 +222,7 @@ function deleteEvent(id) {
     .then(r=>r.json()).then(d => { if(d.success) loadEvents(); });
 }
 
-function calcTravelTime() {
-    var loc = document.getElementById('addLoc').value.trim();
-    var ts = document.getElementById('travelSection');
-    if (!loc) { ts.style.display = 'none'; return; }
-    ts.style.display = '';
-    var start = document.getElementById('addStart').value || '09:00';
-    fetch('/api/bot/schedule/calc-time', {
-        method:'POST', 
-        headers:{'Content-Type':'application/json'},
-        credentials:'same-origin',
-        body:JSON.stringify({location: loc, event_time: start})
-    })
-    .then(function(r){return r.json()}).then(function(d){
-        var ts = document.getElementById('travelSection');
-        if (d.error || !d.walk) { ts.style.display = 'none'; return; }
-        if (d.distance_km && d.distance_km < 0.2) { ts.style.display = 'none'; return; }
-        ts.style.display = '';
-        document.getElementById('calcError').style.display = 'none';
-        var mode = document.querySelector('input[name=transport]:checked');
-        var m = mode ? mode.value : 'walk';
-        var t = d[m];
-        document.getElementById('addDepTime').value = t.dep;
-        document.getElementById('addRetTime').value = (m === 'transit') ? t.ret : '';
-        var ltEl = document.getElementById('lastTransitInfo');
-        if (m === 'transit' && t.last_transit) {
-            ltEl.textContent = '🚌 ' + t.last_transit;
-            ltEl.style.display = '';
-        } else {
-            ltEl.style.display = 'none';
-        }
-    }).catch(function(e){console.error(e);});
-}
+
 </script>
 </body>
 </html>
