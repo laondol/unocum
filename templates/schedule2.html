@@ -201,9 +201,12 @@ function editEvent(id) {
     var am = s.memo ? s.memo.match(/\[숙소:([^\]]+)\]/) : null;
     if (am) {
         document.getElementById('addAccommodation').value = am[1];
-        document.getElementById('accommodationSection').style.display = '';
     } else {
         document.getElementById('addAccommodation').value = '';
+    }
+    if (am || (document.getElementById('addDate').value !== document.getElementById('addEndDate').value)) {
+        document.getElementById('accommodationSection').style.display = '';
+    } else {
         document.getElementById('accommodationSection').style.display = 'none';
     }
     document.getElementById('saveBtn').textContent = '수정';
@@ -213,7 +216,12 @@ function editEvent(id) {
 function toggleAccommodation() {
     var sd = document.getElementById('addDate').value;
     var ed = document.getElementById('addEndDate').value;
-    document.getElementById('accommodationSection').style.display = (sd && ed && sd !== ed) ? '' : 'none';
+    var val = document.getElementById('addAccommodation').value.trim();
+    if (sd && ed && sd !== ed) {
+        document.getElementById('accommodationSection').style.display = '';
+    } else if (!val) {
+        document.getElementById('accommodationSection').style.display = 'none';
+    }
 }
 
 function saveEvent() {
