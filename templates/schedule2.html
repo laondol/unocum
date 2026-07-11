@@ -151,7 +151,12 @@ function showDay(date) {
         const badge = {'red':'🔴','blue':'🔵','green':'🟢','gray':'⚪'}[s.color||'gray']||'⚪';
         const time = s.event_date ? s.event_date.split(' ')[1].substring(0,5) : '';
         let loc = s.location ? '<br>📍 '+s.location : '';
-        h += '<div class="border-bottom py-1 mb-1 small"><strong>'+badge+' '+s.title+'</strong><br>🕐 '+time+loc+'<br><button class="btn btn-sm btn-outline-secondary py-0 mt-1 me-1" onclick="editEvent('+s.id+')">✏️</button><button class="btn btn-sm btn-outline-danger py-0 mt-1" onclick="deleteEvent('+s.id+')">✕</button></div>';
+        var accomm = '';
+        if (s.memo && s.memo.includes('[숙소:')) {
+            var m = s.memo.match(/\[숙소:([^\]]+)\]/);
+            if (m) accomm = '<br>🏠 숙소: '+m[1];
+        }
+        h += '<div class="border-bottom py-1 mb-1 small"><strong>'+badge+' '+s.title+'</strong><br>🕐 '+time+loc+accomm+'<br><button class="btn btn-sm btn-outline-secondary py-0 mt-1 me-1" onclick="editEvent('+s.id+')">✏️</button><button class="btn btn-sm btn-outline-danger py-0 mt-1" onclick="deleteEvent('+s.id+')">✕</button></div>';
     });
     el.innerHTML = h;
 }
@@ -184,30 +189,51 @@ function editEvent(id) {
         document.getElementById('addDate').value = parts[0];
         document.getElementById('addStart').value = parts.length>1 ? parts[1].substring(0,5) : '';
         if (s.end_date) {
-            document.getElementById('addEnd').value = s.end_date.split(' ')[1].substring(0,5);
+            var ep = s.end_date.split(' ');
+            document.getElementById('addEndDate').value = ep[0];
+            document.getElementById('addEnd').value = ep[1].substring(0,5);
+        } else {
+            document.getElementById('addEndDate').value = parts[0];
         }
     }
     document.getElementById('addLoc').value = s.location || '';
-    document.getElementById('addMemo').value = s.memo || s.description || '';
+    document.getElementById('addMemo').value = (s.memo || s.description || '').replace(/\[숙소:[^\]]+\]/,'').trim();
+    var am = s.memo ? s.memo.match(/\[숙소:([^\]]+)\]/) : null;
+    if (am) {
+        document.getElementById('addAccommodation').value = am[1];
+        document.getElementById('accommodationSection').style.display = '';
+    } else {
+        document.getElementById('addAccommodation').value = '';
+        document.getElementById('accommodationSection').style.display = 'none';
+    }
     document.getElementById('saveBtn').textContent = '수정';
     switchTab('add');
+}
+
+function toggleAccommodation() {
+    var sd = document.getElementById('addDate').value;
+    var ed = document.getElementById('addEndDate').value;
+    document.getElementById('accommodationSection').style.display = (sd && ed && sd !== ed) ? '' : 'none';
 }
 
 function saveEvent() {
     var id = document.getElementById('editId').value;
     var title = document.getElementById('addTitle').value.trim();
     var date = document.getElementById('addDate').value;
+    var endDate = document.getElementById('addEndDate').value;
     var start = document.getElementById('addStart').value;
     var end = document.getElementById('addEnd').value;
     var loc = document.getElementById('addLoc').value.trim();
     var memo = document.getElementById('addMemo').value.trim();
+    var accommodation = document.getElementById('addAccommodation').value.trim();
     if (!title || !date) return alert('제목과 날짜를 입력하세요.');
     var evt = start ? date+'T'+start : date+'T09:00';
+    if (accommodation) memo = (memo ? memo+'\n' : '')+'[숙소:'+accommodation+']';
     var cbs = document.querySelectorAll('.friend-cb:checked');
     var invited = [];
     cbs.forEach(function(cb){ invited.push(parseInt(cb.value)); });
     var data = {title, event_date: evt, location: loc, memo, invited: JSON.stringify(invited)};
-    if (end) data.end_date = date+'T'+end;
+    if (end) data.end_date = (endDate && endDate !== date ? endDate : date)+'T'+end;
     if (id) data.id = parseInt(id);
     var url = id ? '/api/bot/schedule/update' : '/api/bot/schedule';
     fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
@@ -215,7 +241,10 @@ function saveEvent() {
         if (d.success) {
             document.getElementById('editId').value = '';
             document.getElementById('saveBtn').textContent = '저장';
-            ['addTitle','addLoc','addMemo','addStart','addEnd'].forEach(function(x){document.getElementById(x).value='';});
+            ['addTitle','addLoc','addMemo','addStart','addEnd','addEndDate','addAccommodation'].forEach(function(x){
+                var el = document.getElementById(x);
+                if (el) el.value = '';
+            });
             alert(id?'수정 완료':'등록 완료');
             loadEvents();
             switchTab('view');
