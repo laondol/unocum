@@ -90,6 +90,7 @@ def register_routes(app):
     @app.route('/share/report')
     @app.route('/share/detail/<path:path>')
     @app.route('/share/edit/<path:path>')
+    @app.route('/user/my')
     def share_spa(path=''):
         return _serve_react_share()
 
