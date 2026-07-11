@@ -1,6 +1,7 @@
 import random, string, re, requests, json
+from sqlalchemy import or_
 from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template, current_app
-from models import db, User, TongBot, TongBotDraft, TongBotSchedule, ChatRoom, ChatMessage, Message, FriendCache, BotKnowledge, StoreInfo, ShareReport
+from models import db, User, TongBot, TongBotDraft, TongBotSchedule, ChatRoom, ChatMessage, Message, FriendCache, BotKnowledge, StoreInfo, ShareReport, SharedRoute
 from datetime import datetime, timedelta, timezone
 import os, uuid
 
@@ -1155,37 +1156,18 @@ def bot_schedule():
                 "return_time": s.return_time.strftime('%H:%M') if s.return_time else '',
                 "invited": s.invited_user_ids, "color": "gray"
             }
-            # 컬러 판정
+            # 컬러 판정 (이동/귀가는 info, 위치 있는 일반일정은 blue, 종일은 red)
+            is_move = '이동' in s.title or '귀가' in s.title
             evt = s.event_date
             if evt:
                 has_time = evt.hour != 0 or evt.minute != 0
-                # 종일 일정: 시작시간이 00:00이고 종료가 없거나 23:59
                 is_allday = not has_time and (not s.end_date or (s.end_date.hour == 23 and s.end_date.minute == 59))
-                if is_allday:
+                if is_move:
+                    item["color"] = "info"
+                elif is_allday:
                     item["color"] = "red"
-                elif s.location:
-                    # 위치 기반 판정: Kakao 좌표 검색해서 집과 비교
-                    loc_lat, loc_lng = _geocode_location(s.location)
-                    if loc_lat and loc_lng and home_lat and home_lng:
-                        from services.transit import haversine_km
-                        d = haversine_km(home_lat, home_lng, loc_lat, loc_lng)
-                        if d <= 1.0:
-                            item["color"] = "green"
-                        else:
-                            item["color"] = "blue"
-                            # 출발시간 계산
-                            travel_min = round(d * 15)
-                            departure = evt - timedelta(minutes=travel_min + 15)  # 15분 여유
-                            item["departure_time"] = departure.strftime("%H:%M")
-                            item["travel_min"] = travel_min
-                            # 귀가시간: 종료시간 + 이동시간
-                            end = s.end_date or (evt + timedelta(hours=1))
-                            return_time = end + timedelta(minutes=travel_min)
-                            item["return_time"] = return_time.strftime("%H:%M")
-                            if d > 10:
-                                item["color"] = "blue"
-                    else:
-                        item["color"] = "green"
+                elif s.location and not is_move:
+                    item["color"] = "blue"
                 else:
                     item["color"] = "gray"
             result_list.append(item)
@@ -1208,8 +1190,85 @@ def bot_schedule():
     if data.get('return_time'):
         s.return_time = datetime.fromisoformat(data['return_time']) if data['return_time'] else None
     db.session.add(s)
+    db.session.flush()
+
+    # Auto-create 이동/귀가 if location is set and not home
+    location = data.get('location','')
+    auto_created = []
+    if location:
+        user = User.query.get(uid)
+        home_addr = f"{user.town or ''} {user.village or ''}".strip()
+        if user.curr_address: home_addr = user.curr_address
+        home_lat = user.curr_latitude
+        home_lng = user.curr_longitude
+        evt_start = datetime.fromisoformat(data.get('event_date',''))
+        if user.temp_address and user.temp_latitude and user.temp_longitude and user.temp_start_date and user.temp_end_date:
+            if user.temp_start_date <= evt_start <= user.temp_end_date:
+                home_addr = f"[임시] {user.temp_address}"
+                home_lat = user.temp_latitude
+                home_lng = user.temp_longitude
+        naver_id = current_app.config.get('NAVER_CLIENT_ID', os.getenv('NAVER_CLIENT_ID', ''))
+        naver_secret = current_app.config.get('NAVER_CLIENT_SECRET', os.getenv('NAVER_CLIENT_SECRET', ''))
+        from services.directions import plan_segment, format_itinerary
+
+        loc_lat, loc_lng = _geocode_location(location)
+        if loc_lat and loc_lng and home_lat and home_lng:
+            from services.transit import haversine_km
+            d = haversine_km(home_lat, home_lng, loc_lat, loc_lng)
+            if d > 1.0:
+                evt_end = end_date or (evt_start + timedelta(hours=1))
+                stime = evt_start.strftime("%H:%M")
+
+                # 이동: event_date=도착시간(약속-5분), departure_time=출발시간(역산)
+                arr_dt = evt_start - timedelta(minutes=5)
+                plan_to = plan_segment(home_addr, home_lat, home_lng, location, loc_lat, loc_lng, arr_dt.strftime("%H:%M"),
+                    home_town=user.town or '', home_village=user.village or '',
+                    naver_id=naver_id, naver_secret=naver_secret)
+                plan_to.update({"from_lat":home_lat,"from_lng":home_lng,"to_lat":loc_lat,"to_lng":loc_lng})
+                dep_dt = arr_dt - timedelta(minutes=plan_to['total_min'])
+                move = TongBotSchedule(user_id=uid, title=f"{data.get('title','')} 이동",
+                    description=format_itinerary(plan_to),
+                    content=json.dumps(plan_to, ensure_ascii=False),
+                    event_date=arr_dt, departure_time=dep_dt, location=location,
+                    memo=f"이동 {plan_to['total_min']}분", departure_location=home_addr, return_location=location)
+                db.session.add(move)
+                db.session.flush()
+                auto_created.append({"id":move.id,"title":move.title,"type":"move","arrival":arr_dt.strftime("%H:%M"),"departure":dep_dt.strftime("%H:%M")})
+
+                # 귀가: 같은 날 기존 귀가 삭제 후 마지막 위치 기준으로 새로 생성
+                evt_date_start = evt_start.replace(hour=0, minute=0, second=0)
+                evt_date_end = evt_start.replace(hour=23, minute=59, second=59)
+                existing_returns = TongBotSchedule.query.filter(
+                    TongBotSchedule.user_id == uid,
+                    TongBotSchedule.title == "집으로 이동",
+                    TongBotSchedule.event_date >= evt_date_start,
+                    TongBotSchedule.event_date <= evt_date_end,
+                    TongBotSchedule.id != s.id
+                ).all()
+                for er in existing_returns:
+                    db.session.delete(er)
+
+                # 귀가: event_date=출발시간, return_time=도착시간
+                target_arrival = "22:00"
+                plan_home = plan_segment(location, loc_lat, loc_lng, home_addr, home_lat, home_lng, target_arrival,
+                    home_town=user.town or '', home_village=user.village or '',
+                    naver_id=naver_id, naver_secret=naver_secret)
+                plan_home.update({"from_lat":loc_lat,"from_lng":loc_lng,"to_lat":home_lat,"to_lng":home_lng})
+                ret_dep = datetime.strptime(f"2026-07-11 {plan_home['departure']}", "%Y-%m-%d %H:%M")
+                if ret_dep < evt_end:
+                    ret_dep = evt_end + timedelta(minutes=5)
+                ret_arr = ret_dep + timedelta(minutes=plan_home['total_min'])
+                home_return = TongBotSchedule(user_id=uid, title="집으로 이동",
+                    description=format_itinerary(plan_home),
+                    content=json.dumps(plan_home, ensure_ascii=False),
+                    event_date=ret_dep, return_time=ret_arr, location=home_addr,
+                    memo=f"귀가 {plan_home['total_min']}분", departure_location=location, return_location=home_addr)
+                db.session.add(home_return)
+                db.session.flush()
+                auto_created.append({"id":home_return.id,"title":"집으로 이동","type":"return","departure":ret_dep.strftime("%H:%M"),"arrival":ret_arr.strftime("%H:%M")})
+
     db.session.commit()
-    return jsonify({"success": True, "id": s.id})
+    return jsonify({"success": True, "id": s.id, "auto_created": auto_created})
 
 @tongbot_bp.route('/api/bot/schedule/update', methods=['POST'])
 def bot_schedule_update():
@@ -1519,10 +1578,203 @@ def chat_messages(room_id):
         count = ChatMessage.query.filter_by(room_id=room_id, is_bot=False).count()
         if count % 5 == 0:
             _moderate_chat(room_id)
-        return jsonify({"ok":True})
-    msgs = ChatMessage.query.filter_by(room_id=room_id).order_by(ChatMessage.created_at.desc()).limit(50).all()
-    msgs.reverse()
-    return jsonify({"messages":[{"id":m.id,"username":m.username,"message":m.message,"is_bot":m.is_bot,"time":m.created_at.strftime("%H:%M") if m.created_at else ""} for m in msgs]})
+    return jsonify({"ok":True})
+
+@tongbot_bp.route('/api/bot/trip/plan', methods=['POST'])
+def bot_trip_plan():
+    uid = session.get('user_id')
+    if not uid: return jsonify({"error":"로그인 필요"}), 401
+    msg = request.json.get('message','').strip()
+    if not msg: return jsonify({"error":"메시지를 입력하세요."})
+    user = User.query.get(uid)
+    if not user: return jsonify({"error":"사용자 없음"}), 404
+
+    def _hm_to_min(t):
+        p=t.split(':'); return int(p[0])*60+int(p[1]) if len(p)>1 else int(p[0])
+
+    home_addr = f"{user.town or ''} {user.village or ''}".strip()
+    if user.curr_address: home_addr = user.curr_address
+    home_lat = user.curr_latitude
+    home_lng = user.curr_longitude
+
+    office_addr = user.office_address or ''
+    office_lat = user.office_latitude
+    office_lng = user.office_longitude
+    work_start = user.work_start_time or '09:00'
+
+    groq_key = current_app.config.get('GROQ_API_KEY', os.getenv('GROQ_API_KEY',''))
+    if not groq_key: return jsonify({"error":"AI 서비스 불가"})
+
+    # Step 1: Parse date first
+    KST = timedelta(hours=9)
+    today = datetime.now(KST)
+    date_prompt = f"""Extract the date from this Korean text as YYYY-MM-DD format. If "오늘" → {today.strftime('%Y-%m-%d')}. If "내일" → {(today+timedelta(days=1)).strftime('%Y-%m-%d')}. If month/day given like "7월11일" → 2026-07-11.
+Output ONLY the date in YYYY-MM-DD format, nothing else.
+Text: {msg}"""
+    try:
+        dr = requests.post('https://api.groq.com/openai/v1/chat/completions',
+            headers={'Authorization':f'Bearer {groq_key}','Content-Type':'application/json'},
+            json={'model':'llama-3.1-8b-instant','messages':[{'role':'user','content':date_prompt}],'temperature':0,'max_tokens':20}, timeout=10)
+        event_date_str = dr.json()['choices'][0]['message']['content'].strip()
+        import re as _re
+        dm = _re.search(r'\d{4}-\d{2}-\d{2}', event_date_str)
+        if dm: event_date_str = dm.group()
+        else: event_date_str = today.strftime('%Y-%m-%d')
+    except:
+        event_date_str = today.strftime('%Y-%m-%d')
+
+    # Step 2: Parse itinerary stops
+    system_prompt = f"""Parse the user's Korean itinerary into a JSON array of stops with format:
+[{{"title":"리얼리스트 미팅","name":"리얼리스트","time":"10:00","location":"양평읍 리얼리스트","type":"meeting"}}]
+
+Rules:
+- "title" is schedule title including activity (미팅, 방문, 모임 etc.)
+- "name" is short place name for 이동 schedule naming
+- "time" is arrival time in HH:MM format. 오전10시→10:00, 오후2시→14:00, 저녁7시→19:00
+- "location" is full location for geocoding (include town/area prefix like 양평읍, 옥천, 용문)
+- "type" is always "meeting"
+- Output ONLY JSON array, no explanation
+- Include ALL stops mentioned"""
+    try:
+        resp = requests.post('https://api.groq.com/openai/v1/chat/completions',
+            headers={'Authorization':f'Bearer {groq_key}','Content-Type':'application/json'},
+            json={'model':'llama-3.1-8b-instant','messages':[
+                {'role':'system','content':system_prompt},
+                {'role':'user','content':msg}
+            ],'temperature':0.1,'max_tokens':1000}, timeout=15)
+        ai_text = resp.json()['choices'][0]['message']['content'].strip()
+        import re, json as _json
+        json_match = re.search(r'\[.*\]', ai_text, re.DOTALL)
+        if not json_match: return jsonify({"error":"일정을 파싱하지 못했습니다","ai_raw":ai_text})
+        stops = _json.loads(json_match.group())
+    except Exception as e:
+        return jsonify({"error":f"AI 파싱 오류: {str(e)}"})
+
+    if not stops: return jsonify({"error":"일정이 없습니다."})
+
+    # Check temp accommodation for this date
+    try:
+        evt_date = datetime.strptime(event_date_str, '%Y-%m-%d')
+        if user.temp_address and user.temp_latitude and user.temp_longitude and user.temp_start_date and user.temp_end_date:
+            if user.temp_start_date <= evt_date <= user.temp_end_date:
+                home_addr = f"[임시] {user.temp_address}"
+                home_lat = user.temp_latitude
+                home_lng = user.temp_longitude
+    except:
+        pass
+
+    from services.directions import plan_segment, format_itinerary, haversine_km
+    import json as _json
+    naver_id = current_app.config.get('NAVER_CLIENT_ID', os.getenv('NAVER_CLIENT_ID', ''))
+    naver_secret = current_app.config.get('NAVER_CLIENT_SECRET', os.getenv('NAVER_CLIENT_SECRET', ''))
+
+    entries = []
+    first_stop = stops[0]
+    last_stop = stops[-1]
+
+    # Step 3: Create meeting schedules
+    for s in stops:
+        stime = s.get('time','12:00')
+        stitle = s.get('title','') or s.get('name','')
+        sname = s.get('name','') or stitle
+        sloc = s.get('location','') or sname
+        evt_dt = datetime.strptime(f"{event_date_str} {stime}", "%Y-%m-%d %H:%M")
+        evt = TongBotSchedule(user_id=uid, title=stitle,
+            event_date=evt_dt, location=sloc, memo="")
+        db.session.add(evt)
+        db.session.flush()
+        entries.append({"id":evt.id,"title":stitle,"date":event_date_str,"time":stime,"location":sloc,"type":"meeting"})
+
+    # Step 4: Check if first stop is at office → can we go from office?
+    need_home_start = False
+    origin_label = f"회사({office_addr})"
+    origin_lat = office_lat
+    origin_lng = office_lng
+
+    if office_addr and office_lat:
+        fs_loc = first_stop.get('location','') or first_stop.get('name','')
+        loc_lat, loc_lng = _geocode_location(fs_loc)
+        if loc_lat and office_lat:
+            d = haversine_km(office_lat, office_lng, loc_lat, loc_lng)
+            if d > 1.0:
+                ws = _hm_to_min(work_start)
+                arr = _hm_to_min(first_stop.get('time','10:00'))
+                avail_min = arr - ws
+                travel_need = round(d / 20 * 60) + 25
+                if travel_need > avail_min:
+                    need_home_start = True
+
+    if need_home_start or not office_addr or not office_lat:
+        origin_label = f"집({home_addr})"
+        origin_lat = home_lat
+        origin_lng = home_lng
+
+    # Step 5: Create 이동 schedules between consecutive stops
+    prev_lat = origin_lat
+    prev_lng = origin_lng
+    prev_name = origin_label
+
+    for i, stop in enumerate(stops):
+        sname = stop.get('name','')
+        sloc = stop.get('location','') or sname
+        stime = stop.get('time','12:00')
+        loc_lat, loc_lng = _geocode_location(sloc)
+        if not loc_lat:
+            loc_lat = prev_lat or home_lat
+            loc_lng = prev_lng or home_lng
+
+        if prev_lat and loc_lat:
+            plan = plan_segment(prev_name, prev_lat, prev_lng, sname, loc_lat, loc_lng, stime,
+                              home_town=user.town or '', home_village=user.village or '',
+                              naver_id=naver_id, naver_secret=naver_secret)
+            plan.update({"from_lat":prev_lat,"from_lng":prev_lng,"to_lat":loc_lat,"to_lng":loc_lng})
+            memo = format_itinerary(plan)
+            arr_dt = datetime.strptime(f"{event_date_str} {stime}", "%Y-%m-%d %H:%M")
+            dep_dt = datetime.strptime(f"{event_date_str} {plan['departure']}", "%Y-%m-%d %H:%M")
+            move_title = f"{sname} 이동"
+            plan_json = _json.dumps(plan, ensure_ascii=False)
+            mov = TongBotSchedule(user_id=uid, title=move_title, description=memo,
+                content=plan_json, event_date=arr_dt, departure_time=dep_dt, location=sloc,
+                memo=f"이동 {plan['total_min']}분 | {plan['distance_km']}km",
+                departure_location=prev_name, return_location=sloc)
+            db.session.add(mov)
+            db.session.flush()
+            entries.append({"id":mov.id,"title":move_title,"date":event_date_str,
+                "time":stime,"departure_time":plan['departure'],"arrival":stime,"total_min":plan['total_min'],
+                "memo":memo,"type":"move"})
+
+        prev_lat = loc_lat
+        prev_lng = loc_lng
+        prev_name = sname
+
+    # Step 6: 귀가
+    if home_lat:
+        ret_time = "20:00"
+        if last_stop.get('time'):
+            ret_min = _hm_to_min(last_stop['time']) + 120
+            if ret_min < 24*60:
+                ret_time = f"{ret_min//60:02d}:{ret_min%60:02d}"
+        plan_home = plan_segment(prev_name, prev_lat, prev_lng, f"집({home_addr})", home_lat, home_lng, ret_time,
+                               home_town=user.town or '', home_village=user.village or '',
+                               naver_id=naver_id, naver_secret=naver_secret)
+        plan_home.update({"from_lat":prev_lat,"from_lng":prev_lng,"to_lat":home_lat,"to_lng":home_lng})
+        memo_home = f"🏠 귀가\n{format_itinerary(plan_home)}"
+        dep_dt = datetime.strptime(f"{event_date_str} {plan_home['departure']}", "%Y-%m-%d %H:%M")
+        plan_json = _json.dumps(plan_home, ensure_ascii=False)
+        sh = TongBotSchedule(user_id=uid, title="집으로 이동", description=memo_home,
+            content=plan_json, event_date=dep_dt, location=home_addr,
+            memo=f"귀가 {plan_home['total_min']}분 | {plan_home['distance_km']}km",
+            departure_location=prev_name, return_location=home_addr)
+        db.session.add(sh)
+        db.session.flush()
+        entries.append({"id":sh.id,"title":"집으로 이동","date":event_date_str,
+            "time":plan_home['departure'],"arrival":plan_home['arrival'],
+            "total_min":plan_home['total_min'],"memo":memo_home,"type":"return"})
+
+    db.session.commit()
+
+    return jsonify({"status":"success","entries":entries,"date":event_date_str,
+        "parsed_stops":stops,"origin":origin_label,"need_home_start":need_home_start})
 
 def _moderate_chat(room_id):
     bot = _get_bot(session.get('user_id'))
@@ -1578,3 +1830,65 @@ def chat_close(room_id):
         message=f"🛑 2시간이 지나 채팅방이 종료되었습니다. 다음에 또 만나요! 💕", is_bot=True))
     db.session.commit()
     return jsonify({"ok":True})
+
+@tongbot_bp.route('/api/bot/route/<int:schedule_id>')
+def bot_route_detail(schedule_id):
+    uid = session.get('user_id')
+    if not uid: return jsonify({"error":"로그인 필요"}), 401
+    s = TongBotSchedule.query.get_or_404(schedule_id)
+    if s.user_id != uid: return jsonify({"error":"권한 없음"}), 403
+    route_data = None
+    if s.content:
+        try: route_data = json.loads(s.content)
+        except: route_data = None
+    evt = s.event_date.strftime("%Y-%m-%d %H:%M") if s.event_date else ""
+    return jsonify({"schedule":{"id":s.id,"title":s.title,"event_date":evt,
+        "location":s.location,"departure_location":s.departure_location,
+        "return_location":s.return_location},"route":route_data})
+
+@tongbot_bp.route('/api/bot/route/<int:schedule_id>/save', methods=['POST'])
+def bot_route_save(schedule_id):
+    uid = session.get('user_id')
+    if not uid: return jsonify({"error":"로그인 필요"}), 401
+    s = TongBotSchedule.query.get_or_404(schedule_id)
+    if s.user_id != uid: return jsonify({"error":"권한 없음"}), 403
+    data = request.get_json() or {}
+    steps = data.get('steps',[])
+    route_data = {"steps":steps,"total_min":data.get('total_min',0),"distance_km":data.get('distance_km',0),
+                  "departure":data.get('departure',''),"arrival":data.get('arrival','')}
+    s.content = json.dumps(route_data, ensure_ascii=False)
+    if data.get('title'): s.title = data['title']
+    if data.get('departure_location'): s.departure_location = data['departure_location']
+    if data.get('return_location'): s.return_location = data['return_location']
+    db.session.commit()
+    return jsonify({"success":True,"route":route_data})
+
+@tongbot_bp.route('/api/bot/route/<int:schedule_id>/share', methods=['POST'])
+def bot_route_share(schedule_id):
+    uid = session.get('user_id')
+    if not uid: return jsonify({"error":"로그인 필요"}), 401
+    s = TongBotSchedule.query.get_or_404(schedule_id)
+    if s.user_id != uid: return jsonify({"error":"권한 없음"}), 403
+    if not s.content: return jsonify({"error":"경로 데이터 없음"})
+    try: route_data = json.loads(s.content)
+    except: return jsonify({"error":"경로 파싱 실패"})
+    sr = SharedRoute(from_name=s.departure_location or '', to_name=s.return_location or s.location or '',
+                     from_lat=0, from_lng=0, to_lat=0, to_lng=0,
+                     steps=s.content, total_min=route_data.get('total_min'), distance_km=route_data.get('distance_km'),
+                     creator_id=uid, source_schedule_id=schedule_id)
+    db.session.add(sr)
+    db.session.commit()
+    return jsonify({"success":True,"shared_id":sr.id})
+
+@tongbot_bp.route('/api/bot/route/shared')
+def bot_route_shared_list():
+    kw = request.args.get('q','').strip()
+    q = SharedRoute.query
+    if kw:
+        q = q.filter(or_(SharedRoute.from_name.ilike(f'%{kw}%'), SharedRoute.to_name.ilike(f'%{kw}%')))
+    routes = q.order_by(SharedRoute.updated_at.desc()).limit(50).all()
+    return jsonify({"routes":[{
+        "id":r.id,"from_name":r.from_name,"to_name":r.to_name,
+        "total_min":r.total_min,"distance_km":r.distance_km,
+        "creator_id":r.creator_id
+    } for r in routes]})
