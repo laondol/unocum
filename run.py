@@ -47,6 +47,11 @@ def create_app():
                         conn.execute(db.text(f'ALTER TABLE user ADD COLUMN {col} {col_t}'))
                         conn.commit()
                         print(f'[OK] user.{col} column added')
+                for col, ct in [('office_latitude','FLOAT'),('office_longitude','FLOAT'),('office_address','VARCHAR(200)'),('work_start_time','VARCHAR(5)')]:
+                    if col not in user_cols:
+                        conn.execute(db.text(f'ALTER TABLE user ADD COLUMN {col} {ct}'))
+                        conn.commit()
+                        print(f'[OK] user.{col} column added')
             for tbl in ['legal_post', 'psycho_post']:
                 try:
                     tbl_cols = [c['name'] for c in _inspector.get_columns(tbl)]
@@ -786,6 +791,21 @@ def create_app():
                         print(f'[OK] user.{col} column added')
     except Exception as e:
         print(f'[SKIP] social column migration: {e}')
+
+    # User 테이블 temp accommodation 컬럼 마이그레이션
+    try:
+        with app.app_context():
+            from sqlalchemy import inspect
+            inspector = inspect(db.engine)
+            user_cols = [c['name'] for c in inspector.get_columns('user')]
+            with db.engine.connect() as conn:
+                for col in ['temp_address', 'temp_latitude', 'temp_longitude', 'temp_start_date', 'temp_end_date']:
+                    if col not in user_cols:
+                        col_type = 'VARCHAR(200)' if col == 'temp_address' else 'FLOAT' if col in ('temp_latitude','temp_longitude') else 'DATETIME'
+                        conn.execute(db.text(f'ALTER TABLE user ADD COLUMN {col} {col_type}'))
+                        print(f'[OK] user.{col} column added')
+    except Exception as e:
+        print(f'[SKIP] temp accommodation migration: {e}')
 
     # legal_post / psycho_post AI 관련 컬럼 마이그레이션 (SQLite)
     try:

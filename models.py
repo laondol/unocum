@@ -50,6 +50,15 @@ class User(db.Model):
     location_share = db.Column(db.Boolean, default=False) # 위치 공유 동의
     village_notify = db.Column(db.Boolean, default=True) # 마을소식 알림
     is_neighbor = db.Column(db.Boolean, default=False)  # 이웃주민 (집에서 위치인증 완료)
+    office_latitude = db.Column(db.Float)                 # 일터 위도
+    office_longitude = db.Column(db.Float)                # 일터 경도
+    office_address = db.Column(db.String(200))            # 일터 주소
+    work_start_time = db.Column(db.String(5))             # 업무 시작시간 (HH:MM)
+    temp_address = db.Column(db.String(200))              # 임시숙소 주소
+    temp_latitude = db.Column(db.Float)                   # 임시숙소 위도
+    temp_longitude = db.Column(db.Float)                  # 임시숙소 경도
+    temp_start_date = db.Column(db.DateTime)              # 임시숙소 시작일
+    temp_end_date = db.Column(db.DateTime)                # 임시숙소 종료일
 
     # SNS 연동 로그인
     social_id = db.Column(db.String(200), unique=True, nullable=True)
@@ -631,4 +640,21 @@ class GpsCalibration(db.Model):
     offset_lat = db.Column(db.Float, default=0)     # 위도 보정값 (누적 평균)
     offset_lon = db.Column(db.Float, default=0)     # 경도 보정값 (누적 평균)
     sample_count = db.Column(db.Integer, default=0) # 보정 횟수
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+
+class SharedRoute(db.Model):
+    __tablename__ = 'shared_route'
+    id = db.Column(db.Integer, primary_key=True)
+    from_name = db.Column(db.String(200), nullable=False)
+    to_name = db.Column(db.String(200), nullable=False)
+    from_lat = db.Column(db.Float)
+    from_lng = db.Column(db.Float)
+    to_lat = db.Column(db.Float)
+    to_lng = db.Column(db.Float)
+    steps = db.Column(db.Text)
+    total_min = db.Column(db.Integer)
+    distance_km = db.Column(db.Float)
+    creator_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    source_schedule_id = db.Column(db.Integer)
+    created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)

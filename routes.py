@@ -2142,23 +2142,7 @@ def register_routes(app):
                     if u:
                         recent_friends.append({"id":u.id,"username":u.username,"name":u.real_name or u.username,"town":u.town or "","village":u.village or ""})
         
-        return render_template('user_profile.html', 
-            profile_user=user, 
-            point_history=point_history, 
-            messages=messages,
-            is_own=is_own,
-            is_admin=is_admin,
-            is_friend=is_friend,
-            bot_name=bot_name,
-            posts=posts,
-            share_images=share_images,
-            appointments=appt_list,
-            bot_memory=bot_memory,
-            bot_drafts=bot_drafts,
-            curr_location=curr_location,
-            recent_friends=recent_friends,
-            bot_message=bot_message
-        )
+        return _serve_react_share()
 
     @app.route('/user/location/refresh', methods=['POST'])
     def user_location_refresh():
@@ -2986,8 +2970,216 @@ def register_routes(app):
         if uid:
             user = User.query.get(uid)
             if user:
-                return jsonify({"id": user.id, "username": user.username, "role": user.role, "managed_pages": (user.managed_pages or '').split(',')})
+                from tongbot_routes import _get_bot
+                bot = _get_bot(user.id)
+                return jsonify({
+                    "id": user.id, "username": user.username, "role": user.role,
+                    "managed_pages": (user.managed_pages or '').split(','),
+                    "office_latitude": user.office_latitude,
+                    "office_longitude": user.office_longitude,
+                    "office_address": user.office_address or '',
+                    "work_start_time": user.work_start_time or '',
+                    "temp_address": user.temp_address or '',
+                    "temp_latitude": user.temp_latitude,
+                    "temp_longitude": user.temp_longitude,
+                    "temp_start_date": user.temp_start_date.strftime('%Y-%m-%d') if user.temp_start_date else '',
+                    "temp_end_date": user.temp_end_date.strftime('%Y-%m-%d') if user.temp_end_date else '',
+                    "bot": {
+                        "bot_name": bot.bot_name, "mood": bot.mood or 'warm',
+                        "level": bot.level or 1, "exp": bot.exp or 0,
+                        "intimacy": bot.intimacy or 0, "tone": bot.tone or 'friendly',
+                        "chat_count": bot.chat_count or 0, "bot_id": bot.bot_id
+                    }
+                })
         return jsonify({"id": None})
+
+    @app.route('/api/user/office', methods=['POST'])
+    def api_user_office():
+        uid = session.get('user_id')
+        if not uid: return jsonify({"error":"login"}), 401
+        user = User.query.get(uid)
+        if not user: return jsonify({"error":"user not found"}), 404
+        data = request.get_json() or {}
+        if 'office_address' in data:
+            addr = data['office_address'].strip()
+            user.office_address = addr
+            if addr:
+                from services.transit import geocode_address
+                from config import Config
+                geo = geocode_address(addr, Config.KAKAO_REST_API_KEY,
+                    naver_id=Config.NAVER_SEARCH_CLIENT_ID or Config.NAVER_CLIENT_ID,
+                    naver_secret=Config.NAVER_SEARCH_CLIENT_SECRET or Config.NAVER_CLIENT_SECRET)
+                if geo:
+                    user.office_latitude = geo['lat']
+                    user.office_longitude = geo['lng']
+        if 'work_start_time' in data:
+            user.work_start_time = data['work_start_time'].strip()
+        db.session.commit()
+        return jsonify({"status":"success","office_address":user.office_address or '','office_latitude':user.office_latitude,'office_longitude':user.office_longitude,'work_start_time':user.work_start_time or ''})
+
+    @app.route('/api/user/temp', methods=['POST'])
+    def api_user_temp():
+        uid = session.get('user_id')
+        if not uid: return jsonify({"error":"login"}), 401
+        user = User.query.get(uid)
+        if not user: return jsonify({"error":"user not found"}), 404
+        data = request.get_json() or {}
+        if 'temp_address' in data:
+            addr = data['temp_address'].strip()
+            user.temp_address = addr
+            if addr:
+                from services.transit import geocode_address
+                from config import Config
+                geo = geocode_address(addr, Config.KAKAO_REST_API_KEY,
+                    naver_id=Config.NAVER_SEARCH_CLIENT_ID or Config.NAVER_CLIENT_ID,
+                    naver_secret=Config.NAVER_SEARCH_CLIENT_SECRET or Config.NAVER_CLIENT_SECRET)
+                if geo:
+                    user.temp_latitude = geo['lat']
+                    user.temp_longitude = geo['lng']
+        if 'temp_start_date' in data and data['temp_start_date']:
+            try: user.temp_start_date = datetime.fromisoformat(data['temp_start_date'])
+            except: pass
+        if 'temp_end_date' in data and data['temp_end_date']:
+            try: user.temp_end_date = datetime.fromisoformat(data['temp_end_date'])
+            except: pass
+        if 'temp_address' in data and not data['temp_address'].strip():
+            user.temp_address = ''; user.temp_latitude = None; user.temp_longitude = None
+            user.temp_start_date = None; user.temp_end_date = None
+        db.session.commit()
+        return jsonify({"status":"success","temp_address":user.temp_address or '','temp_latitude':user.temp_latitude,'temp_longitude':user.temp_longitude,
+            'temp_start_date':user.temp_start_date.strftime('%Y-%m-%d') if user.temp_start_date else '',
+            'temp_end_date':user.temp_end_date.strftime('%Y-%m-%d') if user.temp_end_date else ''})
+
+    @app.route('/api/user/<int:user_id>')
+    def api_user_profile(user_id):
+        uid = session.get('user_id')
+        if not uid: return jsonify({"error":"login"}), 401
+        user = User.query.get_or_404(user_id)
+        is_own = (uid == user.id)
+        is_admin = session.get('role') in ('admin','leader')
+        result = {
+            "id": user.id, "username": user.username, "real_name": user.real_name or user.username,
+            "email": user.email, "phone": user.phone, "social_provider": user.social_provider or '',
+            "town": user.town or '', "village": user.village or '',
+            "is_neighbor": user.is_neighbor or False,
+            "role": user.role, "managed_pages": (user.managed_pages or '').split(','),
+            "points": user.points or 0, "is_paid": user.is_paid or False,
+            "location_share": user.location_share or False,
+            "village_notify": user.village_notify if user.village_notify is not None else True,
+            "is_own": is_own, "is_admin": is_admin,
+        }
+        result['p_is_village'] = 'village' in (user.managed_pages or '') or ((user.managed_pages or '')[:3] == 'vi_')
+        # is_friend
+        is_friend = False
+        if uid and uid != user.id:
+            f = Friend.query.filter(
+                ((Friend.requester_id==uid) & (Friend.receiver_id==user.id) & (Friend.status=='accepted')) |
+                ((Friend.requester_id==user.id) & (Friend.receiver_id==uid) & (Friend.status=='accepted'))
+            ).first()
+            is_friend = bool(f)
+        result['is_friend'] = is_friend
+        result['office_latitude'] = user.office_latitude
+        result['office_longitude'] = user.office_longitude
+        result['office_address'] = user.office_address or ''
+        result['work_start_time'] = user.work_start_time or ''
+        # Point history
+        raw_history = PointHistory.query.filter_by(user_id=user.id).order_by(PointHistory.created_at.desc()).limit(50).all()
+        running = user.points
+        ph = []
+        for h in raw_history:
+            running -= h.amount
+            h.balance_after = running
+            ph.append({"id":h.id,"created_at":h.created_at.strftime('%m/%d %H:%M') if h.created_at else '','change_type':h.change_type,'amount':h.amount,'balance_after':h.balance_after,'description':h.description})
+        result['point_history'] = ph
+        # Messages
+        if is_own:
+            msgs = Message.query.filter_by(receiver_id=user.id).order_by(
+                db.case((Message.sender_role == 'admin', 0),(Message.sender_role == 'leader', 1),else_=2),
+                Message.created_at.desc()).all()
+        elif is_admin:
+            msgs = []
+        else:
+            msgs = Message.query.filter(
+                ((Message.sender_id==uid) & (Message.receiver_id==user.id)) |
+                ((Message.sender_id==user.id) & (Message.receiver_id==uid))
+            ).order_by(Message.created_at.desc()).all()
+        result['messages'] = [{"id":m.id,"subject":m.subject,"content":m.content[:200],"created_at":m.created_at.strftime('%m/%d %H:%M') if m.created_at else '','sender_role':m.sender_role or '','is_read':m.is_read} for m in msgs]
+        # Posts
+        posts = []
+        for p in Post.query.filter_by(user_id=user.id).order_by(Post.created_at.desc()).all():
+            posts.append({'title':p.title,'date':p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '','type':'꿈꾸기','url':f'/post/{p.id}'})
+        for s in ShareReport.query.filter_by(user_id=user.id).order_by(ShareReport.created_at.desc()).all():
+            posts.append({'title':s.title,'date':s.created_at.strftime('%Y-%m-%d %H:%M') if s.created_at else '','type':'공유','url':f'/share/detail/{s.id}'})
+        for w in VillageWish.query.filter_by(user_id=user.id).order_by(VillageWish.created_at.desc()).all():
+            posts.append({'title':w.content[:50] if w.content else '','date':w.created_at.strftime('%Y-%m-%d %H:%M') if w.created_at else '','type':'바람','url':'/village/my-wishes'})
+        if hasattr(LegalPost, 'user_id'):
+            for l in LegalPost.query.filter_by(user_id=user.id).order_by(LegalPost.created_at.desc()).all():
+                posts.append({'title':l.title,'date':l.created_at.strftime('%Y-%m-%d %H:%M') if l.created_at else '','type':'법률','url':f'/legal/post/{l.id}'})
+        posts.sort(key=lambda x: x['date'], reverse=True)
+        result['posts'] = posts[:20]
+        # Appointments
+        appts = LegalAppointment.query.filter_by(user_id=user.id).order_by(LegalAppointment.date.desc()).limit(10).all()
+        result['appointments'] = [{"id":a.id,"title":a.content or '상담예약','date':a.date.isoformat() if a.date else '','time_slot':a.time_slot,'location':a.location or '','status':a.status,'edit_url':f'/legal/appointment/{a.id}/edit'} for a in appts]
+        # Tongbot info
+        bot = TongBot.query.filter_by(user_id=user.id).first()
+        bot_name = bot.bot_name if bot else ''
+        bot_memory = (bot.memory or '')[-500:] if bot else ''
+        from tongbot_routes import _get_bot
+        if is_own:
+            b = _get_bot(uid)
+            bot_name = b.bot_name
+        result['bot_name'] = bot_name
+        result['bot_memory'] = bot_memory
+        bot_drafts = TongBotDraft.query.filter_by(user_id=user.id).order_by(TongBotDraft.updated_at.desc()).limit(5).all()
+        result['bot_drafts'] = [{"id":d.id,"title":d.title or '제목없음',"category":d.category or "","status":d.status,"updated_at":d.updated_at.strftime('%m/%d') if d.updated_at else ""} for d in bot_drafts]
+        # Bot message
+        bot_message = ''
+        if is_own and bot_name:
+            try:
+                h = (datetime.now() + timedelta(hours=9)).hour
+                time_ctx = '아침' if h < 12 else ('오후' if h < 18 else '저녁')
+                import random
+                tips = ['오늘 양평 날씨에 맞는 옷차림을 추천해 드릴까요?','잠시 스트레칭 어떠세요? 건강이 최고예요!','오늘 하루 감사한 일 세 가지만 떠올려 보세요.','좋아하는 음악 한 곡 들으면서 잠시 쉬어 가세요.','오늘 양평의 맛집 정보가 궁금하신가요?']
+                bot_message = random.choice(tips)
+            except:
+                bot_message = '오늘도 행복한 하루 되세요! 💕'
+        result['bot_message'] = bot_message
+        # Location
+        curr_location = ''
+        if is_own or is_admin:
+            if user.curr_address: curr_location = user.curr_address
+            if not curr_location and user.curr_town:
+                curr_location = f"{user.curr_town or ''} {user.curr_village or ''}".strip() or '위치 없음'
+        if not curr_location: curr_location = f"{user.curr_town or ''} {user.curr_village or ''}".strip() or '위치 없음'
+        result['curr_location'] = curr_location
+        result['curr_town'] = user.curr_town or user.town or ''
+        result['curr_village'] = user.curr_village or user.village or ''
+        # Recent friends (only for own profile)
+        recent_friends = []
+        if is_own:
+            f1 = Friend.query.filter_by(requester_id=uid, status='accepted').all()
+            f2 = Friend.query.filter_by(receiver_id=uid, status='accepted').all()
+            friend_ids = set()
+            for f in f1: friend_ids.add(f.receiver_id)
+            for f in f2: friend_ids.add(f.requester_id)
+            if friend_ids:
+                recent = []
+                for fid in friend_ids:
+                    last_msg = ChatMessage.query.filter(ChatMessage.user_id==fid).order_by(ChatMessage.created_at.desc()).first()
+                    recent.append({"id":fid, "last":last_msg.created_at.isoformat() if last_msg and last_msg.created_at else None})
+                recent.sort(key=lambda x: x["last"] or '', reverse=True)
+                for r in recent:
+                    u = User.query.get(r["id"])
+                    if u:
+                        recent_friends.append({"id":u.id,"username":u.username,"name":u.real_name or u.username,"town":u.town or "","village":u.village or ""})
+        result['recent_friends'] = recent_friends
+        # Share images
+        share_images = []
+        img_shares = ShareReport.query.filter(ShareReport.user_id==user.id, ShareReport.image_path.isnot(None), ShareReport.image_path!='').order_by(ShareReport.created_at.desc()).limit(12).all()
+        for s in img_shares:
+            share_images.append({'path':s.image_path,'title':s.title,'url':f'/share/detail/{s.id}'})
+        result['share_images'] = share_images
+        return jsonify(result)
 
     @app.route('/share/comment/<int:report_id>', methods=['POST'])
     def share_add_comment(report_id):
