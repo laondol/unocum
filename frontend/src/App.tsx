@@ -5,6 +5,7 @@ import ShareDetail from './pages/ShareDetail'
 import ShareReport from './pages/ShareReport'
 import ShareEdit from './pages/ShareEdit'
 import UserMyPage from './pages/UserMyPage'
+import UserProfile from './pages/UserProfile'
 
 export default function App() {
   const siteName = (() => {
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="/share/report" element={<ShareReport />} />
           <Route path="/share/edit/:id" element={<ShareEdit />} />
           <Route path="/user/my" element={<UserMyPage />} />
+          <Route path="/user/:userId" element={<UserProfile />} />
           <Route path="*" element={<ShareList />} />
         </Routes>
       </div>

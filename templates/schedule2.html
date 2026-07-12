@@ -58,6 +58,16 @@ body{background:#f8f9fa;font-size:0.9rem;}
         </div>
         <textarea id="addMemo" class="form-control form-control-sm mb-2" rows="2" placeholder="메모"></textarea>
         <div class="mb-2">
+            <label class="small"><input type="checkbox" id="addAllDay" onchange="toggleAllDay()"> 종일</label>
+            <label class="small ms-3"><input type="checkbox" id="addRepeat" onchange="toggleRepeat()"> 반복</label>
+        </div>
+        <div id="repeatOptions" style="display:none;" class="mb-2">
+            <label class="small me-2"><input type="radio" name="repeatType" value="daily"> 매일</label>
+            <label class="small me-2"><input type="radio" name="repeatType" value="weekly"> 매주</label>
+            <label class="small me-2"><input type="radio" name="repeatType" value="monthly"> 매월</label>
+            <label class="small"><input type="radio" name="repeatType" value="yearly"> 매년</label>
+        </div>
+        <div class="mb-2">
             <label class="small">👥 참석자</label>
             <div id="friendCheckboxes" class="small" style="max-height:100px;overflow-y:auto;"></div>
         </div>

@@ -896,6 +896,21 @@ def create_app():
     except Exception as e:
         print(f'[SKIP] temp_email_verify migration: {e}')
 
+    # TongBotSchedule 반복/종일 컬럼 마이그레이션
+    try:
+        with app.app_context():
+            from sqlalchemy import inspect
+            inspector = inspect(db.engine)
+            sched_cols = [c['name'] for c in inspector.get_columns('tong_bot_schedule')]
+            with db.engine.connect() as conn:
+                for col, ct in [('is_allday','BOOLEAN DEFAULT 0'),('is_recurring','BOOLEAN DEFAULT 0'),('repeat_type','VARCHAR(20) DEFAULT \'\''),('repeat_end_date','TIMESTAMP')]:
+                    if col not in sched_cols:
+                        conn.execute(db.text(f'ALTER TABLE tong_bot_schedule ADD COLUMN {col} {ct}'))
+                        conn.commit()
+                        print(f'[OK] tong_bot_schedule.{col} column added')
+    except Exception as e:
+        print(f'[SKIP] schedule recurring migration: {e}')
+
     # 이동/귀가 기존 메모 → format_memo_compact 백필
     try:
         with app.app_context():

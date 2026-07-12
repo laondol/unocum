@@ -345,6 +345,10 @@ class TongBotSchedule(db.Model):
     linked_msg_id = db.Column(db.Integer)
     linked_chat_id = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=datetime.now)
+    is_allday = db.Column(db.Boolean, default=False)
+    is_recurring = db.Column(db.Boolean, default=False)
+    repeat_type = db.Column(db.String(20), default='')
+    repeat_end_date = db.Column(db.DateTime, nullable=True)
 
 class ChatRoom(db.Model):
     id = db.Column(db.Integer, primary_key=True)
