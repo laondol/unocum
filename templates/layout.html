@@ -249,6 +249,41 @@
         document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function(e){new bootstrap.Tooltip(e)});
     });
     </script>
+    <div id="loadingOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(255,255,255,0.6);backdrop-filter:blur(4px);z-index:9999;align-items:center;justify-content:center;flex-direction:column;">
+        <div class="spinner-border text-success" style="width:3rem;height:3rem;" role="status"></div>
+        <div class="mt-2 text-muted small">로딩 중...</div>
+    </div>
+    <style>
+        .btn-once { pointer-events: none; opacity: 0.6; }
+    </style>
+    <script>
+    // Loading overlay
+    (function(){
+        var overlay = document.getElementById('loadingOverlay');
+        var cnt = 0;
+        function show(){ cnt++; overlay.style.display='flex'; }
+        function hide(){ cnt--; if(cnt<=0){ cnt=0; overlay.style.display='none'; } }
+        var origFetch = window.fetch;
+        window.fetch = function(){
+            show();
+            return origFetch.apply(this, arguments).then(function(r){ hide(); return r; }, function(e){ hide(); throw e; });
+        };
+        var origXhr = XMLHttpRequest.prototype.open;
+        XMLHttpRequest.prototype.open = function(){
+            this.addEventListener('loadstart', show);
+            this.addEventListener('loadend', hide);
+            return origXhr.apply(this, arguments);
+        };
+        // Button once-only
+        document.addEventListener('click', function(e){
+            var btn = e.target.closest('button, .btn, input[type=submit], input[type=button]');
+            if (btn && !btn.disabled && !btn.classList.contains('no-once')) {
+                btn.disabled = true;
+                setTimeout(function(){ btn.disabled = false; }, 1000);
+            }
+        });
+    })();
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>
