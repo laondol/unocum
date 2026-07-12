@@ -202,7 +202,6 @@ function showDay(date) {
                             var day = parseInt(dateParts[2]);
                             var hour = parseInt(timeParts[0]);
                             var minute = parseInt(timeParts[1]);
-                            // KST(UTC+9)로 해석하여 UTC 타임스탬프 생성
                             var d = new Date(Date.UTC(year, month, day, hour - 9, minute));
                             if (!isNaN(d.getTime())) arrTs = Math.floor(d.getTime()/1000);
                         } catch(e) {}
@@ -211,8 +210,7 @@ function showDay(date) {
                     var fromLng = parseFloat(r.from_lng).toFixed(7);
                     var toLat = parseFloat(r.to_lat).toFixed(7);
                     var toLng = parseFloat(r.to_lng).toFixed(7);
-                    var dataParam = arrTs ? '!3m1!4b1!4m6!4m5!2m3!6e1!7e2!8j'+arrTs+'!3e3' : '!3m1!4b1!4m6!4m5!2m3!6e1!7e2!3e3';
-                    h += '<a class="btn btn-sm btn-outline-danger py-0" target="_blank" href="https://www.google.co.kr/maps/dir/'+fromLat+','+fromLng+'/'+toLat+','+toLng+'/data='+dataParam+'">🌐Google</a>';
+                    h += '<a class="btn btn-sm btn-outline-danger py-0" target="_blank" href="https://www.google.co.kr/maps/dir/?api=1&origin='+fromLat+','+fromLng+'&destination='+toLat+','+toLng+'&travelmode=transit'+(arrTs?'&arrival_time='+arrTs:'')+'">🌐Google</a>';
                     h += '<a class="btn btn-sm btn-outline-info py-0" target="_blank" href="https://map.naver.com/p/directions/'+r.from_lng+','+r.from_lat+','+dl+'/'+r.to_lng+','+r.to_lat+','+al+'/-/transit">🗺️네이버</a>';
                     h += '<a class="btn btn-sm btn-outline-success py-0" target="_blank" href="https://map.kakao.com/link/by/traffic/'+dl+','+r.from_lat+','+r.from_lng+'/'+al+','+r.to_lat+','+r.to_lng+'">📱카카오</a>';
                     h += '</div>';
