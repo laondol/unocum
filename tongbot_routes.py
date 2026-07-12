@@ -1238,6 +1238,7 @@ def _ensure_day_routes(uid, evt_date, exclude_ids=None):
                 if last_loc.strip() == user.temp_address.strip():
                     skip_return = True
                 else:
+                    return_title = "임시숙소로 이동"
                     return_dest = f"[임시] {user.temp_address}"
                     return_lat, return_lng = user.temp_latitude, user.temp_longitude
         if not skip_return and last_lat and last_lng and return_lat and return_lng and haversine_km(last_lat, last_lng, return_lat, return_lng) > 1.0:
