@@ -189,12 +189,21 @@ function showDay(date) {
                     var dl = encodeURIComponent(s.departure_location || '출발');
                     var al = encodeURIComponent(s.return_location || s.location || '도착');
                     h += '<div class="d-flex gap-1 mt-1 flex-wrap">';
-                    // 이동 일정: event_date=출발시간, end_date=도착시간
+                    // 이동 일정: event_date=출발시간, end_date=도착시간 (서버 저장: KST)
                     var ts = s.end_date || s.event_date;
                     var arrTs = '';
                     if (ts) {
                         try {
-                            var d = new Date(ts.replace(' ','T')+'+09:00');
+                            var parts = ts.split(' ');
+                            var dateParts = parts[0].split('-');
+                            var timeParts = parts[1].split(':');
+                            var year = parseInt(dateParts[0]);
+                            var month = parseInt(dateParts[1]) - 1;
+                            var day = parseInt(dateParts[2]);
+                            var hour = parseInt(timeParts[0]);
+                            var minute = parseInt(timeParts[1]);
+                            // KST(UTC+9)로 해석하여 UTC 타임스탬프 생성
+                            var d = new Date(Date.UTC(year, month, day, hour - 9, minute));
                             if (!isNaN(d.getTime())) arrTs = Math.floor(d.getTime()/1000);
                         } catch(e) {}
                     }
