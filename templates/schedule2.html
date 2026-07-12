@@ -159,8 +159,18 @@ function renderCal() {
 
 function showDay(date) {
     const evts = schedules.filter(s => s.event_date && s.event_date.startsWith(date));
+    // 종일 일정 먼저 정렬
+    evts.sort((a, b) => {
+        const aAll = a.is_allday === true;
+        const bAll = b.is_allday === true;
+        if (aAll && !bAll) return -1;
+        if (!aAll && bAll) return 1;
+        return (a.event_date || '').localeCompare(b.event_date || '');
+    });
     const el = document.getElementById('dayEvents');
     if (!evts.length) { el.innerHTML = '<div class="text-muted small py-2">일정 없음</div><button class="btn btn-sm btn-success mt-1" onclick="addOnDate(\''+date+'\')">➕ '+date+' 일정추가</button>'; return; }
+    // 종일 일정 먼저 정렬
+    evts.sort((a, b) => (a.is_allday === b.is_allday ? 0 : a.is_allday ? -1 : 1));
     let h = '<div class="d-flex justify-content-between align-items-center mb-2"><span class="small fw-bold">'+date+'</span><button class="btn btn-sm btn-success" onclick="addOnDate(\''+date+'\')">➕ '+date+' 일정추가</button></div>';
     evts.forEach(s => {
         const badge = {'red':'🔴','blue':'🔵','green':'🟢','gray':'⚪'}[s.color||'gray']||'⚪';
