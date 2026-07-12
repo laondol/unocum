@@ -116,6 +116,7 @@ function loadEvents() {
         schedules = d.schedules || [];
         renderCal();
         renderEventList();
+        document.getElementById('dayEvents').innerHTML = '';
     });
 }
 
