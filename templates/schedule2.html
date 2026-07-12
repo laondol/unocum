@@ -99,12 +99,14 @@ function switchTab(t) {
     ['tabView','tabAdd','tabList','tabFav'].forEach(id => document.getElementById(id).style.display='none');
     document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).style.display = '';
     if (t === 'add') {
+        if (!document.getElementById('addDate').value) {
+            var today = new Date().toISOString().slice(0,10);
+            document.getElementById('addDate').value = today;
+            document.getElementById('addEndDate').value = today;
+        }
         document.getElementById('editId').value = '';
         document.getElementById('saveBtn').textContent = '저장';
         document.querySelector('#tabAdd h6').textContent = '새 일정';
-        var today = new Date().toISOString().slice(0,10);
-        document.getElementById('addDate').value = today;
-        document.getElementById('addEndDate').value = today;
         document.getElementById('accommodationSection').style.display = 'none';
     }
 }
