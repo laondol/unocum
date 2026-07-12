@@ -1254,7 +1254,8 @@ def bot_schedule():
                     home_town=user.town or '', home_village=user.village or '',
                     naver_id=naver_id, naver_secret=naver_secret)
                 plan_home.update({"from_lat":loc_lat,"from_lng":loc_lng,"to_lat":home_lat,"to_lng":home_lng})
-                ret_dep = datetime.strptime(f"2026-07-11 {plan_home['departure']}", "%Y-%m-%d %H:%M")
+                ret_dep = datetime(evt_start.year, evt_start.month, evt_start.day,
+                    int(plan_home['departure'].split(':')[0]), int(plan_home['departure'].split(':')[1]))
                 if ret_dep < evt_end:
                     ret_dep = evt_end + timedelta(minutes=5)
                 ret_arr = ret_dep + timedelta(minutes=plan_home['total_min'])
