@@ -112,7 +112,7 @@ function switchTab(t) {
 }
 
 function loadEvents() {
-    fetch('/api/bot/schedule').then(r=>r.json()).then(d => {
+    return fetch('/api/bot/schedule').then(r=>r.json()).then(d => {
         schedules = d.schedules || [];
         renderCal();
         renderEventList();
@@ -265,8 +265,7 @@ function saveEvent() {
                 if (el) el.value = '';
             });
             alert(id?'수정 완료':'등록 완료');
-            loadEvents();
-            switchTab('view');
+            loadEvents().then(() => switchTab('view'));
         }
     });
 }
