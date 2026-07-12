@@ -47,26 +47,28 @@ body{background:#f8f9fa;font-size:0.9rem;}
         <h6 class="mb-3">새 일정</h6>
         <input id="addTitle" class="form-control form-control-sm mb-2" placeholder="제목">
         <div class="row g-2 mb-2">
-            <div class="col-6"><label class="small">시작일</label><input type="date" id="addDate" class="form-control form-control-sm"></div>
-            <div class="col-3"><label class="small">시작시간</label><input type="time" id="addStart" class="form-control form-control-sm"></div>
-            <div class="col-6"><label class="small">종료일</label><input type="date" id="addEndDate" class="form-control form-control-sm" onchange="toggleAccommodation()"></div>
-            <div class="col-3"><label class="small">종료</label><input type="time" id="addEnd" class="form-control form-control-sm"></div>
+            <div class="col-5"><label class="small">시작일</label><input type="date" id="addDate" class="form-control form-control-sm"></div>
+            <div class="col-4"><label class="small">시작시간</label><input type="time" id="addStart" class="form-control form-control-sm"></div>
+            <div class="col-3 d-flex align-items-end"><label class="small mb-0"><input type="checkbox" id="addAllDay" onchange="toggleAllDay()"> 종일</label></div>
+        </div>
+        <div class="row g-2 mb-2">
+            <div class="col-4"><label class="small">종료일</label><input type="date" id="addEndDate" class="form-control form-control-sm" onchange="toggleAccommodation()"></div>
+            <div class="col-4"><label class="small">종료시간</label><input type="time" id="addEnd" class="form-control form-control-sm"></div>
+            <div class="col-4 d-flex align-items-end gap-2">
+                <label class="small mb-0"><input type="checkbox" id="addRepeat" onchange="toggleRepeat()"> 반복</label>
+                <div id="repeatOptions" style="display:none;" class="d-flex gap-1">
+                    <label class="small"><input type="radio" name="repeatType" value="daily"> 일</label>
+                    <label class="small"><input type="radio" name="repeatType" value="weekly"> 주</label>
+                    <label class="small"><input type="radio" name="repeatType" value="monthly"> 월</label>
+                    <label class="small"><input type="radio" name="repeatType" value="yearly"> 년</label>
+                </div>
+            </div>
         </div>
         <input id="addLoc" class="form-control form-control-sm mb-2" placeholder="장소">
         <div id="accommodationSection" style="display:none;">
             <input id="addAccommodation" class="form-control form-control-sm mb-2" placeholder="임시숙소 주소">
         </div>
         <textarea id="addMemo" class="form-control form-control-sm mb-2" rows="2" placeholder="메모"></textarea>
-        <div class="mb-2">
-            <label class="small"><input type="checkbox" id="addAllDay" onchange="toggleAllDay()"> 종일</label>
-            <label class="small ms-3"><input type="checkbox" id="addRepeat" onchange="toggleRepeat()"> 반복</label>
-        </div>
-        <div id="repeatOptions" style="display:none;" class="mb-2">
-            <label class="small me-2"><input type="radio" name="repeatType" value="daily"> 매일</label>
-            <label class="small me-2"><input type="radio" name="repeatType" value="weekly"> 매주</label>
-            <label class="small me-2"><input type="radio" name="repeatType" value="monthly"> 매월</label>
-            <label class="small"><input type="radio" name="repeatType" value="yearly"> 매년</label>
-        </div>
         <div class="mb-2">
             <label class="small">👥 참석자</label>
             <div id="friendCheckboxes" class="small" style="max-height:100px;overflow-y:auto;"></div>
@@ -251,6 +253,14 @@ function editEvent(id) {
     } else {
         document.getElementById('accommodationSection').style.display = 'none';
     }
+    document.getElementById('addAllDay').checked = s.is_allday || false;
+    document.getElementById('addRepeat').checked = s.is_recurring || false;
+    document.getElementById('repeatOptions').style.display = s.is_recurring ? '' : 'none';
+    if (s.is_recurring && s.repeat_type) {
+        var rbs = document.getElementsByName('repeatType');
+        for (var i=0;i<rbs.length;i++) { rbs[i].checked = rbs[i].value === s.repeat_type; }
+    }
+    toggleAllDay();
     document.getElementById('saveBtn').textContent = '수정';
 }
 
@@ -265,6 +275,21 @@ function toggleAccommodation() {
     }
 }
 
+function toggleAllDay() {
+    var checked = document.getElementById('addAllDay').checked;
+    document.getElementById('addStart').disabled = checked;
+    document.getElementById('addEnd').disabled = checked;
+    if (checked) {
+        document.getElementById('addStart').value = '';
+        document.getElementById('addEnd').value = '';
+    }
+}
+
+function toggleRepeat() {
+    var checked = document.getElementById('addRepeat').checked;
+    document.getElementById('repeatOptions').style.display = checked ? '' : 'none';
+}
+
 function saveEvent() {
     var id = document.getElementById('editId').value;
     var title = document.getElementById('addTitle').value.trim();
@@ -275,14 +300,22 @@ function saveEvent() {
     var loc = document.getElementById('addLoc').value.trim();
     var memo = document.getElementById('addMemo').value.trim();
     var accommodation = document.getElementById('addAccommodation').value.trim();
+    var isAllDay = document.getElementById('addAllDay').checked;
+    var isRecurring = document.getElementById('addRepeat').checked;
+    var repeatType = '';
+    if (isRecurring) {
+        var rbs = document.getElementsByName('repeatType');
+        for (var i=0;i<rbs.length;i++) { if(rbs[i].checked) { repeatType = rbs[i].value; break; } }
+    }
     if (!title || !date) return alert('제목과 날짜를 입력하세요.');
-    var evt = start ? date+'T'+start : date+'T09:00';
+    var evt = isAllDay ? date+'T00:00' : (start ? date+'T'+start : date+'T09:00');
     if (accommodation) memo = (memo ? memo+'\n' : '')+'[숙소:'+accommodation+']';
     var cbs = document.querySelectorAll('.friend-cb:checked');
     var invited = [];
     cbs.forEach(function(cb){ invited.push(parseInt(cb.value)); });
-    var data = {title, event_date: evt, location: loc, memo, invited: JSON.stringify(invited)};
-    if (end) data.end_date = (endDate && endDate !== date ? endDate : date)+'T'+end;
+    var data = {title, event_date: evt, location: loc, memo, invited: JSON.stringify(invited), is_allday: isAllDay, is_recurring: isRecurring, repeat_type: repeatType};
+    if (end && !isAllDay) data.end_date = (endDate && endDate !== date ? endDate : date)+'T'+end;
+    if (isAllDay) data.end_date = endDate ? endDate+'T23:59' : date+'T23:59';
     if (id) data.id = parseInt(id);
     var url = id ? '/api/bot/schedule/update' : '/api/bot/schedule';
     fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
@@ -294,6 +327,11 @@ function saveEvent() {
                 var el = document.getElementById(x);
                 if (el) el.value = '';
             });
+            document.getElementById('addAllDay').checked = false;
+            document.getElementById('addRepeat').checked = false;
+            document.getElementById('repeatOptions').style.display = 'none';
+            document.getElementById('addStart').disabled = false;
+            document.getElementById('addEnd').disabled = false;
             alert(id?'수정 완료':'등록 완료');
             loadEvents().then(() => switchTab('view'));
         }
