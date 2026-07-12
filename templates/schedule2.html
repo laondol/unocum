@@ -189,7 +189,7 @@ function showDay(date) {
                     var dl = encodeURIComponent(s.departure_location || '출발');
                     var al = encodeURIComponent(s.return_location || s.location || '도착');
                     h += '<div class="d-flex gap-1 mt-1 flex-wrap">';
-                    // 이동 일정: event_date=출발시간, end_date=도착시간 (서버 저장: KST)
+// 이동 일정: event_date=출발시간, end_date=도착시간 (저장시간을 UTC로 간주)
                     var ts = s.end_date || s.event_date;
                     var arrTs = '';
                     if (ts) {
@@ -202,7 +202,8 @@ function showDay(date) {
                             var day = parseInt(dateParts[2]);
                             var hour = parseInt(timeParts[0]);
                             var minute = parseInt(timeParts[1]);
-                            var d = new Date(Date.UTC(year, month, day, hour - 9, minute));
+                            // 저장된 시간을 UTC로 간주 (hour - 9 안 함)
+                            var d = new Date(Date.UTC(year, month, day, hour, minute));
                             if (!isNaN(d.getTime())) arrTs = Math.floor(d.getTime()/1000);
                         } catch(e) {}
                     }
