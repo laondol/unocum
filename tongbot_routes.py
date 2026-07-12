@@ -1224,7 +1224,7 @@ def bot_schedule():
                 evt_date_end = evt_start.replace(hour=23, minute=59, second=59)
                 from_time = home_addr
                 from_lat, from_lng = home_lat, home_lng
-                arr_dt = evt_start - timedelta(minutes=5)
+                arr_dt = evt_start - timedelta(minutes=10)
                 prev_scheds = TongBotSchedule.query.filter(
                     TongBotSchedule.user_id == uid,
                     TongBotSchedule.event_date >= evt_date_start,

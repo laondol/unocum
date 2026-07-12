@@ -1,0 +1,49 @@
+Google Maps Directions URL 구조 (일정 포함)
+=============================================
+
+1. 기본 API 형식 (recommended)
+   https://www.google.co.kr/maps/dir/?api=1
+     &origin={lat},{lng}
+     &destination={lat},{lng}
+     &travelmode=transit
+     &arrival_time={unix_timestamp}
+
+   예:
+   https://www.google.co.kr/maps/dir/?api=1&origin=37.5445,127.3193&destination=37.5565,127.0062&travelmode=transit&arrival_time=1784112600
+
+2. 상세 URL 형식 (Google Calendar 연동 가능)
+   https://www.google.co.kr/maps/dir/{origin_lat},{origin_lng}/{dest_name}/am=t/data=...
+   
+   am=t         = arrival time mode (도착시간 기준)
+   am=r         = departure time mode (출발시간 기준)
+   
+   data 파라미터 구조:
+   !3m1!4b1                              - header
+   !4m13!4m12                            - 12개 필드
+   !1m0                                  - origin (좌표만 있음, extra 없음)
+   !1m5!1m1!1s{place_id}!2m2!1d{lng}!2d{lat}  - destination (5 sub-fields)
+     !1m5 = 5개 하위필드
+     !1m1 = type 1 (place)
+     !1s{place_id} = Google Place ID (ex: 0x357ca31ac955c729:0xf59a9e4cb92068e)
+     !2m2 = 2개 하위필드 (좌표)
+     !1d{lng} = 경도
+     !2d{lat} = 위도
+   !2m3!6e1!7e2!8j{unix_timestamp}      - 시간 정보
+     !6e1 = 도착시간(e=1) / 출발시간(e=2/3)
+     !7e2 = 특정시각
+     !8j{unix_timestamp} = Unix timestamp (초)
+   !5i1                                  - 교통수단 (1=대중교통, 0=자동차, 2=자전거, 3=도보)
+
+   예:
+   https://www.google.co.kr/maps/dir/37.5445798,127.3197183/서울신라호텔+영빈관/am=t/data=!3m1!4b1!4m13!4m12!1m0!1m5!1m1!1s0x357ca31ac955c729:0xf59a9e4cb92068e!2m2!1d127.0061911!2d37.5565066!2m3!6e1!7e2!8j1784112600!5i1?entry=ttu
+
+3. 필요한 데이터
+   - 출발지 좌표 (from_lat, from_lng)
+   - 도착지 좌표 (to_lat, to_lng) - 또는 장소명
+   - 도착시간 (Unix timestamp, 초 단위)
+   - 교통수단 (transit)
+   - (선택) Google Place ID - 없으면 좌표로 대체 가능
+
+4. Unix timestamp 변환
+   JavaScript: Math.floor(new Date('2026-07-12T09:00:00+09:00').getTime() / 1000)
+   Python:    int(datetime.timestamp(dt))
