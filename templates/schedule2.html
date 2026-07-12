@@ -147,8 +147,8 @@ function renderCal() {
 function showDay(date) {
     const evts = schedules.filter(s => s.event_date && s.event_date.startsWith(date));
     const el = document.getElementById('dayEvents');
-    if (!evts.length) { el.innerHTML = '<div class="text-muted small py-2">일정 없음</div><button class="btn btn-sm btn-success mt-1" onclick="addOnDate(\''+date+'\')">➕ 이 날짜에 일정 추가</button>'; return; }
-    let h = '<div class="d-flex justify-content-between align-items-center mb-2"><span class="small fw-bold">'+date+'</span><button class="btn btn-sm btn-success" onclick="addOnDate(\''+date+'\')">➕</button></div>';
+    if (!evts.length) { el.innerHTML = '<div class="text-muted small py-2">일정 없음</div><button class="btn btn-sm btn-success mt-1" onclick="addOnDate(\''+date+'\')">➕ '+date+' 일정추가</button>'; return; }
+    let h = '<div class="d-flex justify-content-between align-items-center mb-2"><span class="small fw-bold">'+date+'</span><button class="btn btn-sm btn-success" onclick="addOnDate(\''+date+'\')">➕ '+date+' 일정추가</button></div>';
     evts.forEach(s => {
         const badge = {'red':'🔴','blue':'🔵','green':'🟢','gray':'⚪'}[s.color||'gray']||'⚪';
         const time = s.event_date ? s.event_date.split(' ')[1].substring(0,5) : '';
