@@ -1235,7 +1235,7 @@ def bot_schedule():
                 db.session.flush()
                 auto_created.append({"id":move.id,"title":move.title,"type":"move","arrival":arr_dt.strftime("%H:%M"),"departure":dep_dt.strftime("%H:%M")})
 
-                # 귀가: 같은 날 기존 귀가 삭제 후 마지막 위치 기준으로 새로 생성
+                # 귀가: 같은 날 기존 귀가 삭제 후 마지막 일정 위치 기준으로 새로 생성
                 evt_date_start = evt_start.replace(hour=0, minute=0, second=0)
                 evt_date_end = evt_start.replace(hour=23, minute=59, second=59)
                 existing_returns = TongBotSchedule.query.filter(
@@ -1248,25 +1248,45 @@ def bot_schedule():
                 for er in existing_returns:
                     db.session.delete(er)
 
-                # 귀가: event_date=출발시간, return_time=도착시간
-                target_arrival = "22:00"
-                plan_home = plan_segment(location, loc_lat, loc_lng, home_addr, home_lat, home_lng, target_arrival,
-                    home_town=user.town or '', home_village=user.village or '',
-                    naver_id=naver_id, naver_secret=naver_secret)
-                plan_home.update({"from_lat":loc_lat,"from_lng":loc_lng,"to_lat":home_lat,"to_lng":home_lng})
-                ret_dep = datetime(evt_start.year, evt_start.month, evt_start.day,
-                    int(plan_home['departure'].split(':')[0]), int(plan_home['departure'].split(':')[1]))
-                if ret_dep < evt_end:
-                    ret_dep = evt_end + timedelta(minutes=5)
-                ret_arr = ret_dep + timedelta(minutes=plan_home['total_min'])
-                home_return = TongBotSchedule(user_id=uid, title="집으로 이동",
-                    description=format_itinerary(plan_home),
-                    content=json.dumps(plan_home, ensure_ascii=False),
-                    event_date=ret_dep, return_time=ret_arr, location=home_addr,
-                    memo=f"귀가 {plan_home['total_min']}분", departure_location=location, return_location=home_addr)
-                db.session.add(home_return)
-                db.session.flush()
-                auto_created.append({"id":home_return.id,"title":"집으로 이동","type":"return","departure":ret_dep.strftime("%H:%M"),"arrival":ret_arr.strftime("%H:%M")})
+                # 마지막 일정(가장 늦은 시간) 찾기 (이동/귀가 제외)
+                day_scheds = TongBotSchedule.query.filter(
+                    TongBotSchedule.user_id == uid,
+                    TongBotSchedule.event_date >= evt_date_start,
+                    TongBotSchedule.event_date <= evt_date_end,
+                    TongBotSchedule.id != s.id
+                ).order_by(TongBotSchedule.event_date.desc()).all()
+                last_real = s
+                for ds in day_scheds:
+                    if ds.title and ('이동' in ds.title or '귀가' in ds.title):
+                        continue
+                    if ds.location:
+                        last_real = ds
+                        break
+                last_loc = last_real.location
+                last_lat, last_lng = (loc_lat, loc_lng) if last_real.id == s.id else _geocode_location(last_loc) or (None, None)
+
+                if last_lat and last_lng and home_lat and home_lng:
+                    target_arrival = "22:00"
+                    plan_home = plan_segment(last_loc, last_lat, last_lng, home_addr, home_lat, home_lng, target_arrival,
+                        home_town=user.town or '', home_village=user.village or '',
+                        naver_id=naver_id, naver_secret=naver_secret)
+                    plan_home.update({"from_lat":last_lat,"from_lng":last_lng,"to_lat":home_lat,"to_lng":home_lng})
+                    ret_dep = datetime(evt_start.year, evt_start.month, evt_start.day,
+                        int(plan_home['departure'].split(':')[0]), int(plan_home['departure'].split(':')[1]))
+                    last_end = last_real.event_date + timedelta(hours=1)
+                    if last_real.end_date:
+                        last_end = last_real.end_date
+                    if ret_dep < last_end:
+                        ret_dep = last_end + timedelta(minutes=5)
+                    ret_arr = ret_dep + timedelta(minutes=plan_home['total_min'])
+                    home_return = TongBotSchedule(user_id=uid, title="집으로 이동",
+                        description=format_itinerary(plan_home),
+                        content=json.dumps(plan_home, ensure_ascii=False),
+                        event_date=ret_dep, return_time=ret_arr, location=home_addr,
+                        memo=f"귀가 {plan_home['total_min']}분", departure_location=last_loc, return_location=home_addr)
+                    db.session.add(home_return)
+                    db.session.flush()
+                    auto_created.append({"id":home_return.id,"title":"집으로 이동","type":"return","departure":ret_dep.strftime("%H:%M"),"arrival":ret_arr.strftime("%H:%M")})
 
     db.session.commit()
     return jsonify({"success": True, "id": s.id, "auto_created": auto_created})
