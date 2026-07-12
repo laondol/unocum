@@ -44,12 +44,12 @@ def create_app():
                 for col in ['jin_verified_at', 'photo_path']:
                     if col not in user_cols:
                         col_t = 'DATETIME' if col == 'jin_verified_at' else 'VARCHAR(300)'
-                        conn.execute(db.text(f'ALTER TABLE user ADD COLUMN {col} {col_t}'))
+                        conn.execute(db.text(f'ALTER TABLE "user" ADD COLUMN {col} {col_t}'))
                         conn.commit()
                         print(f'[OK] user.{col} column added')
                 for col, ct in [('office_latitude','FLOAT'),('office_longitude','FLOAT'),('office_address','VARCHAR(200)'),('work_start_time','VARCHAR(5)')]:
                     if col not in user_cols:
-                        conn.execute(db.text(f'ALTER TABLE user ADD COLUMN {col} {ct}'))
+                        conn.execute(db.text(f'ALTER TABLE "user" ADD COLUMN {col} {ct}'))
                         conn.commit()
                         print(f'[OK] user.{col} column added')
             for tbl in ['legal_post', 'psycho_post']:
@@ -135,7 +135,7 @@ def create_app():
             user_cols = [c['name'] for c in inspector.get_columns('user')]
             with db.engine.connect() as conn:
                 if 'last_payout' not in user_cols:
-                    conn.execute(db.text('ALTER TABLE user ADD COLUMN last_payout DATETIME'))
+                    conn.execute(db.text('ALTER TABLE "user" ADD COLUMN last_payout DATETIME'))
                     print('[OK] user.last_payout column added')
                 # 기존 회원 last_payout NULL → 지금 시각으로 설정 (추가 지급 방지)
                 conn.execute(db.text("UPDATE user SET last_payout = datetime('now') WHERE last_payout IS NULL"))
@@ -162,7 +162,7 @@ def create_app():
                 }
                 for col_name, col_type in new_user_cols.items():
                     if col_name not in user_cols:
-                        conn.execute(db.text(f'ALTER TABLE user ADD COLUMN {col_name} {col_type}'))
+                        conn.execute(db.text(f'ALTER TABLE "user" ADD COLUMN {col_name} {col_type}'))
                         print(f'[OK] user.{col_name} column added')
                 # 기존 town/village를 reg_town/reg_village로 복사 (최초 1회)
                 if 'reg_town' in user_cols and 'town' in user_cols:
@@ -290,37 +290,37 @@ def create_app():
             # User 테이블 마이그레이션 (추가)
             with db.engine.connect() as conn:
                 if 'last_login' not in user_cols:
-                    conn.execute(db.text('ALTER TABLE user ADD COLUMN last_login DATETIME'))
+                    conn.execute(db.text('ALTER TABLE "user" ADD COLUMN last_login DATETIME'))
                     print('[OK] user.last_login column added')
                 if 'location_share' not in user_cols:
-                    conn.execute(db.text('ALTER TABLE user ADD COLUMN location_share BOOLEAN DEFAULT 0'))
+                    conn.execute(db.text('ALTER TABLE "user" ADD COLUMN location_share BOOLEAN DEFAULT 0'))
                     print('[OK] user.location_share column added')
                 if 'last_logout' not in user_cols:
-                    conn.execute(db.text('ALTER TABLE user ADD COLUMN last_logout DATETIME'))
+                    conn.execute(db.text('ALTER TABLE "user" ADD COLUMN last_logout DATETIME'))
                     print('[OK] user.last_logout column added')
                 if 'login_location_share' not in user_cols:
-                    conn.execute(db.text('ALTER TABLE user ADD COLUMN login_location_share BOOLEAN DEFAULT 0'))
+                    conn.execute(db.text('ALTER TABLE "user" ADD COLUMN login_location_share BOOLEAN DEFAULT 0'))
                     print('[OK] user.login_location_share column added')
                 if 'login_town' not in user_cols:
-                    conn.execute(db.text('ALTER TABLE user ADD COLUMN login_town VARCHAR(50)'))
+                    conn.execute(db.text('ALTER TABLE "user" ADD COLUMN login_town VARCHAR(50)'))
                     print('[OK] user.login_town column added')
                 if 'login_village' not in user_cols:
-                    conn.execute(db.text('ALTER TABLE user ADD COLUMN login_village VARCHAR(50)'))
+                    conn.execute(db.text('ALTER TABLE "user" ADD COLUMN login_village VARCHAR(50)'))
                     print('[OK] user.login_village column added')
                 if 'login_latitude' not in user_cols:
-                    conn.execute(db.text('ALTER TABLE user ADD COLUMN login_latitude FLOAT'))
+                    conn.execute(db.text('ALTER TABLE "user" ADD COLUMN login_latitude FLOAT'))
                     print('[OK] user.login_latitude column added')
                 if 'login_longitude' not in user_cols:
-                    conn.execute(db.text('ALTER TABLE user ADD COLUMN login_longitude FLOAT'))
+                    conn.execute(db.text('ALTER TABLE "user" ADD COLUMN login_longitude FLOAT'))
                     print('[OK] user.login_longitude column added')
                 if 'social_id' not in user_cols:
-                    conn.execute(db.text('ALTER TABLE user ADD COLUMN social_id VARCHAR(200)'))
+                    conn.execute(db.text('ALTER TABLE "user" ADD COLUMN social_id VARCHAR(200)'))
                     print('[OK] user.social_id column added')
                 if 'social_provider' not in user_cols:
-                    conn.execute(db.text('ALTER TABLE user ADD COLUMN social_provider VARCHAR(20)'))
+                    conn.execute(db.text('ALTER TABLE "user" ADD COLUMN social_provider VARCHAR(20)'))
                     print('[OK] user.social_provider column added')
                 if 'social_email' not in user_cols:
-                    conn.execute(db.text('ALTER TABLE user ADD COLUMN social_email VARCHAR(100)'))
+                    conn.execute(db.text('ALTER TABLE "user" ADD COLUMN social_email VARCHAR(100)'))
                     print('[OK] user.social_email column added')
             
             # ShareComment 테이블 생성
@@ -787,7 +787,7 @@ def create_app():
                 for col in ['social_id', 'social_provider', 'social_email', 'email_verification_token', 'email_verification_sent_at', 'is_neighbor', 'jin_verified_at', 'photo_path']:
                     if col not in user_cols:
                         col_type = 'VARCHAR(200)' if col in ('social_id', 'email_verification_token') else 'VARCHAR(100)' if col in ('social_email',) else 'VARCHAR(20)' if col in ('social_provider',) else 'BOOLEAN DEFAULT 0' if col in ('is_neighbor',) else 'DATETIME'
-                        conn.execute(db.text(f'ALTER TABLE user ADD COLUMN {col} {col_type}'))
+                        conn.execute(db.text(f'ALTER TABLE "user" ADD COLUMN {col} {col_type}'))
                         print(f'[OK] user.{col} column added')
     except Exception as e:
         print(f'[SKIP] social column migration: {e}')
@@ -799,10 +799,18 @@ def create_app():
             inspector = inspect(db.engine)
             user_cols = [c['name'] for c in inspector.get_columns('user')]
             with db.engine.connect() as conn:
+                from sqlalchemy import inspect as sa_ins
+                _dialect = sa_ins(db.engine).dialect.name
                 for col in ['temp_address', 'temp_latitude', 'temp_longitude', 'temp_start_date', 'temp_end_date']:
                     if col not in user_cols:
-                        col_type = 'VARCHAR(200)' if col == 'temp_address' else 'FLOAT' if col in ('temp_latitude','temp_longitude') else 'DATETIME'
-                        conn.execute(db.text(f'ALTER TABLE user ADD COLUMN {col} {col_type}'))
+                        if col in ('temp_address',):
+                            col_type = 'VARCHAR(200)'
+                        elif col in ('temp_latitude','temp_longitude'):
+                            col_type = 'FLOAT'
+                        else:
+                            col_type = 'TIMESTAMP' if _dialect == 'postgresql' else 'DATETIME'
+                        conn.execute(db.text(f'ALTER TABLE "user" ADD COLUMN {col} {col_type}'))
+                        conn.commit()
                         print(f'[OK] user.{col} column added')
     except Exception as e:
         print(f'[SKIP] temp accommodation migration: {e}')
@@ -887,6 +895,37 @@ def create_app():
                         print('[OK] temp_email_verify.redirect column added')
     except Exception as e:
         print(f'[SKIP] temp_email_verify migration: {e}')
+
+    # 이동/귀가 기존 메모 → format_memo_compact 백필
+    try:
+        with app.app_context():
+            from models import TongBotSchedule
+            from services.directions import format_memo_compact
+            import json
+            targets = TongBotSchedule.query.filter(
+                TongBotSchedule.content.isnot(None),
+                TongBotSchedule.content != ''
+            ).all()
+            updated = 0
+            for t in targets:
+                if not (t.title and ('이동' in t.title or '귀가' in t.title)):
+                    continue
+                try:
+                    plan = json.loads(t.content)
+                    if plan.get("compact"):
+                        continue
+                    compact = format_memo_compact(plan)
+                    plan["compact"] = compact
+                    t.content = json.dumps(plan, ensure_ascii=False)
+                    t.memo = compact
+                    updated += 1
+                except:
+                    pass
+            if updated:
+                db.session.commit()
+                print(f'[OK] {updated} 이동/귀가 entries backfilled with compact memo')
+    except Exception as e:
+        print(f'[SKIP] compact memo backfill: {e}')
 
     # gunicorn에서도 실행되도록 초기화 보장
     with app.app_context():

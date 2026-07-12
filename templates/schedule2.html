@@ -168,8 +168,8 @@ function showDay(date) {
                     var al = encodeURIComponent(s.return_location || s.location || '도착');
                     h += '<div class="d-flex gap-1 mt-1 flex-wrap">';
                     h += '<a class="btn btn-sm btn-outline-success py-0" target="_blank" href="https://map.kakao.com/link/by/traffic/'+dl+','+r.from_lat+','+r.from_lng+'/'+al+','+r.to_lat+','+r.to_lng+'">📱카카오맵</a>';
-                    h += '<a class="btn btn-sm btn-outline-info py-0" target="_blank" href="https://map.naver.com/p/directions/'+r.from_lng+','+r.from_lat+','+dl+'/'+r.to_lng+','+r.to_lat+','+al+'">🗺️네이버</a>';
-                    h += '<a class="btn btn-sm btn-outline-danger py-0" target="_blank" href="https://www.google.com/maps/dir/?api=1&origin='+r.from_lat+','+r.from_lng+'&destination='+r.to_lat+','+r.to_lng+'&travelmode=transit">🌐Google</a>';
+                    h += '<a class="btn btn-sm btn-outline-info py-0" target="_blank" href="https://map.naver.com/p/directions/'+r.from_lng+','+r.from_lat+','+dl+'/'+r.to_lng+','+r.to_lat+','+al+'/-/transit">🗺️네이버</a>';
+                    h += '<a class="btn btn-sm btn-outline-danger py-0" target="_blank" href="https://www.google.co.kr/maps/dir/'+r.from_lat+','+r.from_lng+'/'+al+'">🌐Google</a>';
                     h += '</div>';
                 }
             } catch(e){}
@@ -207,6 +207,7 @@ function changeMonth(d) {
 function editEvent(id) {
     var s = schedules.find(function(x){return x.id === id;});
     if (!s) return;
+    switchTab('add');
     document.querySelector('#tabAdd h6').textContent = '일정 수정';
     document.getElementById('editId').value = id;
     document.getElementById('addTitle').value = s.title || '';
@@ -223,7 +224,11 @@ function editEvent(id) {
         }
     }
     document.getElementById('addLoc').value = s.location || '';
-    document.getElementById('addMemo').value = (s.memo || s.description || '').replace(/\[숙소:[^\]]+\]/,'').trim();
+    var memoVal = s.memo || s.description || '';
+    if (s.content) {
+        try { var cc = JSON.parse(s.content); if (cc.compact) memoVal = cc.compact; } catch(e){}
+    }
+    document.getElementById('addMemo').value = memoVal.replace(/\[숙소:[^\]]+\]/,'').trim();
     var am = s.memo ? s.memo.match(/\[숙소:([^\]]+)\]/) : null;
     if (am) {
         document.getElementById('addAccommodation').value = am[1];
@@ -236,7 +241,6 @@ function editEvent(id) {
         document.getElementById('accommodationSection').style.display = 'none';
     }
     document.getElementById('saveBtn').textContent = '수정';
-    switchTab('add');
 }
 
 function toggleAccommodation() {
