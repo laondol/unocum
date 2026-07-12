@@ -45,12 +45,12 @@ body{background:#f8f9fa;font-size:0.9rem;}
 <div id="tabAdd" style="display:none;">
     <div class="card p-3">
         <h6 class="mb-3">새 일정</h6>
-        <input id="addTitle" class="form-control form-control-sm mb-2" placeholder="제목"> <input id="addAccommodation" class="form-control form-control-sm mb-2" placeholder="임시숙소 주소">
+        <input id="addTitle" class="form-control form-control-sm mb-2" placeholder="제목">
         <div class="row g-2 mb-2">
-            <div class="col-4"><label class="small">시작일</label><input type="date" id="addDate" class="form-control form-control-sm"></div>
-            <div class="col-2"><label class="small">시작시간</label><input type="time" id="addStart" class="form-control form-control-sm"></div>
-            <div class="col-4"><label class="small">종료일</label><input type="date" id="addEndDate" class="form-control form-control-sm" onchange="toggleAccommodation()"></div>
-            <div class="col-2"><label class="small">종료</label><input type="time" id="addEnd" class="form-control form-control-sm"></div>
+            <div class="col-6"><label class="small">시작일</label><input type="date" id="addDate" class="form-control form-control-sm"></div>
+            <div class="col-3"><label class="small">시작시간</label><input type="time" id="addStart" class="form-control form-control-sm"></div>
+            <div class="col-6"><label class="small">종료일</label><input type="date" id="addEndDate" class="form-control form-control-sm" onchange="toggleAccommodation()"></div>
+            <div class="col-3"><label class="small">종료</label><input type="time" id="addEnd" class="form-control form-control-sm"></div>
         </div>
         <input id="addLoc" class="form-control form-control-sm mb-2" placeholder="장소">
         <div id="accommodationSection" style="display:none;">
