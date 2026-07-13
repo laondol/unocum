@@ -11,32 +11,19 @@
             </div>
 
             <!-- 일반 아이디 로그인 -->
-            <form id="loginForm" action="/login" method="post">
+            {% if error %}
+            <div class="alert alert-danger text-center py-2 mb-3" style="border-radius: 12px;">{{ error }}</div>
+            {% endif %}
+            <form action="/login" method="post" onsubmit="document.getElementById('loginOverlay').style.display='flex'; this.querySelector('button[type=submit]').disabled=true;">
                 <input type="hidden" name="next" value="{{ next }}">
-                <input type="hidden" name="lat" id="loginLat" value="">
-                <input type="hidden" name="lon" id="loginLon" value="">
                 <div class="mb-3">
                     <input type="text" name="username" class="form-control p-3 border-0 bg-light" placeholder="이메일" style="border-radius: 12px;" required>
                 </div>
                 <div class="mb-4">
                     <input type="password" name="password" class="form-control p-3 border-0 bg-light" placeholder="비밀번호" style="border-radius: 12px;" required>
                 </div>
-                <button class="btn btn-success w-100 p-3 fw-bold mb-3" style="border-radius: 12px;">로그인</button>
+                <button type="submit" class="btn btn-success w-100 p-3 fw-bold mb-3 no-once" style="border-radius: 12px;">로그인</button>
             </form>
-            <script>
-            document.getElementById('loginForm').addEventListener('submit', function(e) {
-                e.preventDefault();
-                const form = this;
-                function doSubmit() { form.submit(); }
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(pos => {
-                        document.getElementById('loginLat').value = pos.coords.latitude;
-                        document.getElementById('loginLon').value = pos.coords.longitude;
-                        doSubmit();
-                    }, doSubmit, {enableHighAccuracy: false, timeout: 3000});
-                } else { doSubmit(); }
-            });
-            </script>
 
             <div class="text-center mt-2">
                 <a href="/reset-password" class="text-muted small text-decoration-none">🔑 비밀번호 찾기</a>
@@ -51,5 +38,9 @@
         </div>
     </div>
 </div>
+</div>
+<div id="loginOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(255,255,255,0.7);backdrop-filter:blur(4px);z-index:9999;align-items:center;justify-content:center;flex-direction:column;">
+    <div class="spinner-border text-success" style="width:3rem;height:3rem;" role="status"></div>
+    <div class="mt-2 text-muted small">로그인 중...</div>
 </div>
 {% endblock %}

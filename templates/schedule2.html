@@ -54,13 +54,16 @@ body{background:#f8f9fa;font-size:0.9rem;}
         <div class="row g-2 mb-2">
             <div class="col-4"><label class="small">종료일</label><input type="date" id="addEndDate" class="form-control form-control-sm" onchange="toggleAccommodation()"></div>
             <div class="col-4"><label class="small">종료시간</label><input type="time" id="addEnd" class="form-control form-control-sm"></div>
-            <div class="col-4 d-flex align-items-end gap-2">
+            <div class="col-4 d-flex align-items-end gap-2" style="position:relative;">
                 <label class="small mb-0"><input type="checkbox" id="addRepeat" onchange="toggleRepeat()"> 반복</label>
-                <div id="repeatOptions" style="display:none;" class="d-flex gap-1">
+                <div id="repeatOptions" style="display:none; position:absolute; top:100%; left:0; z-index:30; background:#fff; border:1px solid #ced4da; border-radius:8px; padding:8px; box-shadow:0 4px 12px rgba(0,0,0,.15);" class="d-flex gap-1 align-items-center flex-wrap">
+                    <span class="small">매</span>
+                    <input type="number" id="addRepeatInterval" class="form-control form-control-sm" style="width:64px;" min="1" max="365" value="1">
                     <label class="small"><input type="radio" name="repeatType" value="daily"> 일</label>
                     <label class="small"><input type="radio" name="repeatType" value="weekly"> 주</label>
                     <label class="small"><input type="radio" name="repeatType" value="monthly"> 월</label>
                     <label class="small"><input type="radio" name="repeatType" value="yearly"> 년</label>
+                    <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 ms-1" onclick="document.getElementById('repeatOptions').style.display='none'">확인</button>
                 </div>
             </div>
         </div>
@@ -85,6 +88,16 @@ body{background:#f8f9fa;font-size:0.9rem;}
 
 <!-- 리스트 탭 (숨김, 렌더링용) -->
 <div id="tabList" style="display:none;"><div id="eventList" class="small"></div></div>
+</div>
+
+<div id="delModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:2000; align-items:center; justify-content:center;">
+  <div style="background:#fff; border-radius:10px; padding:16px; width:90%; max-width:260px;">
+    <div class="fw-bold mb-2" style="font-size:.9rem;">반복 일정 삭제</div>
+    <button class="btn btn-sm btn-danger w-100 mb-1" onclick="doDelete('all')">모두 삭제</button>
+    <button class="btn btn-sm btn-warning w-100 mb-1" onclick="doDelete('this_after')">이 일정 이후 삭제</button>
+    <button class="btn btn-sm btn-outline-secondary w-100 mb-1" onclick="doDelete('this_only')">이 일정만 삭제</button>
+    <button class="btn btn-sm btn-light w-100" onclick="closeDel()">취소</button>
+  </div>
 </div>
 
 <script>
@@ -181,7 +194,12 @@ function showDay(date) {
             var m = s.memo.match(/\[숙소:([^\]]+)\]/);
             if (m) accomm = '<br>🏠 숙소: '+m[1];
         }
-        h += '<div class="border-bottom py-1 mb-1 small"><strong>'+badge+' '+s.title+'</strong><br>🕐 '+time+loc+accomm+'<br>';
+        var repTxt = '';
+        if (s.is_recurring && s.repeat_type) {
+            var _rm = {'daily':'일','weekly':'주','monthly':'월','yearly':'년'}[s.repeat_type] || '';
+            repTxt = ' 🔁매'+(s.repeat_interval||1)+_rm+(s.repeat_infinite ? '(무한)' : '');
+        }
+        h += '<div class="border-bottom py-1 mb-1 small"><strong>'+badge+' '+s.title+repTxt+'</strong><br>🕐 '+time+loc+accomm+'<br>';
         if ((s.title && (s.title.includes('이동') || s.title.includes('집으로'))) && s.content) {
             try {
                 var r = JSON.parse(s.content);
@@ -211,7 +229,13 @@ function showDay(date) {
                     var fromLng = parseFloat(r.from_lng).toFixed(7);
                     var toLat = parseFloat(r.to_lat).toFixed(7);
                     var toLng = parseFloat(r.to_lng).toFixed(7);
-                    var dataParam = arrTs ? '!3m1!4b1!4m4!4m3!2m1!6e2!3e3' : '!3m1!4b1!4m6!4m5!2m3!6e1!7e2!3e3';
+                    var isHome = s.title && s.title.includes('집으로');
+                    var dataParam;
+                    if (isHome) {
+                        dataParam = '!3m1!4b1!4m4!4m3!2m1!6e2!3e3';
+                    } else {
+                        dataParam = '!3m1!4b1!4m6!4m5!2m3!6e1!7e2!8j' + (arrTs || '') + '!3e3';
+                    }
                     h += '<a class="btn btn-sm btn-outline-danger py-0" target="_blank" href="https://www.google.co.kr/maps/dir/'+fromLat+','+fromLng+'/'+toLat+','+toLng+'/data='+dataParam+'">🌐Google</a>';
                     h += '<a class="btn btn-sm btn-outline-info py-0" target="_blank" href="https://map.naver.com/p/directions/'+r.from_lng+','+r.from_lat+','+dl+'/'+r.to_lng+','+r.to_lat+','+al+'/-/transit">🗺️네이버</a>';
                     h += '<a class="btn btn-sm btn-outline-success py-0" target="_blank" href="https://map.kakao.com/link/by/traffic/'+dl+','+r.from_lat+','+r.from_lng+'/'+al+','+r.to_lat+','+r.to_lng+'">📱카카오</a>';
@@ -292,6 +316,12 @@ function editEvent(id) {
         var rbs = document.getElementsByName('repeatType');
         for (var i=0;i<rbs.length;i++) { rbs[i].checked = rbs[i].value === s.repeat_type; }
     }
+    document.getElementById('addRepeatInterval').value = s.repeat_interval || 1;
+    if (s.repeat_infinite) {
+        var _ed = new Date(document.getElementById('addDate').value + 'T00:00');
+        _ed.setDate(_ed.getDate() - 1);
+        document.getElementById('addEndDate').value = _ed.toISOString().slice(0,10);
+    }
     toggleAllDay();
     document.getElementById('saveBtn').textContent = '수정';
 }
@@ -335,6 +365,8 @@ function saveEvent() {
     var isAllDay = document.getElementById('addAllDay').checked;
     var isRecurring = document.getElementById('addRepeat').checked;
     var repeatType = '';
+    var repeatInterval = parseInt(document.getElementById('addRepeatInterval').value) || 1;
+    var repeatInfinite = !!(isRecurring && endDate && endDate < date);
     if (isRecurring) {
         var rbs = document.getElementsByName('repeatType');
         for (var i=0;i<rbs.length;i++) { if(rbs[i].checked) { repeatType = rbs[i].value; break; } }
@@ -345,9 +377,10 @@ function saveEvent() {
     var cbs = document.querySelectorAll('.friend-cb:checked');
     var invited = [];
     cbs.forEach(function(cb){ invited.push(parseInt(cb.value)); });
-    var data = {title, event_date: evt, location: loc, memo, invited: JSON.stringify(invited), is_allday: isAllDay, is_recurring: isRecurring, repeat_type: repeatType};
+    var data = {title, event_date: evt, location: loc, memo, invited: JSON.stringify(invited), is_allday: isAllDay, is_recurring: isRecurring, repeat_type: repeatType, repeat_interval: repeatInterval, repeat_infinite: repeatInfinite};
     if (end && !isAllDay) data.end_date = (endDate && endDate !== date ? endDate : date)+'T'+end;
     if (isAllDay) data.end_date = endDate ? endDate+'T23:59' : date+'T23:59';
+    if (repeatInfinite) data.end_date = '';
     if (id) data.id = parseInt(id);
     var url = id ? '/api/bot/schedule/update' : '/api/bot/schedule';
     fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
@@ -361,6 +394,7 @@ function saveEvent() {
             });
             document.getElementById('addAllDay').checked = false;
             document.getElementById('addRepeat').checked = false;
+            document.getElementById('addRepeatInterval').value = 1;
             document.getElementById('repeatOptions').style.display = 'none';
             document.getElementById('addStart').disabled = false;
             document.getElementById('addEnd').disabled = false;
@@ -371,9 +405,27 @@ function saveEvent() {
 }
 
 function deleteEvent(id) {
-    if (!confirm('삭제?')) return;
-    fetch('/api/bot/schedule/delete', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id})})
-    .then(r=>r.json()).then(d => { if(d.success) loadEvents(); });
+    var s = schedules.find(function(x){ return x.id === id; });
+    if (s && s.is_recurring) {
+        delTarget = { id: id, occ_date: s.event_date ? s.event_date.split(' ')[0] : '' };
+        document.getElementById('delModal').style.display = 'flex';
+    } else {
+        if (confirm('삭제할까요?')) doDelete('all', id);
+    }
+}
+var delTarget = null;
+function closeDel() {
+    document.getElementById('delModal').style.display = 'none';
+    delTarget = null;
+}
+function doDelete(mode, directId) {
+    var id = (directId != null) ? directId : (delTarget && delTarget.id);
+    var occ = (directId != null) ? '' : (delTarget && delTarget.occ_date);
+    if (id == null) return;
+    fetch('/api/bot/schedule/delete', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id:id, mode:mode, occ_date:occ})})
+    .then(function(r){ return r.json(); }).then(function(d){
+        if (d.success) { closeDel(); loadEvents(); }
+    });
 }
 
 
