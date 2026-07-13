@@ -22,7 +22,7 @@ export default function App() {
           <Route path="/share/detail/:id" element={<ShareDetail />} />
           <Route path="/share/report" element={<ShareReport />} />
           <Route path="/share/edit/:id" element={<ShareEdit />} />
-          <Route path="/user/my" element={<UserMyPage />} />
+          <Route path="/user/:userId" element={<UserMyPage />} />
           <Route path="*" element={<ShareList />} />
         </Routes>
       </div>

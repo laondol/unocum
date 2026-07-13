@@ -94,7 +94,6 @@ def register_routes(app):
     @app.route('/share/report')
     @app.route('/share/detail/<path:path>')
     @app.route('/share/edit/<path:path>')
-    @app.route('/user/my')
     def share_spa(path=''):
         return _serve_react_share()
 
@@ -568,7 +567,7 @@ def register_routes(app):
                 else:
                     u.last_payout = now
                     db.session.commit()
-                return redirect(next_url or '/user/my')
+                return redirect(next_url or url_for('user_profile', user_id=u.id))
             return render_template('login.html', next=next_url, error='로그인 정보가 올바르지 않습니다.')
         return render_template('login.html', next=next_url)
 
