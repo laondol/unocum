@@ -58,7 +58,7 @@ body{background:#f8f9fa;font-size:0.9rem;}
             <div class="col-4"><label class="small d-block">종료시간</label><input type="time" id="addEnd" class="form-control form-control-sm"></div>
             <div class="col-4 d-flex align-items-end gap-2" style="position:relative;">
                 <button type="button" class="btn btn-sm btn-outline-secondary" id="btnRepeat" onclick="toggleRepeat()">🔁 반복</button>
-                <div id="repeatOptions" style="display:none; position:absolute; top:100%; left:0; z-index:30; background:#fff; border:1px solid #ced4da; border-radius:8px; padding:8px; box-shadow:0 4px 12px rgba(0,0,0,.15);" class="d-flex gap-1 align-items-center flex-wrap">
+                <div id="repeatOptions" style="display:none; position:absolute; top:100%; left:0; z-index:30; background:#fff; border:1px solid #ced4da; border-radius:8px; padding:8px; box-shadow:0 4px 12px rgba(0,0,0,.15);" class="gap-1 align-items-center flex-wrap">
                     <span class="small">매</span>
                     <input type="number" id="addRepeatInterval" class="form-control form-control-sm" style="width:64px;" min="1" max="365" value="1">
                     <label class="small"><input type="radio" name="repeatType" value="daily"> 일</label>
@@ -354,7 +354,7 @@ function toggleAllDay() {
 }
 
 function setRepeatOptionsVisible(v) {
-    document.getElementById('repeatOptions').style.display = v ? '' : 'none';
+    document.getElementById('repeatOptions').style.display = v ? 'flex' : 'none';
     repeatOn = v;
     var b = document.getElementById('btnRepeat');
     b.classList.toggle('btn-primary', v);
@@ -419,11 +419,17 @@ function addChangeMonth(d) {
     renderAddCal();
 }
 document.addEventListener('click', function(e){
+    var t = e.target;
     var p = document.getElementById('addCalPopup');
     if (p && p.style.display !== 'none') {
-        var t = e.target;
         if (!p.contains(t) && t !== document.getElementById('addDate') && t !== document.getElementById('addEndDate')) {
             p.style.display = 'none';
+        }
+    }
+    var r = document.getElementById('repeatOptions');
+    if (r && r.style.display !== 'none') {
+        if (!r.contains(t) && t !== document.getElementById('btnRepeat')) {
+            r.style.display = 'none';
         }
     }
 });
