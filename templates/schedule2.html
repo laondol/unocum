@@ -182,7 +182,7 @@ function showDay(date) {
             if (m) accomm = '<br>🏠 숙소: '+m[1];
         }
         h += '<div class="border-bottom py-1 mb-1 small"><strong>'+badge+' '+s.title+'</strong><br>🕐 '+time+loc+accomm+'<br>';
-        if ((s.title && (s.title.includes('이동') || s.title.includes('귀가'))) && s.content) {
+        if ((s.title && (s.title.includes('이동') || s.title.includes('집으로'))) && s.content) {
             try {
                 var r = JSON.parse(s.content);
                 if (r && r.from_lat && r.to_lat) {
@@ -211,7 +211,7 @@ function showDay(date) {
                     var fromLng = parseFloat(r.from_lng).toFixed(7);
                     var toLat = parseFloat(r.to_lat).toFixed(7);
                     var toLng = parseFloat(r.to_lng).toFixed(7);
-                    var dataParam = arrTs ? '!3m1!4b1!4m6!4m5!2m3!6e1!7e2!8j'+arrTs+'!3e3' : '!3m1!4b1!4m6!4m5!2m3!6e1!7e2!3e3';
+                    var dataParam = arrTs ? '!3m1!4b1!4m4!4m3!2m1!6e2!3e3' : '!3m1!4b1!4m6!4m5!2m3!6e1!7e2!3e3';
                     h += '<a class="btn btn-sm btn-outline-danger py-0" target="_blank" href="https://www.google.co.kr/maps/dir/'+fromLat+','+fromLng+'/'+toLat+','+toLng+'/data='+dataParam+'">🌐Google</a>';
                     h += '<a class="btn btn-sm btn-outline-info py-0" target="_blank" href="https://map.naver.com/p/directions/'+r.from_lng+','+r.from_lat+','+dl+'/'+r.to_lng+','+r.to_lat+','+al+'/-/transit">🗺️네이버</a>';
                     h += '<a class="btn btn-sm btn-outline-success py-0" target="_blank" href="https://map.kakao.com/link/by/traffic/'+dl+','+r.from_lat+','+r.from_lng+'/'+al+','+r.to_lat+','+r.to_lng+'">📱카카오</a>';
