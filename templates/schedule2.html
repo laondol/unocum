@@ -361,7 +361,8 @@ function setRepeatOptionsVisible(v) {
     b.classList.toggle('btn-outline-secondary', !v);
 }
 function toggleRepeat() {
-    setRepeatOptionsVisible(document.getElementById('repeatOptions').style.display === 'none');
+    repeatOn = !repeatOn;
+    setRepeatOptionsVisible(repeatOn);
 }
 function closeRepeatOptions() {
     document.getElementById('repeatOptions').style.display = 'none';
