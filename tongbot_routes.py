@@ -1249,20 +1249,28 @@ def _ensure_day_routes(uid, evt_date, exclude_ids=None):
             plan_home.update({"from_lat":last_lat,"from_lng":last_lng,"to_lat":return_lat,"to_lng":return_lng})
             _compact_home = format_memo_compact(plan_home)
             plan_home["compact"] = _compact_home
-            ret_dep = datetime(evt_date.year, evt_date.month, evt_date.day,
-                int(plan_home['departure'].split(':')[0]), int(plan_home['departure'].split(':')[1]))
-            last_end = last_evt.end_date or (last_evt.event_date + timedelta(hours=1))
-            if ret_dep < last_end:
-                ret_dep = last_end + timedelta(minutes=5)
-            ret_arr = ret_dep + timedelta(minutes=plan_home['total_min'])
-            home_return = TongBotSchedule(user_id=uid, title=return_title,
-                description=format_itinerary(plan_home),
-                content=json.dumps(plan_home, ensure_ascii=False),
-                event_date=ret_dep, end_date=ret_arr, location=return_dest,
-                memo=_compact_home, departure_location=last_loc, return_location=return_dest)
-            db.session.add(home_return)
-            db.session.flush()
-            auto_created.append({"id":home_return.id,"title":return_title,"type":"return","departure":ret_dep.strftime("%H:%M"),"arrival":ret_arr.strftime("%H:%M")})
+            dep_raw = plan_home.get('departure') or ''
+            try:
+                _hh, _mm = dep_raw.split(':')[:2]
+                _hh = int(_hh); _mm = int(_mm)
+                if not (0 <= _hh < 24 and 0 <= _mm < 60):
+                    raise ValueError
+                ret_dep = datetime(evt_date.year, evt_date.month, evt_date.day, _hh, _mm)
+            except (ValueError, TypeError, AttributeError, IndexError):
+                ret_dep = None
+            if ret_dep:
+                last_end = last_evt.end_date or (last_evt.event_date + timedelta(hours=1))
+                if ret_dep < last_end:
+                    ret_dep = last_end + timedelta(minutes=5)
+                ret_arr = ret_dep + timedelta(minutes=plan_home['total_min'])
+                home_return = TongBotSchedule(user_id=uid, title=return_title,
+                    description=format_itinerary(plan_home),
+                    content=json.dumps(plan_home, ensure_ascii=False),
+                    event_date=ret_dep, end_date=ret_arr, location=return_dest,
+                    memo=_compact_home, departure_location=last_loc, return_location=return_dest)
+                db.session.add(home_return)
+                db.session.flush()
+                auto_created.append({"id":home_return.id,"title":return_title,"type":"return","departure":ret_dep.strftime("%H:%M"),"arrival":ret_arr.strftime("%H:%M")})
     return auto_created
 
 @tongbot_bp.route('/api/bot/schedule', methods=['GET', 'POST'])
@@ -1335,26 +1343,26 @@ def bot_schedule():
                     if rt == 'daily':
                         if (cur - start_dt).days % interval == 0:
                             do_emit = True
-                        cur += timedelta(days=1)
+                        nxt = cur + timedelta(days=1)
                     elif rt == 'weekly':
                         if cur.weekday() == start_dt.weekday() and ((cur - start_dt).days // 7) % interval == 0:
                             do_emit = True
-                        cur += timedelta(days=1)
+                        nxt = cur + timedelta(days=1)
                     elif rt == 'monthly':
                         if cur.day == start_dt.day:
                             months = (cur.year - start_dt.year) * 12 + (cur.month - start_dt.month)
                             if months % interval == 0:
                                 do_emit = True
-                            cur = _add_months(cur, 1)
+                            nxt = _add_months(cur, 1)
                         else:
-                            cur += timedelta(days=1)
+                            nxt = cur + timedelta(days=1)
                     elif rt == 'yearly':
                         if cur.month == start_dt.month and cur.day == start_dt.day:
                             if (cur.year - start_dt.year) % interval == 0:
                                 do_emit = True
-                            cur = _add_months(cur, 12)
+                            nxt = _add_months(cur, 12)
                         else:
-                            cur += timedelta(days=1)
+                            nxt = cur + timedelta(days=1)
                     if do_emit:
                         emitted['n'] += 1
                         new_item = dict(rit)
@@ -1363,6 +1371,7 @@ def bot_schedule():
                         if rit.get('end_date'):
                             new_item['end_date'] = cur.strftime('%Y-%m-%d') + rit['end_date'][10:]
                         result_list.append(new_item)
+                    cur = nxt
             except:
                 pass
         return jsonify({"schedules": result_list})
