@@ -568,7 +568,7 @@ def register_routes(app):
                 else:
                     u.last_payout = now
                     db.session.commit()
-                return redirect(next_url or url_for('user_profile', user_id=u.id))
+                return redirect(next_url or '/user/my')
             return "<script>alert('로그인 정보 오류'); history.back();</script>"
         return render_template('login.html', next=next_url)
 
