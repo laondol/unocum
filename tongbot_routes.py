@@ -399,10 +399,10 @@ def _resolve_location(location_name, uid):
                 # 소요시간: 사용자 집 → 장소 (transit.py 사용)
                 time_min = None
                 dist_km = None
-                if user and (user.curr_latitude or user.latitude):
+                if user and (user.curr_latitude or user.reg_latitude):
                     from services.transit import haversine_km
-                    home_lat = user.curr_latitude or user.latitude or 0
-                    home_lng = user.curr_longitude or user.longitude or 0
+                    home_lat = user.curr_latitude or user.reg_latitude or 0
+                    home_lng = user.curr_longitude or user.reg_longitude or 0
                     if home_lat and home_lng:
                         dist_km = haversine_km(home_lat, home_lng, lat, lng)
                         time_min = round(dist_km * 15)
@@ -789,7 +789,7 @@ def _get_proactive_suggestions(user, msg):
     suggestions = []
     now = datetime.now(KST)
     h = now.hour
-    has_home = bool(user.curr_latitude or user.latitude)
+    has_home = bool(user.curr_latitude or user.reg_latitude)
 
     # 시간대별 추천
     if 7 <= h <= 9:
@@ -924,8 +924,8 @@ def bot_schedule_ai_internal(uid, msg, user, bot=None):
             user_home = User.query.get(uid)
             if s.location and user_home:
                 loc_lat, loc_lng = _geocode_location(s.location)
-                home_lat = user_home.curr_latitude or user_home.latitude
-                home_lng = user_home.curr_longitude or user_home.longitude
+                home_lat = user_home.curr_latitude or user_home.reg_latitude
+                home_lng = user_home.curr_longitude or user_home.reg_longitude
                 if loc_lat and home_lat:
                     from services.transit import haversine_km
                     d = haversine_km(home_lat, home_lng, loc_lat, loc_lng)
@@ -1098,8 +1098,8 @@ def bot_schedule_calc_time():
     event_time = data.get('event_time','')
     if not loc: return jsonify({})
     user = User.query.get(uid)
-    home_lat = user.curr_latitude or user.latitude or 0
-    home_lng = user.curr_longitude or user.longitude or 0
+    home_lat = user.curr_latitude or user.reg_latitude or 0
+    home_lng = user.curr_longitude or user.reg_longitude or 0
     if not home_lat:
         return jsonify({"error": "기본주소가 설정되지 않았습니다. 회원정보에서 이웃인증을 해주세요."})
     try:
@@ -1280,8 +1280,8 @@ def bot_schedule():
         return jsonify({"error": "로그인이 필요합니다."}), 401
     if request.method == 'GET':
         user = User.query.get(uid)
-        home_lat = user.curr_latitude or user.latitude
-        home_lng = user.curr_longitude or user.longitude
+        home_lat = user.curr_latitude or user.reg_latitude
+        home_lng = user.curr_longitude or user.reg_longitude
         schedules = TongBotSchedule.query.filter_by(user_id=uid).order_by(TongBotSchedule.event_date.asc()).limit(30).all()
         result_list = []
         for s in schedules:
