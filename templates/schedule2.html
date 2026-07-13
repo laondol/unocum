@@ -248,7 +248,7 @@ function showDay(date) {
                 }
             } catch(e){}
         }
-        h += '<br><button class="btn btn-sm btn-outline-secondary py-0 mt-1 me-1" onclick="editEvent('+s.id+')">✏️</button><button class="btn btn-sm btn-outline-danger py-0 mt-1" onclick="confirmDelete('+s.id+')">✕</button></div>';
+        h += '<br><button class="btn btn-sm btn-outline-secondary py-0 mt-1 me-1" onclick="editEvent(\'+s.id+\')">✏️</button><button class="btn btn-sm btn-outline-danger py-0 mt-1" onclick="confirmDelete(\'+s.id+\')">✕</button></div>';
     });
     el.innerHTML = h;
 }
@@ -259,7 +259,7 @@ function renderEventList() {
     el.innerHTML = schedules.map(s => {
         const badge = {'red':'🔴','blue':'🔵','green':'🟢','gray':'⚪'}[s.color||'gray']||'⚪';
         const time = s.event_date ? s.event_date.split(' ')[1].substring(0,5) : '';
-        return '<div class="border-bottom py-1"><strong>'+badge+' '+s.title+'</strong><br><small>🕐 '+time+'</small>'+(s.location?'<br><small>📍 '+s.location+'</small>':'')+'<br><button class="btn btn-sm btn-outline-secondary mt-1 me-1" onclick="editEvent('+s.id+')">✏️</button><button class="btn btn-sm btn-outline-danger mt-1" onclick="confirmDelete('+s.id+')">✕</button></div>';
+        return '<div class="border-bottom py-1"><strong>'+badge+' '+s.title+'</strong><br><small>🕐 '+time+'</small>'+(s.location?'<br><small>📍 '+s.location+'</small>':'')+'<br><button class="btn btn-sm btn-outline-secondary mt-1 me-1" onclick="editEvent(\'+s.id+\')">✏️</button><button class="btn btn-sm btn-outline-danger mt-1" onclick="confirmDelete(\'+s.id+\')">✕</button></div>';
     }).join('');
 }
 
@@ -279,11 +279,13 @@ function changeMonth(d) {
 }
 
 function editEvent(id) {
-    var s = schedules.find(function(x){return x.id === id;});
+    var sid = String(id);
+    var bid = sid.indexOf('_') >= 0 ? sid.split('_')[0] : sid;
+    var s = schedules.find(function(x){ return String(x.id) === bid; });
     if (!s) return;
     switchTab('add');
     document.querySelector('#tabAdd h6').textContent = '일정 수정';
-    document.getElementById('editId').value = id;
+    document.getElementById('editId').value = bid;
     document.getElementById('addTitle').value = s.title || '';
     if (s.event_date) {
         var parts = s.event_date.split(' ');
