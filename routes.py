@@ -2145,7 +2145,23 @@ def register_routes(app):
                     if u:
                         recent_friends.append({"id":u.id,"username":u.username,"name":u.real_name or u.username,"town":u.town or "","village":u.village or ""})
         
-        return _serve_react_share()
+        return render_template('user_profile.html', 
+            profile_user=user, 
+            point_history=point_history, 
+            messages=messages,
+            is_own=is_own,
+            is_admin=is_admin,
+            is_friend=is_friend,
+            bot_name=bot_name,
+            posts=posts,
+            share_images=share_images,
+            appointments=appt_list,
+            bot_memory=bot_memory,
+            bot_drafts=bot_drafts,
+            curr_location=curr_location,
+            recent_friends=recent_friends,
+            bot_message=bot_message
+        )
 
     @app.route('/user/location/refresh', methods=['POST'])
     def user_location_refresh():
