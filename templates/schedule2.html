@@ -18,6 +18,8 @@ body{background:#f8f9fa;font-size:0.9rem;}
 .cal-day.event-green::after{display:block;background:#198754;}
 .cal-day.event-gray::after{display:block;background:#adb5bd;}
 .cal-day.today.event-red::after,.cal-day.today.event-blue::after,.cal-day.today.event-green::after,.cal-day.today.event-gray::after{background:#fff;}
+.cal-day.selstart{background:#0d6efd;color:#fff;font-weight:bold;}
+.cal-day.cal-sel{background:#cfe2ff;}
 </style>
 </head>
 <body>
@@ -47,15 +49,15 @@ body{background:#f8f9fa;font-size:0.9rem;}
         <h6 class="mb-3">새 일정</h6>
         <input id="addTitle" class="form-control form-control-sm mb-2" placeholder="제목">
         <div class="row g-2 mb-2">
-            <div class="col-5"><label class="small">시작일</label><input type="date" id="addDate" class="form-control form-control-sm"></div>
-            <div class="col-4"><label class="small">시작시간</label><input type="time" id="addStart" class="form-control form-control-sm"></div>
-            <div class="col-3 d-flex align-items-end"><label class="small mb-0"><input type="checkbox" id="addAllDay" onchange="toggleAllDay()"> 종일</label></div>
+            <div class="col-4"><label class="small d-block">시작일</label><input type="date" id="addDate" class="form-control form-control-sm" onchange="addSelectingEnd=false; toggleAccommodation(); renderAddCal();"></div>
+            <div class="col-4"><label class="small d-block">시작시간</label><input type="time" id="addStart" class="form-control form-control-sm"></div>
+            <div class="col-4 d-flex align-items-end"><label class="small mb-0"><input type="checkbox" id="addAllDay" onchange="toggleAllDay()"> 종일</label></div>
         </div>
         <div class="row g-2 mb-2">
-            <div class="col-4"><label class="small">종료일</label><input type="date" id="addEndDate" class="form-control form-control-sm" onchange="toggleAccommodation()"></div>
-            <div class="col-4"><label class="small">종료시간</label><input type="time" id="addEnd" class="form-control form-control-sm"></div>
+            <div class="col-4"><label class="small d-block">종료일</label><input type="date" id="addEndDate" class="form-control form-control-sm" onchange="addSelectingEnd=false; toggleAccommodation(); renderAddCal();"></div>
+            <div class="col-4"><label class="small d-block">종료시간</label><input type="time" id="addEnd" class="form-control form-control-sm"></div>
             <div class="col-4 d-flex align-items-end gap-2" style="position:relative;">
-                <label class="small mb-0"><input type="checkbox" id="addRepeat" onchange="toggleRepeat()"> 반복</label>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnRepeat" onclick="toggleRepeat()">🔁 반복</button>
                 <div id="repeatOptions" style="display:none; position:absolute; top:100%; left:0; z-index:30; background:#fff; border:1px solid #ced4da; border-radius:8px; padding:8px; box-shadow:0 4px 12px rgba(0,0,0,.15);" class="d-flex gap-1 align-items-center flex-wrap">
                     <span class="small">매</span>
                     <input type="number" id="addRepeatInterval" class="form-control form-control-sm" style="width:64px;" min="1" max="365" value="1">
@@ -63,9 +65,19 @@ body{background:#f8f9fa;font-size:0.9rem;}
                     <label class="small"><input type="radio" name="repeatType" value="weekly"> 주</label>
                     <label class="small"><input type="radio" name="repeatType" value="monthly"> 월</label>
                     <label class="small"><input type="radio" name="repeatType" value="yearly"> 년</label>
-                    <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 ms-1" onclick="document.getElementById('repeatOptions').style.display='none'">확인</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 ms-1" onclick="closeRepeatOptions()">확인</button>
                 </div>
             </div>
+        </div>
+        <div class="mb-2">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addChangeMonth(-1)">◀</button>
+                <span id="addCalTitle" class="fw-bold small"></span>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addChangeMonth(1)">▶</button>
+            </div>
+            <div class="cal-grid mb-1"><div class="cal-header">일</div><div class="cal-header">월</div><div class="cal-header">화</div><div class="cal-header">수</div><div class="cal-header">목</div><div class="cal-header">금</div><div class="cal-header">토</div></div>
+            <div class="cal-grid mb-1" id="addCalGrid"></div>
+            <div class="small text-muted">날짜를 클릭하면 시작일, 다시 클릭하면 종료일이 지정됩니다.</div>
         </div>
         <input id="addLoc" class="form-control form-control-sm mb-2" placeholder="장소">
         <div id="accommodationSection" style="display:none;">
@@ -92,6 +104,7 @@ body{background:#f8f9fa;font-size:0.9rem;}
 
 <script>
 let calYear, calMonth, schedules = [], friends = [];
+let repeatOn = false, addSelectingEnd = false, addCalYear, addCalMonth;
 
 fetch('/api/chat/friends').then(r=>r.json()).then(d => {
     friends = d.friends || [];
@@ -123,6 +136,8 @@ function switchTab(t) {
         document.getElementById('saveBtn').textContent = '저장';
         document.querySelector('#tabAdd h6').textContent = '새 일정';
         document.getElementById('accommodationSection').style.display = 'none';
+        repeatOn = false; setRepeatOptionsVisible(false);
+        addSelectingEnd = false; renderAddCal();
     }
 }
 
@@ -300,8 +315,8 @@ function editEvent(id) {
         document.getElementById('accommodationSection').style.display = 'none';
     }
     document.getElementById('addAllDay').checked = s.is_allday || false;
-    document.getElementById('addRepeat').checked = s.is_recurring || false;
-    setRepeatOptionsVisible(s.is_recurring);
+    repeatOn = s.is_recurring || false;
+    setRepeatOptionsVisible(repeatOn);
     if (s.is_recurring && s.repeat_type) {
         var rbs = document.getElementsByName('repeatType');
         for (var i=0;i<rbs.length;i++) { rbs[i].checked = rbs[i].value === s.repeat_type; }
@@ -312,6 +327,7 @@ function editEvent(id) {
         _ed.setDate(_ed.getDate() - 1);
         document.getElementById('addEndDate').value = _ed.toISOString().slice(0,10);
     }
+    renderAddCal();
     toggleAllDay();
     document.getElementById('saveBtn').textContent = '수정';
 }
@@ -339,9 +355,61 @@ function toggleAllDay() {
 
 function setRepeatOptionsVisible(v) {
     document.getElementById('repeatOptions').style.display = v ? '' : 'none';
+    repeatOn = v;
+    var b = document.getElementById('btnRepeat');
+    b.classList.toggle('btn-primary', v);
+    b.classList.toggle('btn-outline-secondary', !v);
 }
 function toggleRepeat() {
-    setRepeatOptionsVisible(document.getElementById('addRepeat').checked);
+    setRepeatOptionsVisible(document.getElementById('repeatOptions').style.display === 'none');
+}
+function closeRepeatOptions() {
+    document.getElementById('repeatOptions').style.display = 'none';
+    var b = document.getElementById('btnRepeat');
+    b.classList.add('btn-primary');
+    b.classList.remove('btn-outline-secondary');
+}
+
+function renderAddCal() {
+    const now = new Date();
+    if (!addCalYear) { addCalYear = now.getFullYear(); addCalMonth = now.getMonth()+1; }
+    document.getElementById('addCalTitle').textContent = addCalYear+'년 '+addCalMonth+'월';
+    const firstDay = new Date(addCalYear, addCalMonth-1, 1).getDay();
+    const lastDate = new Date(addCalYear, addCalMonth, 0).getDate();
+    const sd = document.getElementById('addDate').value;
+    const ed = document.getElementById('addEndDate').value;
+    let html = '';
+    for (let i = 0; i < firstDay; i++) html += '<div></div>';
+    for (let d = 1; d <= lastDate; d++) {
+        const ds = addCalYear+'-'+String(addCalMonth).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+        const isToday = now.getFullYear()===addCalYear && now.getMonth()+1===addCalMonth && now.getDate()===d;
+        let cls = 'cal-day';
+        if (ds === sd || ds === ed) cls += ' selstart';
+        else if (sd && ed && ds > sd && ds < ed) cls += ' cal-sel';
+        if (isToday) cls += ' today';
+        html += '<div class="'+cls+'" onclick="addCalClick(\''+ds+'\')">'+d+'</div>';
+    }
+    document.getElementById('addCalGrid').innerHTML = html;
+}
+function addCalClick(ds) {
+    if (!addSelectingEnd) {
+        document.getElementById('addDate').value = ds;
+        document.getElementById('addEndDate').value = ds;
+        addSelectingEnd = true;
+    } else {
+        var sd = document.getElementById('addDate').value;
+        if (ds < sd) { document.getElementById('addEndDate').value = sd; document.getElementById('addDate').value = ds; }
+        else { document.getElementById('addEndDate').value = ds; }
+        addSelectingEnd = false;
+    }
+    toggleAccommodation();
+    renderAddCal();
+}
+function addChangeMonth(d) {
+    addCalMonth += d;
+    if (addCalMonth > 12) { addCalMonth = 1; addCalYear++; }
+    if (addCalMonth < 1) { addCalMonth = 12; addCalYear--; }
+    renderAddCal();
 }
 
 function saveEvent() {
@@ -355,7 +423,7 @@ function saveEvent() {
     var memo = document.getElementById('addMemo').value.trim();
     var accommodation = document.getElementById('addAccommodation').value.trim();
     var isAllDay = document.getElementById('addAllDay').checked;
-    var isRecurring = document.getElementById('addRepeat').checked;
+    var isRecurring = repeatOn;
     var repeatType = '';
     var repeatInterval = parseInt(document.getElementById('addRepeatInterval').value) || 1;
     var repeatInfinite = !!(isRecurring && endDate && endDate < date);
@@ -385,7 +453,7 @@ function saveEvent() {
                 if (el) el.value = '';
             });
             document.getElementById('addAllDay').checked = false;
-            document.getElementById('addRepeat').checked = false;
+            repeatOn = false;
             document.getElementById('addRepeatInterval').value = 1;
             setRepeatOptionsVisible(false);
             document.getElementById('addStart').disabled = false;
