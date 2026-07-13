@@ -1354,7 +1354,7 @@ def bot_schedule():
                     return dt.replace(year=y, month=m, day=min(dt.day, last))
                 emitted = {'n': 0}
                 cur = start_dt + timedelta(days=1)
-                while cur <= end_dt and emitted['n'] < 1000:
+                while cur <= end_dt and emitted['n'] < 120:
                     do_emit = False
                     if rt == 'daily':
                         if (cur - start_dt).days % interval == 0:
@@ -1519,6 +1519,15 @@ def schedule_popup():
     resp.headers['Pragma'] = 'no-cache'
     resp.headers['Expires'] = '0'
     return resp
+
+@tongbot_bp.route('/schedule2')
+def schedule_popup2():
+    resp = make_response(render_template('schedule2.html'))
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
+
 def schedule_popup():
     if not session.get('user_id'):
         return redirect(url_for('login', next='/schedule'))
