@@ -348,10 +348,9 @@ class TongBotSchedule(db.Model):
     is_allday = db.Column(db.Boolean, default=False)
     is_recurring = db.Column(db.Boolean, default=False)
     repeat_type = db.Column(db.String(20), default='')
+    repeat_end_date = db.Column(db.DateTime, nullable=True)
     repeat_interval = db.Column(db.Integer, default=1)
     repeat_infinite = db.Column(db.Boolean, default=False)
-    repeat_exceptions = db.Column(db.Text, default='')
-    repeat_end_date = db.Column(db.DateTime, nullable=True)
 
 class ChatRoom(db.Model):
     id = db.Column(db.Integer, primary_key=True)

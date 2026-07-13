@@ -903,7 +903,7 @@ def create_app():
             inspector = inspect(db.engine)
             sched_cols = [c['name'] for c in inspector.get_columns('tong_bot_schedule')]
             with db.engine.connect() as conn:
-                for col, ct in [('is_allday','BOOLEAN DEFAULT 0'),('is_recurring','BOOLEAN DEFAULT 0'),('repeat_type','VARCHAR(20) DEFAULT \'\''),('repeat_interval','INTEGER DEFAULT 1'),('repeat_infinite','BOOLEAN DEFAULT 0'),('repeat_exceptions','TEXT'),('repeat_end_date','TIMESTAMP')]:
+                for col, ct in [('is_allday','BOOLEAN DEFAULT 0'),('is_recurring','BOOLEAN DEFAULT 0'),('repeat_type','VARCHAR(20) DEFAULT \'\''),('repeat_end_date','TIMESTAMP'),('repeat_interval','INTEGER DEFAULT 1'),('repeat_infinite','BOOLEAN DEFAULT 0')]:
                     if col not in sched_cols:
                         conn.execute(db.text(f'ALTER TABLE tong_bot_schedule ADD COLUMN {col} {ct}'))
                         conn.commit()
