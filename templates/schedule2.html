@@ -45,16 +45,16 @@ body{background:#f8f9fa;font-size:0.9rem;}
 
 <!-- 추가 탭 -->
 <div id="tabAdd" style="display:none;">
-    <div class="card p-3">
+    <div class="card p-3" style="position:relative">
         <h6 class="mb-3">새 일정</h6>
         <input id="addTitle" class="form-control form-control-sm mb-2" placeholder="제목">
         <div class="row g-2 mb-2">
-            <div class="col-4"><label class="small d-block">시작일</label><input type="date" id="addDate" class="form-control form-control-sm" onchange="addSelectingEnd=false; toggleAccommodation(); renderAddCal();"></div>
+            <div class="col-4"><label class="small d-block">시작일</label><input type="date" id="addDate" class="form-control form-control-sm" onfocus="showAddCal('start', this)" onclick="showAddCal('start', this)" onchange="toggleAccommodation();"></div>
             <div class="col-4"><label class="small d-block">시작시간</label><input type="time" id="addStart" class="form-control form-control-sm"></div>
             <div class="col-4 d-flex align-items-end"><label class="small mb-0"><input type="checkbox" id="addAllDay" onchange="toggleAllDay()"> 종일</label></div>
         </div>
         <div class="row g-2 mb-2">
-            <div class="col-4"><label class="small d-block">종료일</label><input type="date" id="addEndDate" class="form-control form-control-sm" onchange="addSelectingEnd=false; toggleAccommodation(); renderAddCal();"></div>
+            <div class="col-4"><label class="small d-block">종료일</label><input type="date" id="addEndDate" class="form-control form-control-sm" onfocus="showAddCal('end', this)" onclick="showAddCal('end', this)" onchange="toggleAccommodation();"></div>
             <div class="col-4"><label class="small d-block">종료시간</label><input type="time" id="addEnd" class="form-control form-control-sm"></div>
             <div class="col-4 d-flex align-items-end gap-2" style="position:relative;">
                 <button type="button" class="btn btn-sm btn-outline-secondary" id="btnRepeat" onclick="toggleRepeat()">🔁 반복</button>
@@ -69,7 +69,7 @@ body{background:#f8f9fa;font-size:0.9rem;}
                 </div>
             </div>
         </div>
-        <div class="mb-2">
+        <div id="addCalPopup" style="display:none; position:absolute; z-index:40; background:#fff; border:1px solid #ced4da; border-radius:8px; padding:8px; box-shadow:0 4px 12px rgba(0,0,0,.15); width:260px;">
             <div class="d-flex justify-content-between align-items-center mb-1">
                 <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addChangeMonth(-1)">◀</button>
                 <span id="addCalTitle" class="fw-bold small"></span>
@@ -77,7 +77,7 @@ body{background:#f8f9fa;font-size:0.9rem;}
             </div>
             <div class="cal-grid mb-1"><div class="cal-header">일</div><div class="cal-header">월</div><div class="cal-header">화</div><div class="cal-header">수</div><div class="cal-header">목</div><div class="cal-header">금</div><div class="cal-header">토</div></div>
             <div class="cal-grid mb-1" id="addCalGrid"></div>
-            <div class="small text-muted">날짜를 클릭하면 시작일, 다시 클릭하면 종료일이 지정됩니다.</div>
+            <div class="small text-muted" id="addCalHint"></div>
         </div>
         <input id="addLoc" class="form-control form-control-sm mb-2" placeholder="장소">
         <div id="accommodationSection" style="display:none;">
@@ -104,7 +104,7 @@ body{background:#f8f9fa;font-size:0.9rem;}
 
 <script>
 let calYear, calMonth, schedules = [], friends = [];
-let repeatOn = false, addSelectingEnd = false, addCalYear, addCalMonth;
+let repeatOn = false, addCalMode = 'start', addCalYear, addCalMonth;
 
 fetch('/api/chat/friends').then(r=>r.json()).then(d => {
     friends = d.friends || [];
@@ -137,7 +137,7 @@ function switchTab(t) {
         document.querySelector('#tabAdd h6').textContent = '새 일정';
         document.getElementById('accommodationSection').style.display = 'none';
         repeatOn = false; setRepeatOptionsVisible(false);
-        addSelectingEnd = false; renderAddCal();
+        document.getElementById('addCalPopup').style.display = 'none';
     }
 }
 
@@ -391,16 +391,22 @@ function renderAddCal() {
     }
     document.getElementById('addCalGrid').innerHTML = html;
 }
+function showAddCal(mode, inputEl) {
+    addCalMode = mode;
+    var popup = document.getElementById('addCalPopup');
+    if (inputEl && inputEl.offsetParent) {
+        popup.style.top = (inputEl.offsetTop + inputEl.offsetHeight + 4) + 'px';
+        popup.style.left = inputEl.offsetLeft + 'px';
+    }
+    document.getElementById('addCalHint').textContent = (mode === 'start' ? '시작일' : '종료일') + '을 선택하세요. 시작일보다 앞으로 정하면 무한반복됩니다.';
+    renderAddCal();
+    popup.style.display = '';
+}
 function addCalClick(ds) {
-    if (!addSelectingEnd) {
+    if (addCalMode === 'start') {
         document.getElementById('addDate').value = ds;
-        document.getElementById('addEndDate').value = ds;
-        addSelectingEnd = true;
     } else {
-        var sd = document.getElementById('addDate').value;
-        if (ds < sd) { document.getElementById('addEndDate').value = sd; document.getElementById('addDate').value = ds; }
-        else { document.getElementById('addEndDate').value = ds; }
-        addSelectingEnd = false;
+        document.getElementById('addEndDate').value = ds;
     }
     toggleAccommodation();
     renderAddCal();
@@ -411,6 +417,15 @@ function addChangeMonth(d) {
     if (addCalMonth < 1) { addCalMonth = 12; addCalYear--; }
     renderAddCal();
 }
+document.addEventListener('click', function(e){
+    var p = document.getElementById('addCalPopup');
+    if (p && p.style.display !== 'none') {
+        var t = e.target;
+        if (!p.contains(t) && t !== document.getElementById('addDate') && t !== document.getElementById('addEndDate')) {
+            p.style.display = 'none';
+        }
+    }
+});
 
 function saveEvent() {
     var id = document.getElementById('editId').value;
