@@ -569,7 +569,7 @@ def register_routes(app):
                     u.last_payout = now
                     db.session.commit()
                 return redirect(next_url or '/user/my')
-            return "<script>alert('로그인 정보 오류'); history.back();</script>"
+            return render_template('login.html', next=next_url, error='로그인 정보가 올바르지 않습니다.')
         return render_template('login.html', next=next_url)
 
     @app.route('/logout')

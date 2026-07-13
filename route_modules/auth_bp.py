@@ -156,7 +156,7 @@ def login():
             else:
                 u.last_payout = now; db.session.commit()
             return redirect(next_url or url_for('user.profile', user_id=u.id))
-        return "<script>alert('로그인 정보 오류'); history.back();</script>"
+            return render_template('login.html', next=next_url, error='로그인 정보가 올바르지 않습니다.')
     return render_template('login.html', next=next_url)
 
 @auth_bp.route('/logout')
