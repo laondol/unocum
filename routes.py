@@ -66,6 +66,10 @@ def register_routes(app):
         resp.headers['X-Frame-Options'] = 'SAMEORIGIN'
         resp.headers['X-XSS-Protection'] = '1; mode=block'
         resp.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        if resp.mimetype == 'text/html':
+            resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            resp.headers['Pragma'] = 'no-cache'
+            resp.headers['Expires'] = '0'
         return resp
 
     # React 공유마당 SPA (frontend/dist/index.html)
