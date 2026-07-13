@@ -1301,6 +1301,7 @@ def bot_schedule():
                 "repeat_type": s.repeat_type or '',
                 "repeat_interval": s.repeat_interval or 1,
                 "repeat_infinite": s.repeat_infinite or False,
+                "exceptions": s.repeat_exceptions or '',
             }
             is_move = '이동' in s.title or '귀가' in s.title
             evt = s.event_date
@@ -1318,16 +1319,31 @@ def bot_schedule():
 
         # Expand recurring events
         recurring_items = [it for it in result_list if it.get('is_recurring') and (it.get('end_date') or it.get('repeat_infinite'))]
+        # base 발생일이 예외에 있으면 원본(base) 항목 숨김
+        _remove_ids = set()
+        for rit in recurring_items:
+            try:
+                _exc = set(json.loads(rit.get('exceptions') or '[]'))
+                if rit['event_date'][:10] in _exc:
+                    _remove_ids.add(rit['id'])
+            except:
+                pass
+        if _remove_ids:
+            result_list = [it for it in result_list if it['id'] not in _remove_ids]
         for rit in recurring_items:
             base_s = next(s for s in schedules if s.id == rit['id'])
             try:
                 from datetime import timedelta
                 import calendar as _cal
+                import json as _json
                 start_dt = datetime.strptime(rit['event_date'][:10], '%Y-%m-%d')
                 if rit.get('repeat_infinite'):
                     end_dt = datetime(2999, 12, 31)
                 else:
                     end_dt = datetime.strptime((rit.get('end_date') or '')[:10], '%Y-%m-%d')
+                exc = set()
+                try: exc = set(_json.loads(rit.get('exceptions') or '[]'))
+                except: pass
                 rt = rit['repeat_type']
                 interval = int(rit.get('repeat_interval') or 1) or 1
                 def _add_months(dt, n):
@@ -1363,7 +1379,7 @@ def bot_schedule():
                             nxt = _add_months(cur, 12)
                         else:
                             nxt = cur + timedelta(days=1)
-                    if do_emit:
+                    if do_emit and cur.strftime('%Y-%m-%d') not in exc:
                         emitted['n'] += 1
                         new_item = dict(rit)
                         new_item['id'] = f"{rit['id']}_{cur.strftime('%Y%m%d')}"
@@ -1458,8 +1474,36 @@ def bot_schedule_delete():
     data = request.get_json()
     s = TongBotSchedule.query.get(data.get('id'))
     if not s or s.user_id != uid: return jsonify({"error":"권한없음"}),403
-    evt_date = s.event_date
+    mode = data.get('mode', 'all')
+    occ_date = data.get('date')
     is_move = s.title and ('이동' in s.title or '귀가' in s.title)
+    # 반복 일정 분할 삭제
+    if s.is_recurring and occ_date and mode in ('this_after', 'this_only'):
+        try:
+            occ = datetime.strptime(occ_date[:10], '%Y-%m-%d')
+        except:
+            occ = None
+        start = s.event_date
+        if mode == 'this_only' and occ:
+            import json as _json
+            exc = []
+            try: exc = _json.loads(s.repeat_exceptions or '[]')
+            except: exc = []
+            if occ_date[:10] not in exc:
+                exc.append(occ_date[:10])
+            s.repeat_exceptions = _json.dumps(exc, ensure_ascii=False)
+            db.session.commit()
+            return jsonify({"success": True})
+        if mode == 'this_after':
+            if not occ or (start and occ <= start):
+                pass  # 시작일 포함 이후 = 전체 삭제로 진행
+            else:
+                s.end_date = occ - timedelta(days=1)
+                s.repeat_infinite = False
+                db.session.commit()
+                return jsonify({"success": True})
+    # 전체 삭제 (기본)
+    evt_date = s.event_date
     db.session.delete(s)
     db.session.flush()
     auto_created = []

@@ -248,7 +248,7 @@ function showDay(date) {
                 }
             } catch(e){}
         }
-        h += '<br><button class="btn btn-sm btn-outline-secondary py-0 mt-1 me-1" onclick="editEvent('+s.id+')">✏️</button><button class="btn btn-sm btn-outline-danger py-0 mt-1" onclick="deleteEvent('+s.id+')">✕</button></div>';
+        h += '<br><button class="btn btn-sm btn-outline-secondary py-0 mt-1 me-1" onclick="editEvent('+s.id+')">✏️</button><button class="btn btn-sm btn-outline-danger py-0 mt-1" onclick="confirmDelete('+s.id+')">✕</button></div>';
     });
     el.innerHTML = h;
 }
@@ -259,7 +259,7 @@ function renderEventList() {
     el.innerHTML = schedules.map(s => {
         const badge = {'red':'🔴','blue':'🔵','green':'🟢','gray':'⚪'}[s.color||'gray']||'⚪';
         const time = s.event_date ? s.event_date.split(' ')[1].substring(0,5) : '';
-        return '<div class="border-bottom py-1"><strong>'+badge+' '+s.title+'</strong><br><small>🕐 '+time+'</small>'+(s.location?'<br><small>📍 '+s.location+'</small>':'')+'<br><button class="btn btn-sm btn-outline-secondary mt-1 me-1" onclick="editEvent('+s.id+')">✏️</button><button class="btn btn-sm btn-outline-danger mt-1" onclick="deleteEvent('+s.id+')">✕</button></div>';
+        return '<div class="border-bottom py-1"><strong>'+badge+' '+s.title+'</strong><br><small>🕐 '+time+'</small>'+(s.location?'<br><small>📍 '+s.location+'</small>':'')+'<br><button class="btn btn-sm btn-outline-secondary mt-1 me-1" onclick="editEvent('+s.id+')">✏️</button><button class="btn btn-sm btn-outline-danger mt-1" onclick="confirmDelete('+s.id+')">✕</button></div>';
     }).join('');
 }
 
@@ -498,16 +498,54 @@ function saveEvent() {
     });
 }
 
-function deleteEvent(id) {
-    if (confirm('삭제할까요?')) {
-        fetch('/api/bot/schedule/delete', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id:id})})
-        .then(function(r){ return r.json(); }).then(function(d){
-            if (d.success) loadEvents();
-        });
+function deleteEvent(id, mode, date) {
+    var body = { id: id };
+    if (mode) body.mode = mode;
+    if (date) body.date = date;
+    fetch('/api/bot/schedule/delete', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
+    .then(function(r){ return r.json(); }).then(function(d){
+        if (d.success) loadEvents();
+    });
+}
+
+var delPending = null;
+function confirmDelete(id) {
+    var ev = null;
+    for (var i=0;i<schedules.length;i++){ if (String(schedules[i].id)===String(id)) { ev = schedules[i]; break; } }
+    if (!ev) return;
+    if (ev.is_recurring) {
+        var baseId = id, date = (ev.event_date||'').slice(0,10);
+        var sid = String(id);
+        if (sid.indexOf('_') >= 0) {
+            var parts = sid.split('_');
+            baseId = parts[0];
+            date = parts[1].replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
+        }
+        delPending = { baseId: baseId, date: date };
+        document.getElementById('delModal').style.display = 'flex';
+    } else {
+        if (confirm('삭제할까요?')) deleteEvent(id, 'all', null);
     }
+}
+function closeDel() { document.getElementById('delModal').style.display = 'none'; delPending = null; }
+function doDelete(mode) {
+    if (!delPending) return;
+    var p = delPending;
+    closeDel();
+    deleteEvent(p.baseId, mode, p.date);
 }
 
 
 </script>
+<div id="delModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:50; align-items:center; justify-content:center;">
+  <div style="background:#fff; border-radius:12px; padding:16px; width:280px; max-width:90%; box-shadow:0 8px 24px rgba(0,0,0,.2);">
+    <div class="fw-bold mb-1">반복 일정 삭제</div>
+    <div class="small text-muted mb-3">어떤 범위를 삭제할까요?</div>
+    <button type="button" class="btn btn-sm btn-danger w-100 mb-2" onclick="doDelete('all')">전체 삭제</button>
+    <button type="button" class="btn btn-sm btn-outline-danger w-100 mb-2" onclick="doDelete('this_after')">이 일정 포함 이후 삭제</button>
+    <button type="button" class="btn btn-sm btn-outline-secondary w-100 mb-2" onclick="doDelete('this_only')">이 일정만 삭제</button>
+    <button type="button" class="btn btn-sm btn-light w-100" onclick="closeDel()">취소</button>
+  </div>
+</div>
 </body>
 </html>

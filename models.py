@@ -351,6 +351,7 @@ class TongBotSchedule(db.Model):
     repeat_end_date = db.Column(db.DateTime, nullable=True)
     repeat_interval = db.Column(db.Integer, default=1)
     repeat_infinite = db.Column(db.Boolean, default=False)
+    repeat_exceptions = db.Column(db.Text, default='')  # JSON list of 'YYYY-MM-DD' dates to skip
 
 class ChatRoom(db.Model):
     id = db.Column(db.Integer, primary_key=True)

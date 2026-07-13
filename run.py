@@ -77,6 +77,16 @@ def create_app():
                         print('[OK] message.attachment column added')
             except:
                 pass
+            # TongBotSchedule.repeat_exceptions 컬럼
+            try:
+                tbl_cols = [c['name'] for c in _inspector.get_columns('tongbot_schedule')]
+                if 'repeat_exceptions' not in tbl_cols:
+                    with db.engine.connect() as conn:
+                        conn.execute(db.text('ALTER TABLE tongbot_schedule ADD COLUMN repeat_exceptions TEXT DEFAULT \'\''))
+                        conn.commit()
+                        print('[OK] tongbot_schedule.repeat_exceptions column added')
+            except:
+                pass
         except Exception as e:
             print(f'[SKIP] critical column migration: {e}')
     
