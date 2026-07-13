@@ -1,6 +1,6 @@
 import random, string, re, requests, json
 from sqlalchemy import or_
-from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template, current_app
+from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template, current_app, make_response
 from models import db, User, TongBot, TongBotDraft, TongBotSchedule, ChatRoom, ChatMessage, Message, FriendCache, BotKnowledge, StoreInfo, ShareReport, SharedRoute
 from datetime import datetime, timedelta, timezone
 import os, uuid
@@ -1527,7 +1527,11 @@ def bot_schedule_delete():
     return jsonify({"success":True, "auto_created": auto_created})
 @tongbot_bp.route('/schedule')
 def schedule_popup():
-    return render_template('schedule2.html')
+    resp = make_response(render_template('schedule2.html'))
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
 def schedule_popup():
     if not session.get('user_id'):
         return redirect(url_for('login', next='/schedule'))
