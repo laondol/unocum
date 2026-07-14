@@ -176,7 +176,7 @@
         </div>
         <div id="scheduleList">
             {% for s in schedules %}
-            <div class="card mb-2"><div class="card-body p-2 small"><strong>{{ s.title }}</strong><span class="text-muted ms-2">{{ s.event_date.strftime('%Y-%m-%d %H:%M') if s.event_date else '' }}</span>{% if s.description %}<br>{{ s.description }}{% endif %}</div></div>
+            <div class="card mb-2"><div class="card-body p-2 small"><strong>{{ s.title }}</strong><span class="text-muted ms-2">{{ s.event_date.strftime('%Y-%m-%d %H:%M') if s.event_date else '' }}</span>{% set sm = s.memo or s.description %}{% if sm %}<br>{{ sm }}{% endif %}</div></div>
             {% endfor %}
             {% if not schedules %}<div class="text-muted text-center py-3">등록된 일정이 없습니다.</div>{% endif %}
         </div>

@@ -11,15 +11,19 @@ body{background:#f8f9fa;font-size:0.9rem;}
 .cal-header{text-align:center;font-size:0.75rem;font-weight:bold;color:#6c757d;padding:4px;}
 .cal-day{text-align:center;padding:8px 4px;border-radius:8px;cursor:pointer;font-size:0.85rem;position:relative;}
 .cal-day:hover{background:#e9ecef;}
-.cal-day.today{background:#0d6efd;color:#fff;font-weight:bold;}
+.cal-day.today{background:#d4f4ec;color:#0d6e5e;font-weight:bold;}
 .cal-day::after{content:'';display:none;width:6px;height:6px;border-radius:50%;margin:3px auto 0;}
 .cal-day.event-red::after{display:block;background:#dc3545;}
 .cal-day.event-blue::after{display:block;background:#0d6efd;}
 .cal-day.event-green::after{display:block;background:#198754;}
 .cal-day.event-gray::after{display:block;background:#adb5bd;}
-.cal-day.today.event-red::after,.cal-day.today.event-blue::after,.cal-day.today.event-green::after,.cal-day.today.event-gray::after{background:#fff;}
+.cal-day.today.event-red::after,.cal-day.today.event-blue::after,.cal-day.today.event-green::after,.cal-day.today.event-gray::after{background:#0d6e5e;}
 .cal-day.selstart{background:#0d6efd;color:#fff;font-weight:bold;}
 .cal-day.cal-sel{background:#cfe2ff;}
+.cal-day.selected{background:#0d6efd;color:#fff;font-weight:bold;border-radius:50%;width:30px;height:30px;line-height:30px;margin:0 auto;}
+.cal-day.selected::after{background:#fff;}
+.cal-day.today.selected{background:#0d6efd;color:#fff;}
+.cal-day.today.selected::after{background:#fff;}
 </style>
 </head>
 <body>
@@ -27,7 +31,9 @@ body{background:#f8f9fa;font-size:0.9rem;}
 <div class="d-flex gap-2 mb-3">
     <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('view')">📅 달력</button>
     <button class="btn btn-sm btn-success" onclick="switchTab('add')" id="btnAdd">➕ 일정등록</button>
+    <button class="btn btn-sm btn-outline-secondary ms-auto position-relative" onclick="toggleBell()">🔔<span id="bellBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none; font-size:0.6rem;">0</span></button>
 </div>
+<div id="bellPanel" class="card p-2 shadow" style="display:none; position:fixed; right:10px; top:54px; z-index:70; width:280px; max-height:60vh; overflow:auto;"></div>
 
 <!-- 달력 탭 -->
 <div id="tabView">
@@ -65,9 +71,55 @@ body{background:#f8f9fa;font-size:0.9rem;}
                     <label class="small"><input type="radio" name="repeatType" value="weekly"> 주</label>
                     <label class="small"><input type="radio" name="repeatType" value="monthly"> 월</label>
                     <label class="small"><input type="radio" name="repeatType" value="yearly"> 년</label>
-                    <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 ms-1" onclick="closeRepeatOptions()">확인</button>
+                        <div class="border-top mt-1 pt-1 w-100">
+                            <div class="small fw-bold mb-1">요일 반복 (체크 시 날짜반복 무시)</div>
+                            <div class="d-flex gap-1 flex-wrap">
+                                <label class="small"><input type="checkbox" class="wd-cb" value="0" onchange="updateRepeatMode()"> 월</label>
+                                <label class="small"><input type="checkbox" class="wd-cb" value="1" onchange="updateRepeatMode()"> 화</label>
+                                <label class="small"><input type="checkbox" class="wd-cb" value="2" onchange="updateRepeatMode()"> 수</label>
+                                <label class="small"><input type="checkbox" class="wd-cb" value="3" onchange="updateRepeatMode()"> 목</label>
+                                <label class="small"><input type="checkbox" class="wd-cb" value="4" onchange="updateRepeatMode()"> 금</label>
+                                <label class="small"><input type="checkbox" class="wd-cb" value="5" onchange="updateRepeatMode()"> 토</label>
+                                <label class="small"><input type="checkbox" class="wd-cb" value="6" onchange="updateRepeatMode()"> 일</label>
+                            </div>
+                            <div class="d-flex align-items-center gap-1 mt-1">
+                                <span class="small">매</span>
+                                <select id="addRepeatWeekOfMonth" class="form-select form-select-sm" style="width:auto;">
+                                    <option value="0">매주</option>
+                                    <option value="1">1번째</option>
+                                    <option value="2">2번째</option>
+                                    <option value="3">3번째</option>
+                                    <option value="4">4번째</option>
+                                    <option value="5">5번째</option>
+                                </select>
+                                <span class="small">요일</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-1 mt-1">
+                                <span class="small">매년</span>
+                                <select id="addRepeatMonthOfYear" class="form-select form-select-sm" style="width:auto;">
+                                    <option value="0">매년 아님</option>
+                                    <option value="1">1월</option>
+                                    <option value="2">2월</option>
+                                    <option value="3">3월</option>
+                                    <option value="4">4월</option>
+                                    <option value="5">5월</option>
+                                    <option value="6">6월</option>
+                                    <option value="7">7월</option>
+                                    <option value="8">8월</option>
+                                    <option value="9">9월</option>
+                                    <option value="10">10월</option>
+                                    <option value="11">11월</option>
+                                    <option value="12">12월</option>
+                                </select>
+                                <span class="small">에만</span>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 ms-1" onclick="closeRepeatOptions()">확인</button>
                 </div>
             </div>
+        </div>
+        <div class="row g-2 mb-2">
+            <div class="col-6"><label class="small d-block">알림</label><select id="addReminder" class="form-control form-control-sm"><option value="0">알림 안 함</option><option value="10">10분 전</option><option value="30">30분 전</option><option value="60">1시간 전</option><option value="1440">1일 전</option></select></div>
         </div>
         <div id="addCalPopup" style="display:none; position:absolute; z-index:40; background:#fff; border:1px solid #ced4da; border-radius:8px; padding:8px; box-shadow:0 4px 12px rgba(0,0,0,.15); width:260px;">
             <div class="d-flex justify-content-between align-items-center mb-1">
@@ -83,7 +135,32 @@ body{background:#f8f9fa;font-size:0.9rem;}
         <div id="accommodationSection" style="display:none;">
             <input id="addAccommodation" class="form-control form-control-sm mb-2" placeholder="임시숙소 주소">
         </div>
-        <textarea id="addMemo" class="form-control form-control-sm mb-2" rows="2" placeholder="메모"></textarea>
+        <div class="mb-2">
+            <label class="small d-block">메모</label>
+            <div class="btn-group btn-group-sm mb-1" role="toolbar" style="flex-wrap:wrap; gap:2px;">
+                <button type="button" class="btn btn-outline-secondary" onclick="memoExec('bold')"><b>B</b></button>
+                <button type="button" class="btn btn-outline-secondary" onclick="memoExec('italic')"><i>I</i></button>
+                <button type="button" class="btn btn-outline-secondary" onclick="memoExec('underline')"><u>U</u></button>
+                <button type="button" class="btn btn-outline-secondary" onclick="memoExec('insertUnorderedList')">• 목록</button>
+                <button type="button" class="btn btn-outline-secondary" onclick="memoLink()">🔗 링크</button>
+                <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('memoFile').click()">🖼️첨부</button>
+                <button type="button" class="btn btn-outline-secondary" onclick="openDraw()">✏️그리기</button>
+                <button type="button" class="btn btn-outline-secondary" onclick="numBadgeClick()" title="선택한 숫자를 동그란 배지로">🔢 번호</button>
+                <span class="small text-muted align-self-center" title="글자색">A</span>
+                <input type="color" id="memoColor" value="#212529" title="글자색" style="width:30px;height:30px;padding:1px;border:1px solid #ced4da;border-radius:4px;background:#fff;cursor:pointer;" onchange="memoForeColor(this.value)">
+                <span class="small text-muted align-self-center" title="배경색">▦</span>
+                <input type="color" id="memoBg" value="#fff3cd" title="배경색" style="width:30px;height:30px;padding:1px;border:1px solid #ced4da;border-radius:4px;background:#fff;cursor:pointer;" onchange="memoBackColor(this.value)">
+            </div>
+            <div id="numPanel" style="display:none; margin:4px 0; padding:8px; border:1px solid #ced4da; border-radius:8px; background:#f8f9fa;">
+                <div class="small mb-1">동그란 번호 (버스·지하철 호선 등)</div>
+                <input id="numInput" class="form-control form-control-sm mb-2" style="max-width:150px;" placeholder="예: 200, 2호선">
+                <div id="numColors" class="d-flex flex-wrap gap-1 mb-2"></div>
+                <button type="button" class="btn btn-sm btn-success" onclick="insertNumBadge()">넣기</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleNumPanel()">닫기</button>
+            </div>
+            <div id="memoEditor" class="form-control form-control-sm" style="min-height:84px; overflow:auto;" contenteditable="true" data-ph="메모를 입력하세요"></div>
+            <input type="file" id="memoFile" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.hwp" style="display:none;" onchange="uploadMemoFiles(this)">
+        </div>
         <div class="mb-2">
             <label class="small">👥 참석자</label>
             <div id="friendCheckboxes" class="small" style="max-height:100px;overflow-y:auto;"></div>
@@ -103,7 +180,7 @@ body{background:#f8f9fa;font-size:0.9rem;}
 </div>
 
 <script>
-let calYear, calMonth, schedules = [], friends = [];
+let calYear, calMonth, schedules = [], friends = [], selDate = null;
 let repeatOn = false, addCalMode = 'start', addCalYear, addCalMonth;
 
 fetch('/api/chat/friends').then(r=>r.json()).then(d => {
@@ -127,22 +204,30 @@ function switchTab(t) {
     ['tabView','tabAdd','tabList','tabFav'].forEach(id => document.getElementById(id).style.display='none');
     document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).style.display = '';
     if (t === 'add') {
-        if (!document.getElementById('addDate').value) {
-            var today = new Date().toISOString().slice(0,10);
-            document.getElementById('addDate').value = today;
-            document.getElementById('addEndDate').value = today;
-        }
         document.getElementById('editId').value = '';
         document.getElementById('saveBtn').textContent = '저장';
         document.querySelector('#tabAdd h6').textContent = '새 일정';
         document.getElementById('accommodationSection').style.display = 'none';
         repeatOn = false; setRepeatOptionsVisible(false);
         document.getElementById('addCalPopup').style.display = 'none';
+        // 이전 입력값 초기화 (새 일정 진입 시)
+        ['addTitle','addLoc','memoEditor','addStart','addEnd','addDate','addEndDate','addAccommodation','numInput'].forEach(function(x){ var el=document.getElementById(x); if(el) el.value=''; });
+        var today = new Date().toISOString().slice(0,10);
+        document.getElementById('addDate').value = today;
+        document.getElementById('addEndDate').value = today;
+        document.getElementById('addAllDay').checked = false;
+        document.getElementById('addReminder').value = 0;
+        document.getElementById('addRepeatInterval').value = 1;
+        document.querySelectorAll('.wd-cb').forEach(function(cb){ cb.checked=false; });
+        document.getElementById('addRepeatWeekOfMonth').value = 0;
+        document.getElementById('addRepeatMonthOfYear').value = 0;
+        if (document.getElementById('numPanel')) document.getElementById('numPanel').style.display='none';
+        toggleAllDay();
     }
 }
 
 function loadEvents() {
-    return fetch('/api/bot/schedule').then(r=>r.json()).then(d => {
+    return fetch('/api/bot/schedule?_='+Date.now()).then(r=>r.json()).then(d => {
         schedules = d.schedules || [];
         renderCal();
         renderEventList();
@@ -170,12 +255,14 @@ function renderCal() {
             else if (colors.includes('green')) cls = 'event-green';
             else cls = 'event-gray';
         }
-        html += '<div class="cal-day '+(today?'today ':'')+cls+'" onclick="showDay(\''+ds+'\')">'+d+'</div>';
+        html += '<div class="cal-day '+(today?'today ':'')+cls+(ds===selDate?' selected':'')+'" onclick="showDay(\''+ds+'\')">'+d+'</div>';
     }
     document.getElementById('calGrid').innerHTML = html;
 }
 
 function showDay(date) {
+    selDate = date;
+    renderCal();
     const evts = schedules.filter(s => s.event_date && s.event_date.startsWith(date));
     // 종일 일정 먼저 정렬
     evts.sort((a, b) => {
@@ -248,7 +335,7 @@ function showDay(date) {
                 }
             } catch(e){}
         }
-        h += '<br><button class="btn btn-sm btn-outline-secondary py-0 mt-1 me-1" onclick="editEvent(\'' + s.id + '\')">✏️</button><button class="btn btn-sm btn-outline-danger py-0 mt-1" onclick="confirmDelete(\'' + s.id + '\')">✕</button></div>';
+        h += '<br><button class="btn btn-sm btn-outline-info py-0 mt-1 me-1" onclick="showDetail(\'' + s.id + '\')">🔍</button><button class="btn btn-sm btn-outline-secondary py-0 mt-1 me-1" onclick="editEvent(\'' + s.id + '\')">✏️</button><button class="btn btn-sm btn-outline-danger py-0 mt-1" onclick="confirmDelete(\'' + s.id + '\')">✕</button></div>';
     });
     el.innerHTML = h;
 }
@@ -300,11 +387,11 @@ function editEvent(id) {
         }
     }
     document.getElementById('addLoc').value = s.location || '';
-    var memoVal = s.memo || s.description || '';
-    if (s.content) {
-        try { var cc = JSON.parse(s.content); if (cc.compact) memoVal = cc.compact; } catch(e){}
-    }
-    document.getElementById('addMemo').value = memoVal.replace(/\[숙소:[^\]]+\]/,'').trim();
+    var memoVal = '';
+    if (s.memo && s.memo.trim()) memoVal = s.memo;
+    else if (s.description && s.description.trim()) memoVal = s.description;
+    else if (s.content) { try { var cc = JSON.parse(s.content); if (cc && cc.compact) memoVal = cc.compact; } catch(e){} }
+    document.getElementById('memoEditor').innerHTML = memoVal.replace(/\[숙소:[^\]]+\]/g,'').trim();
     var am = s.memo ? s.memo.match(/\[숙소:([^\]]+)\]/) : null;
     if (am) {
         document.getElementById('addAccommodation').value = am[1];
@@ -324,6 +411,12 @@ function editEvent(id) {
         for (var i=0;i<rbs.length;i++) { rbs[i].checked = rbs[i].value === s.repeat_type; }
     }
     document.getElementById('addRepeatInterval').value = s.repeat_interval || 1;
+    var wmask = s.repeat_weekdays || 0;
+    document.querySelectorAll('.wd-cb').forEach(function(cb){ cb.checked = !!(wmask & (1 << parseInt(cb.value))); });
+    document.getElementById('addRepeatWeekOfMonth').value = s.repeat_week_of_month || 0;
+    document.getElementById('addRepeatMonthOfYear').value = s.repeat_month_of_year || 0;
+    document.getElementById('addReminder').value = s.reminder_minutes || 0;
+    updateRepeatMode();
     if (s.repeat_infinite) {
         var _ed = new Date(document.getElementById('addDate').value + 'T00:00');
         _ed.setDate(_ed.getDate() - 1);
@@ -436,6 +529,206 @@ document.addEventListener('click', function(e){
     }
 });
 
+function getWeekdayMask() {
+    var mask = 0;
+    document.querySelectorAll('.wd-cb').forEach(function(cb){ if (cb.checked) mask |= (1 << parseInt(cb.value)); });
+    return mask;
+}
+function updateRepeatMode() {
+    var wd = getWeekdayMask();
+    var rbs = document.getElementsByName('repeatType');
+    for (var i=0;i<rbs.length;i++) rbs[i].disabled = !!wd;
+}
+
+function memoExec(cmd){ var ed=document.getElementById('memoEditor'); ed.focus(); try{ document.execCommand(cmd, false, null); }catch(e){} }
+var savedRange = null;
+function saveRange(){ var ed=document.getElementById('memoEditor'); var sel=window.getSelection(); if(sel && sel.rangeCount>0){ var r=sel.getRangeAt(0); try{ if(ed.contains(r.commonAncestorContainer)) savedRange=r.cloneRange(); }catch(e){} } }
+if(document.getElementById('memoEditor')){ document.getElementById('memoEditor').addEventListener('keyup', saveRange); document.getElementById('memoEditor').addEventListener('mouseup', saveRange); }
+function memoForeColor(c){ var ed=document.getElementById('memoEditor'); ed.focus(); if(savedRange){ var sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(savedRange); } try{ document.execCommand('styleWithCSS', false, true); document.execCommand('foreColor', false, c); }catch(e){} }
+function memoBackColor(c){ var ed=document.getElementById('memoEditor'); ed.focus(); if(savedRange){ var sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(savedRange); } try{ document.execCommand('styleWithCSS', false, true); document.execCommand('hiliteColor', false, c); }catch(e){} }
+function memoLink(){
+    var url = prompt('링크 주소를 입력하세요 (예: https://...)');
+    if(!url) return;
+    var ed=document.getElementById('memoEditor'); ed.focus();
+    var sel = window.getSelection();
+    if(sel && sel.toString()){ try{ document.execCommand('createLink', false, url); }catch(e){ insertMemoHtml('<a href="'+url+'" target="_blank">'+sel.toString()+'</a>'); } }
+    else { insertMemoHtml('<a href="'+url+'" target="_blank">'+url+'</a>'); }
+}
+function insertMemoHtml(html){
+    var ed = document.getElementById('memoEditor'); ed.focus();
+    if(savedRange){ var sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(savedRange); }
+    var ok=false; try{ ok = document.execCommand('insertHTML', false, html); }catch(e){}
+    if(!ok){ ed.innerHTML += html; }
+}
+var numColor = '#1971ef';
+function buildNumColors(){
+    var cs = [['#1971ef','#fff'],['#2e7d32','#fff'],['#e53935','#fff'],['#fdd835','#222'],['#fb8c00','#fff'],['#8e24aa','#fff'],['#607d8b','#fff'],['#222222','#fff']];
+    var box = document.getElementById('numColors'); if(!box) return; box.innerHTML='';
+    cs.forEach(function(c){
+        var b=document.createElement('button'); b.type='button';
+        b.style.cssText='width:24px;height:24px;border-radius:50%;border:2px solid '+(numColor===c[0]?'#0d6efd':'#fff')+';background:'+c[0]+';cursor:pointer;';
+        b.onclick=function(){ numColor=c[0]; buildNumColors(); };
+        box.appendChild(b);
+    });
+}
+function numBadgeClick(){
+    if(savedRange && !savedRange.collapsed){ insertNumBadge(); }
+    else { toggleNumPanel(); }
+}
+function toggleNumPanel(){
+    var p=document.getElementById('numPanel');
+    if(!p) return;
+    p.style.display = (p.style.display==='none' || !p.style.display) ? 'block' : 'none';
+    if(p.style.display==='block'){ if(!document.getElementById('numColors').children.length) buildNumColors(); document.getElementById('numInput').focus(); }
+}
+function insertNumBadge(){
+    var inp=document.getElementById('numInput'); var txt=(inp.value||'').trim();
+    if(!txt){ alert('번호를 입력하세요'); return; }
+    var tc = (numColor==='#fdd835') ? '#222222' : '#ffffff';
+    var html = '<span contenteditable="false" class="memo-num" style="display:inline-flex;align-items:center;justify-content:center;min-width:1.6em;height:1.6em;padding:0 .4em;margin:0 1px;border-radius:50%;background:'+numColor+';color:'+tc+';font-size:0.85em;font-weight:700;line-height:1;vertical-align:middle;">'+txt.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</span>';
+    insertMemoHtml(html);
+    document.getElementById('numPanel').style.display='none';
+    inp.value='';
+}
+function uploadMemoFiles(input){
+    var files = input.files;
+    if(!files || !files.length) return;
+    var fd = new FormData();
+    for(var i=0;i<files.length;i++) fd.append('file', files[i]);
+    fetch('/api/bot/schedule/attachment', {method:'POST', body:fd})
+    .then(function(r){return r.json();})
+    .then(function(d){
+        if(d.urls){
+            d.urls.forEach(function(u){
+                var isImg = /\.(png|jpe?g|gif|webp)$/i.test(u);
+                if(isImg) insertMemoHtml('<img src="'+u+'" style="max-width:220px; max-height:220px; display:block; margin:4px 0; border:1px solid #ddd; border-radius:6px;">');
+                else insertMemoHtml('<a href="'+u+'" target="_blank" style="display:inline-block; margin:4px 0; padding:4px 8px; border:1px solid #ced4da; border-radius:6px;">📎 '+u.split('/').pop()+'</a>');
+            });
+        } else if(d.error){ alert(d.error); }
+        input.value='';
+    }).catch(function(e){ alert('업로드 실패'); input.value=''; });
+}
+var _drawing=false, _drawCtx=null;
+function openDraw(){
+    var m=document.getElementById('drawModal'); m.style.display='flex';
+    var c=document.getElementById('drawCanvas');
+    if(!_drawCtx){ _drawCtx=c.getContext('2d'); }
+    c.onpointerdown=drawStart; c.onpointermove=drawMove; window.onpointerup=drawEnd;
+}
+function closeDraw(){ document.getElementById('drawModal').style.display='none'; }
+function drawStart(e){ _drawing=true; drawDot(e); }
+function drawMove(e){ if(_drawing) drawDot(e); }
+function drawEnd(){ _drawing=false; }
+function drawDot(e){
+    if(!_drawCtx) return;
+    var c=document.getElementById('drawCanvas');
+    var rect=c.getBoundingClientRect();
+    var x=(e.clientX-rect.left)*(c.width/rect.width);
+    var y=(e.clientY-rect.top)*(c.height/rect.height);
+    _drawCtx.fillStyle=document.getElementById('drawColor').value;
+    var sz=parseInt(document.getElementById('drawSize').value)||3;
+    _drawCtx.beginPath(); _drawCtx.arc(x,y,sz/2,0,Math.PI*2); _drawCtx.fill();
+}
+function drawClear(){ if(_drawCtx){ _drawCtx.clearRect(0,0,320,220); } }
+function drawSave(){
+    var c=document.getElementById('drawCanvas');
+    c.toBlob(function(blob){
+        if(!blob){ closeDraw(); return; }
+        var fd=new FormData(); fd.append('file', blob, 'draw_'+Date.now()+'.png');
+        fetch('/api/bot/schedule/attachment', {method:'POST', body:fd})
+        .then(function(r){return r.json();})
+        .then(function(d){ if(d.urls && d.urls[0]) insertMemoHtml('<img src="'+d.urls[0]+'" style="max-width:220px; max-height:220px; display:block; margin:4px 0; border:1px solid #ddd; border-radius:6px;">'); closeDraw(); })
+        .catch(function(){ closeDraw(); });
+    }, 'image/png');
+}
+function showDetail(id){
+    var s=null, baseId=String(id).split('_')[0];
+    for(var i=0;i<schedules.length;i++){ if(String(schedules[i].id)===String(id)){ s=schedules[i]; break; } }
+    if(!s) return;
+    document.getElementById('detailTitle').textContent = s.title || '(제목없음)';
+    var meta=[];
+    if(s.event_date) meta.push('🕐 '+s.event_date.replace('T',' ').substring(0,16));
+    if(s.location) meta.push('📍 '+s.location);
+    if(s.memo && s.memo.indexOf('[숙소:')>=0){ var m=s.memo.match(/\[숙소:([^\]]+)\]/); if(m) meta.push('🏠 '+m[1]); }
+    document.getElementById('detailMeta').innerHTML = meta.join('<br>');
+    var mv = s.memo ? s.memo.replace(/\[숙소:[^\]]+\]/g,'') : '';
+    document.getElementById('detailMemo').innerHTML = mv || '<span class="text-muted">메모 없음</span>';
+    document.getElementById('detailEditBtn').onclick = function(){ closeDetail(); editEvent(baseId); };
+    document.getElementById('detailModal').style.display='flex';
+}
+function closeDetail(){ document.getElementById('detailModal').style.display='none'; }
+
+let shownReminderIds = new Set();
+function beep(){
+  try{
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if(!Ctx) return;
+    var ctx = new Ctx();
+    var o = ctx.createOscillator();
+    var g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.type='sine'; o.frequency.value=880;
+    g.gain.setValueAtTime(0.0001, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime+0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+0.5);
+    o.start(); o.stop(ctx.currentTime+0.5);
+  }catch(e){}
+}
+function fireNotification(r){
+  beep();
+  try{ if(navigator.vibrate) navigator.vibrate([200,100,200]); }catch(e){}
+  if('Notification' in window && Notification.permission==='granted'){
+    try{ new Notification(r.title, {body:(r.event_date||'')+' 알림', icon:'🔔'}); }catch(e){}
+  } else {
+    var t=document.createElement('div');
+    t.className='toast align-items-center text-bg-primary border-0';
+    t.style.cssText='position:fixed;top:60px;right:10px;z-index:80;';
+    t.innerHTML='<div class="d-flex"><div class="toast-body">🔔 '+r.title+' ('+(r.event_date||'')+')</div></div>';
+    document.body.appendChild(t);
+    setTimeout(function(){ if(t.parentNode) t.parentNode.removeChild(t); }, 6000);
+  }
+  markReminderSeen([r.id]);
+}
+function markReminderSeen(ids){
+  if(!ids || !ids.length) return;
+  fetch('/api/bot/schedule/reminder/seen', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ids:ids})})
+    .then(function(){ checkReminders(); })
+    .catch(function(){});
+}
+function checkReminders(){
+  fetch('/api/bot/schedule/reminders')
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var list=d.reminders||[];
+      list.forEach(function(r){
+        if(!shownReminderIds.has(r.id)){ shownReminderIds.add(r.id); fireNotification(r); }
+      });
+      renderBellPanel(list);
+    })
+    .catch(function(){});
+}
+function renderBellPanel(list){
+  list = list || [];
+  var badge=document.getElementById('bellBadge');
+  if(list.length>0){ badge.style.display=''; badge.textContent=list.length; }
+  else { badge.style.display='none'; }
+  var p=document.getElementById('bellPanel');
+  if(!p) return;
+  if(!list.length){ p.innerHTML='<div class="small text-muted">알림 없음</div>'; return; }
+  var h='<div class="small fw-bold mb-2">알림 ('+list.length+')</div>';
+  list.forEach(function(r){
+    h+='<div class="border-bottom py-1 small"><div><strong>🔔 '+r.title+'</strong></div><div class="text-muted">'+r.event_date+'</div><button class="btn btn-sm btn-outline-secondary py-0 mt-1" onclick="markReminderSeen(['+r.id+'])">확인</button></div>';
+  });
+  p.innerHTML=h;
+}
+function toggleBell(){
+  if('Notification' in window && Notification.permission==='default'){ Notification.requestPermission(); }
+  var p=document.getElementById('bellPanel');
+  if(p.style.display==='none' || !p.style.display){ p.style.display='block'; checkReminders(); }
+  else { p.style.display='none'; }
+}
+function startReminderPoll(){ checkReminders(); setInterval(checkReminders, 20000); }
+startReminderPoll();
 var saving = false;
 function saveEvent() {
     if (saving) return;
@@ -446,24 +739,27 @@ function saveEvent() {
     var start = document.getElementById('addStart').value;
     var end = document.getElementById('addEnd').value;
     var loc = document.getElementById('addLoc').value.trim();
-    var memo = document.getElementById('addMemo').value.trim();
+    var memo = document.getElementById('memoEditor').innerHTML.trim();
     var accommodation = document.getElementById('addAccommodation').value.trim();
     var isAllDay = document.getElementById('addAllDay').checked;
     var isRecurring = repeatOn;
     var repeatType = '';
     var repeatInterval = parseInt(document.getElementById('addRepeatInterval').value) || 1;
     var repeatInfinite = !!(isRecurring && endDate && endDate < date);
+    var repeatWeekdays = getWeekdayMask();
+    var repeatWeekOfMonth = parseInt(document.getElementById('addRepeatWeekOfMonth').value) || 0;
+    var repeatMonthOfYear = parseInt(document.getElementById('addRepeatMonthOfYear').value) || 0;
     if (isRecurring) {
         var rbs = document.getElementsByName('repeatType');
         for (var i=0;i<rbs.length;i++) { if(rbs[i].checked) { repeatType = rbs[i].value; break; } }
     }
     if (!title || !date) return alert('제목과 날짜를 입력하세요.');
     var evt = isAllDay ? date+'T00:00' : (start ? date+'T'+start : date+'T09:00');
-    if (accommodation) memo = (memo ? memo+'\n' : '')+'[숙소:'+accommodation+']';
+    if (accommodation) memo = (memo ? memo : '')+'<br>[숙소:'+accommodation+']';
     var cbs = document.querySelectorAll('.friend-cb:checked');
     var invited = [];
     cbs.forEach(function(cb){ invited.push(parseInt(cb.value)); });
-    var data = {title, event_date: evt, location: loc, memo, invited: JSON.stringify(invited), is_allday: isAllDay, is_recurring: isRecurring, repeat_type: repeatType, repeat_interval: repeatInterval, repeat_infinite: repeatInfinite};
+    var data = {title, event_date: evt, location: loc, memo, invited: JSON.stringify(invited), is_allday: isAllDay, is_recurring: isRecurring, repeat_type: repeatType, repeat_interval: repeatInterval, repeat_infinite: repeatInfinite, repeat_weekdays: repeatWeekdays, repeat_week_of_month: repeatWeekOfMonth, repeat_month_of_year: repeatMonthOfYear, reminder_minutes: parseInt(document.getElementById('addReminder').value) || 0};
     if (end && !isAllDay) data.end_date = (endDate && endDate !== date ? endDate : date)+'T'+end;
     if (isAllDay) data.end_date = endDate ? endDate+'T23:59' : date+'T23:59';
     if (repeatInfinite) data.end_date = '';
@@ -476,7 +772,7 @@ function saveEvent() {
     .then(function(r){return r.json()}).then(function(d){
         if (d.success) {
             document.getElementById('editId').value = '';
-            ['addTitle','addLoc','addMemo','addStart','addEnd','addEndDate','addAccommodation'].forEach(function(x){
+            ['addTitle','addLoc','memoEditor','addStart','addEnd','addEndDate','addAccommodation'].forEach(function(x){
                 var el = document.getElementById(x);
                 if (el) el.value = '';
             });
@@ -547,6 +843,36 @@ function doDelete(mode) {
     <button type="button" class="btn btn-sm btn-outline-danger w-100 mb-2" onclick="doDelete('this_after')">이 일정 포함 이후 삭제</button>
     <button type="button" class="btn btn-sm btn-outline-secondary w-100 mb-2" onclick="doDelete('this_only')">이 일정만 삭제</button>
     <button type="button" class="btn btn-sm btn-light w-100" onclick="closeDel()">취소</button>
+  </div>
+</div>
+
+<style>#memoEditor:empty:before{content:attr(data-ph);color:#999;}</style>
+<div id="drawModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:90; align-items:center; justify-content:center;">
+  <div class="bg-white p-3 rounded" style="width:360px; max-width:94%;">
+    <div class="d-flex gap-2 mb-2 align-items-center">
+      <input type="color" id="drawColor" value="#222222" class="form-control form-control-sm" style="width:46px; height:34px; padding:0;">
+      <input type="range" id="drawSize" min="1" max="24" value="3" class="form-control form-control-sm" style="width:110px;">
+      <span class="small">굵기</span>
+      <button class="btn btn-sm btn-outline-secondary" onclick="drawClear()">지우기</button>
+      <button class="btn btn-sm btn-secondary" onclick="closeDraw()">닫기</button>
+    </div>
+    <canvas id="drawCanvas" width="320" height="220" style="border:1px solid #ced4da; background:#fff; width:100%; touch-action:none; border-radius:6px;"></canvas>
+    <div class="mt-2 text-end">
+      <button class="btn btn-sm btn-primary" onclick="drawSave()">메모에 삽입</button>
+    </div>
+  </div>
+</div>
+<div id="detailModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:90; align-items:center; justify-content:center;">
+  <div class="bg-white p-3 rounded" style="width:440px; max-width:94%; max-height:84vh; overflow:auto;">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <strong id="detailTitle"></strong>
+      <button class="btn btn-sm btn-secondary" onclick="closeDetail()">닫기</button>
+    </div>
+    <div id="detailMeta" class="small text-muted mb-2"></div>
+    <div id="detailMemo" style="white-space:normal; word-break:break-word;"></div>
+    <div class="mt-3 text-end">
+      <button class="btn btn-sm btn-primary" id="detailEditBtn">수정</button>
+    </div>
   </div>
 </div>
 </body>

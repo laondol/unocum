@@ -747,6 +747,9 @@ export default function UserMyPage() {
               <div className="modal-body py-2">
                 <div className="mb-2">{routeModal.schedule?.departure_location} → {routeModal.schedule?.return_location || routeModal.schedule?.location}</div>
                 {routeModal.route?.departure && <div className="text-muted mb-2">⏰ {routeModal.route.departure} 출발 → {routeModal.route.arrival} 도착 (총 {routeModal.route.total_min}분)</div>}
+                {routeModal.schedule?.memo && (
+                  <div className="mb-2 p-2 bg-light border rounded" dangerouslySetInnerHTML={{__html: routeModal.schedule.memo}} />
+                )}
 
                 {!editingSteps && routeModal.route?.steps?.map((st:any,i:number) => (
                   <div key={i} className="border-start border-2 border-info ps-2 py-1 mb-1">

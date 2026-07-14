@@ -1,5 +1,21 @@
-import requests, math, json
+import requests, math, json, time
 from math import radians, sin, cos, sqrt, atan2
+
+# In-process TTL cache for ODSay routing results (saves the 1,000 calls/day quota).
+_ODSAY_CACHE = {}
+_ODSAY_CACHE_TTL = 24 * 3600
+
+def _odsay_cache_key(fy, fx, ty, tx):
+    return (round(fy, 5), round(fx, 5), round(ty, 5), round(tx, 5))
+
+def _odsay_cache_get(fy, fx, ty, tx):
+    hit = _ODSAY_CACHE.get(_odsay_cache_key(fy, fx, ty, tx))
+    if hit and (hit[0] + _ODSAY_CACHE_TTL) > time.time():
+        return hit[1], hit[2], hit[3]
+    return None
+
+def _odsay_cache_set(fy, fx, ty, tx, steps, total_min, dist):
+    _ODSAY_CACHE[_odsay_cache_key(fy, fx, ty, tx)] = (time.time(), steps, total_min, dist)
 
 def haversine_km(lat1, lng1, lat2, lng2):
     R = 6371
@@ -160,13 +176,159 @@ def naver_transit(from_lat, from_lng, to_lat, to_lng, client_id=None, client_sec
     except:
         return None
 
-def plan_segment(from_name, from_lat, from_lng, to_name, to_lat, to_lng, arrival_time_str, home_town=None, home_village=None, naver_id=None, naver_secret=None):
+def _estimate_plan(from_name, to_name, direct_km, arrival_min):
+    """Distance-based transit estimate used when Naver is unavailable and the
+    leg lies outside the Yangpyeong transit network."""
+    total_min = int(direct_km * 3 + 15)
+    steps = [{"mode": "🚌 대중교통(추정)", "from": from_name, "to": to_name,
+              "detail": f"대중교통 약 {total_min}분 ({round(direct_km, 1)}km, 정확 경로 미제공)",
+              "time_min": total_min}]
+    dep_min = arrival_min - total_min
+    return {"steps": steps, "total_min": total_min, "departure": _min_to_hm(dep_min),
+            "arrival": _min_to_hm(arrival_min), "distance_km": round(direct_km, 1), "estimate": True}
+
+def is_korea(lat, lng):
+    """Rough bounding box for South Korea (incl. Jeju)."""
+    try:
+        return 33.0 <= float(lat) <= 38.7 and 124.5 <= float(lng) <= 129.7
+    except (TypeError, ValueError):
+        return False
+
+def odsay_transit(from_lat, from_lng, to_lat, to_lng, api_key, arrival_min=None):
+    """ODSay public transit routing (Korea). Returns plan_segment-compatible dict."""
+    if not api_key:
+        return None
+    _cached = _odsay_cache_get(from_lat, from_lng, to_lat, to_lng)
+    if _cached:
+        _steps, _total, _dist = _cached
+        _dep = (arrival_min - _total) if arrival_min is not None else 0
+        return {"steps": _steps, "total_min": _total,
+                "departure": _min_to_hm(_dep) if arrival_min is not None else "",
+                "arrival": _min_to_hm(arrival_min) if arrival_min is not None else "",
+                "distance_km": _dist}
+    url = "https://api.odsay.com/v1/api/searchPubTransPathT"
+    params = {"apiKey": api_key, "SX": from_lng, "SY": from_lat,
+              "EX": to_lng, "EY": to_lat, "OPT": 0, "lang": 0}
+    try:
+        resp = requests.get(url, params=params, timeout=6)
+        data = resp.json()
+    except:
+        return None
+    if data.get("error"):
+        return None
+    paths = (data.get("result") or {}).get("path") or []
+    if not paths:
+        return None
+    path = paths[0]
+    info = path.get("info", {})
+    total_min = info.get("totalTime")
+    if not total_min or total_min <= 0:
+        return None
+    total_min = int(total_min)
+    steps = []
+    for sp in path.get("subPath", []):
+        t = sp.get("trafficType")
+        sec = sp.get("sectionTime") or 0
+        dist = sp.get("distance") or 0
+        if t == 3:
+            steps.append({"mode": "🚶 도보", "from": "", "to": "",
+                          "detail": f"도보 {sec}분 ({round(dist/1000,1)}km)", "time_min": sec})
+        elif t == 1:
+            lane = (sp.get("lane") or [{}])[0]
+            name = lane.get("name") or ""
+            start = sp.get("startName") or ""
+            end = sp.get("endName") or ""
+            steps.append({"mode": "🚄 지하철", "from": start, "to": end,
+                          "detail": f"{name} {start}→{end} ({sec}분, {sp.get('stationCount',0)}정거장)",
+                          "time_min": sec, "subway_name": name})
+        elif t == 2:
+            lane = (sp.get("lane") or [{}])[0]
+            name = lane.get("name") or lane.get("busNo") or ""
+            start = sp.get("startName") or ""
+            end = sp.get("endName") or ""
+            steps.append({"mode": "🚌 버스", "from": start, "to": end,
+                          "detail": f"{name} {start}→{end} ({sec}분)", "time_min": sec, "bus_no": name})
+        else:
+            steps.append({"mode": "🚉 기타", "from": "", "to": "", "detail": f"{sec}분", "time_min": sec})
+    _odsay_cache_set(from_lat, from_lng, to_lat, to_lng, steps, total_min, round(info.get("pointDistance", 0)/1000, 1))
+    dep_min = (arrival_min - total_min) if arrival_min is not None else 0
+    return {"steps": steps, "total_min": total_min,
+            "departure": _min_to_hm(dep_min) if arrival_min is not None else "",
+            "arrival": _min_to_hm(arrival_min) if arrival_min is not None else "",
+            "distance_km": round(info.get("pointDistance", 0)/1000, 1)}
+
+def google_transit(from_lat, from_lng, to_lat, to_lng, api_key, arrival_min=None):
+    """Google Maps Directions (transit mode) - used for overseas legs."""
+    if not api_key:
+        return None
+    url = "https://maps.googleapis.com/maps/api/directions/json"
+    params = {"origin": f"{from_lat},{from_lng}", "destination": f"{to_lat},{to_lng}",
+              "mode": "transit", "language": "ko", "region": "kr",
+              "key": api_key, "departure_time": "now"}
+    try:
+        resp = requests.get(url, params=params, timeout=6)
+        data = resp.json()
+    except:
+        return None
+    if data.get("status") != "OK":
+        return None
+    routes = data.get("routes") or []
+    if not routes:
+        return None
+    leg = routes[0]["legs"][0]
+    total_sec = leg.get("duration", {}).get("value", 0)
+    total_min = round(total_sec / 60)
+    if total_min <= 0:
+        return None
+    steps = []
+    for s in leg.get("steps", []):
+        mode = s.get("travel_mode")
+        dur = round(s.get("duration", {}).get("value", 0) / 60)
+        if mode == "WALKING":
+            dist_m = s.get("distance", {}).get("value", 0)
+            steps.append({"mode": "🚶 도보", "from": "", "to": "",
+                          "detail": f"도보 {dur}분 ({round(dist_m/1000,1)}km)", "time_min": dur})
+        elif mode == "TRANSIT":
+            td = s.get("transit_details", {})
+            line = td.get("line", {})
+            veh = line.get("vehicle", {}).get("type", "")
+            name = line.get("short_name") or line.get("name") or veh
+            dep = td.get("departure_stop", {}).get("name", "")
+            arr = td.get("arrival_stop", {}).get("name", "")
+            icon = "🚄" if any(k in veh for k in ("SUBWAY", "RAIL", "METRO", "TRAIN")) else "🚌"
+            steps.append({"mode": f"{icon} {veh}", "from": dep, "to": arr,
+                          "detail": f"{name} {dep}→{arr} ({dur}분)", "time_min": dur,
+                          "bus_no": name if icon == "🚌" else "", "subway_name": name if icon == "🚄" else ""})
+        else:
+            steps.append({"mode": "🚗 기타", "from": "", "to": "", "detail": f"{mode} {dur}분", "time_min": dur})
+    dep_min = (arrival_min - total_min) if arrival_min is not None else 0
+    return {"steps": steps, "total_min": total_min,
+            "departure": _min_to_hm(dep_min) if arrival_min is not None else "",
+            "arrival": _min_to_hm(arrival_min) if arrival_min is not None else "",
+            "distance_km": round(leg.get("distance", {}).get("value", 0)/1000, 1)}
+
+def plan_segment(from_name, from_lat, from_lng, to_name, to_lat, to_lng, arrival_time_str, home_town=None, home_village=None, naver_id=None, naver_secret=None, odsay_key=None, google_key=None):
     parts = arrival_time_str.split(":")
     arr_h = int(parts[0]) if parts else 9
     arr_m = int(parts[1]) if len(parts) > 1 else 0
     arrival_min = arr_h * 60 + arr_m
 
-    # Try Naver API first (nationwide, real-time)
+    # Regional routing: Korea -> ODSay, Overseas -> Google
+    domestic = is_korea(from_lat, from_lng) and is_korea(to_lat, to_lng)
+    if domestic:
+        primary, secondary, pk, sk = odsay_transit, google_transit, odsay_key, google_key
+    else:
+        primary, secondary, pk, sk = google_transit, odsay_transit, google_key, odsay_key
+    res = primary(from_lat, from_lng, to_lat, to_lng, pk, arrival_min)
+    if not res and sk:
+        res = secondary(from_lat, from_lng, to_lat, to_lng, sk, arrival_min)
+    if res:
+        dep_min = arrival_min - res["total_min"]
+        res["departure"] = _min_to_hm(dep_min)
+        res["arrival"] = arrival_time_str
+        return res
+
+    # Legacy Naver (if configured)
     naver_result = naver_transit(from_lat, from_lng, to_lat, to_lng, naver_id, naver_secret, arrival_min)
     if naver_result:
         dep_min = arrival_min - naver_result["total_min"]
@@ -188,6 +350,17 @@ def plan_segment(from_name, from_lat, from_lng, to_name, to_lat, to_lng, arrival
     # 1. Walk to nearest bus stop or station
     near_station, dist_station = find_nearest_station(from_lat, from_lng)
     near_bus, dist_bus = find_nearest_bus_stop(from_lat, from_lng)
+
+    # When Naver is unavailable, legs outside the Yangpyeong transit network
+    # (both endpoints far from any Yangpyeong station/bus stop) would otherwise
+    # produce absurd "walk to a distant Yangpyeong station" estimates. Fall back
+    # to a distance-based estimate instead.
+    _ns_to, _ds_to = find_nearest_station(to_lat, to_lng)
+    _nb_to, _db_to = find_nearest_bus_stop(to_lat, to_lng)
+    _from_far = dist_station > 5.0 or dist_bus > 5.0
+    _to_far = _ds_to > 5.0 or _db_to > 5.0
+    if _from_far and _to_far:
+        return _estimate_plan(from_name, to_name, direct_km, arrival_min)
 
     use_station_first = dist_station <= dist_bus or dist_station < 3.0
 
