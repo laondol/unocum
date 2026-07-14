@@ -66,6 +66,10 @@ def register_routes(app):
         resp.headers['X-Frame-Options'] = 'SAMEORIGIN'
         resp.headers['X-XSS-Protection'] = '1; mode=block'
         resp.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        if resp.mimetype == 'text/html':
+            resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            resp.headers['Pragma'] = 'no-cache'
+            resp.headers['Expires'] = '0'
         return resp
 
     # React 공유마당 SPA (frontend/dist/index.html)
@@ -90,7 +94,6 @@ def register_routes(app):
     @app.route('/share/report')
     @app.route('/share/detail/<path:path>')
     @app.route('/share/edit/<path:path>')
-    @app.route('/user/my')
     def share_spa(path=''):
         return _serve_react_share()
 
@@ -565,7 +568,7 @@ def register_routes(app):
                     u.last_payout = now
                     db.session.commit()
                 return redirect(next_url or url_for('user_profile', user_id=u.id))
-            return "<script>alert('로그인 정보 오류'); history.back();</script>"
+            return render_template('login.html', next=next_url, error='로그인 정보가 올바르지 않습니다.')
         return render_template('login.html', next=next_url)
 
     @app.route('/logout')
