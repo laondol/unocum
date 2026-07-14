@@ -77,6 +77,16 @@ def create_app():
                         print('[OK] message.attachment column added')
             except:
                 pass
+            # TongBotSchedule.repeat_exceptions 컬럼
+            try:
+                tbl_cols = [c['name'] for c in _inspector.get_columns('tongbot_schedule')]
+                if 'repeat_exceptions' not in tbl_cols:
+                    with db.engine.connect() as conn:
+                        conn.execute(db.text('ALTER TABLE tongbot_schedule ADD COLUMN repeat_exceptions TEXT DEFAULT \'\''))
+                        conn.commit()
+                        print('[OK] tongbot_schedule.repeat_exceptions column added')
+            except:
+                pass
         except Exception as e:
             print(f'[SKIP] critical column migration: {e}')
     
@@ -108,6 +118,18 @@ def create_app():
                 print(f"[CACHE] error: {e}")
             time.sleep(600)  # 10분마다 갱신
     threading.Thread(target=cache_scheduler, daemon=True).start()
+    # 알림 체크 스레드
+    def notification_scheduler():
+        import time
+        while True:
+            time.sleep(5)
+            try:
+                from tongbot_routes import run_notification_check
+                run_notification_check()
+            except Exception as e:
+                print(f'[NOTI] error: {e}')
+            time.sleep(30)
+    threading.Thread(target=notification_scheduler, daemon=True).start()
     
     # DB 마이그레이션: 누락된 컬럼 자동 추가
     def migrate_news_article():
@@ -903,11 +925,25 @@ def create_app():
             inspector = inspect(db.engine)
             sched_cols = [c['name'] for c in inspector.get_columns('tong_bot_schedule')]
             with db.engine.connect() as conn:
-                for col, ct in [('is_allday','BOOLEAN DEFAULT 0'),('is_recurring','BOOLEAN DEFAULT 0'),('repeat_type','VARCHAR(20) DEFAULT \'\''),('repeat_end_date','TIMESTAMP')]:
+                for col, ct in [('is_allday','BOOLEAN DEFAULT 0'),('is_recurring','BOOLEAN DEFAULT 0'),('repeat_type','VARCHAR(20) DEFAULT \'\''),('repeat_end_date','TIMESTAMP'),('repeat_interval','INTEGER DEFAULT 1'),('repeat_infinite','BOOLEAN DEFAULT 0'),('repeat_weekdays','INTEGER DEFAULT 0'),('repeat_week_of_month','INTEGER DEFAULT 0'),('repeat_month_of_year','INTEGER DEFAULT 0'),('reminder_minutes','INTEGER DEFAULT 0')]:
                     if col not in sched_cols:
                         conn.execute(db.text(f'ALTER TABLE tong_bot_schedule ADD COLUMN {col} {ct}'))
                         conn.commit()
                         print(f'[OK] tong_bot_schedule.{col} column added')
+    except Exception as e:
+        print(f'[SKIP] schedule recurring migration: {e}')
+    # ScheduleReminderLog 테이블 생성
+    try:
+        with app.app_context():
+            from sqlalchemy import inspect as _insp2
+            insp2 = _insp2(db.engine)
+            if 'schedule_reminder_log' not in insp2.get_table_names():
+                with db.engine.connect() as _c:
+                    _c.execute(db.text("CREATE TABLE schedule_reminder_log (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, schedule_id INTEGER, occ_date VARCHAR(20), title VARCHAR(200), event_date TIMESTAMP, sent_at TIMESTAMP, seen BOOLEAN DEFAULT 0)"))
+                    _c.commit()
+                print('[OK] schedule_reminder_log table created')
+    except Exception as e:
+        print(f'[SKIP] schedule_reminder_log migration: {e}')
     except Exception as e:
         print(f'[SKIP] schedule recurring migration: {e}')
 

@@ -1293,7 +1293,13 @@ def bot_schedule():
                 "invited": s.invited_user_ids, "color": "gray",
                 "is_allday": s.is_allday or False,
                 "is_recurring": s.is_recurring or False,
-                "repeat_type": s.repeat_type or ''
+                "repeat_type": s.repeat_type or '',
+                "repeat_interval": s.repeat_interval or 1,
+                "repeat_infinite": s.repeat_infinite or False,
+                "repeat_weekdays": s.repeat_weekdays or 0,
+                "repeat_week_of_month": s.repeat_week_of_month or 0,
+                "repeat_month_of_year": s.repeat_month_of_year or 0,
+                "reminder_minutes": s.reminder_minutes or 0
             }
             is_move = '이동' in s.title or '귀가' in s.title
             evt = s.event_date
@@ -1360,7 +1366,13 @@ def bot_schedule():
         is_allday=data.get('is_allday', False),
         is_recurring=data.get('is_recurring', False),
         repeat_type=data.get('repeat_type', ''),
-        repeat_end_date=end_date if data.get('is_recurring') else None)
+        repeat_end_date=end_date if data.get('is_recurring') else None,
+        repeat_interval=data.get('repeat_interval', 1) or 1,
+        repeat_infinite=data.get('repeat_infinite', False),
+        repeat_weekdays=data.get('repeat_weekdays', 0) or 0,
+        repeat_week_of_month=data.get('repeat_week_of_month', 0) or 0,
+        repeat_month_of_year=data.get('repeat_month_of_year', 0) or 0,
+        reminder_minutes=data.get('reminder_minutes', 0) or 0)
     if data.get('departure_time'):
         s.departure_time = datetime.fromisoformat(data['departure_time']) if data['departure_time'] else None
     if data.get('return_time'):
@@ -1398,6 +1410,12 @@ def bot_schedule_update():
     if 'is_allday' in data: s.is_allday = data['is_allday']
     if 'is_recurring' in data: s.is_recurring = data['is_recurring']
     if data.get('repeat_type') is not None: s.repeat_type = data['repeat_type']
+    if data.get('repeat_interval') is not None: s.repeat_interval = data.get('repeat_interval') or 1
+    if data.get('repeat_infinite') is not None: s.repeat_infinite = data.get('repeat_infinite')
+    if data.get('repeat_weekdays') is not None: s.repeat_weekdays = data.get('repeat_weekdays') or 0
+    if data.get('repeat_week_of_month') is not None: s.repeat_week_of_month = data.get('repeat_week_of_month') or 0
+    if data.get('repeat_month_of_year') is not None: s.repeat_month_of_year = data.get('repeat_month_of_year') or 0
+    if data.get('reminder_minutes') is not None: s.reminder_minutes = data.get('reminder_minutes') or 0
     if data.get('is_recurring') and s.end_date:
         s.repeat_end_date = s.end_date
     elif not data.get('is_recurring'):
@@ -1434,6 +1452,124 @@ def bot_schedule_delete():
         auto_created = _ensure_day_routes(uid, evt_date)
     db.session.commit()
     return jsonify({"success":True, "auto_created": auto_created})
+
+@tongbot_bp.route('/api/bot/schedule/reminders', methods=['GET'])
+def bot_schedule_reminders():
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({"error": "로그인이 필요합니다."}), 401
+    from models import ScheduleReminderLog
+    logs = ScheduleReminderLog.query.filter_by(user_id=uid, seen=False).order_by(ScheduleReminderLog.event_date.asc()).all()
+    out = []
+    for l in logs:
+        out.append({"id": l.id, "title": l.title, "event_date": l.event_date.strftime('%Y-%m-%d %H:%M') if l.event_date else '', "occ_date": l.occ_date})
+    return jsonify({"reminders": out})
+
+@tongbot_bp.route('/api/bot/schedule/reminder/seen', methods=['POST'])
+def bot_schedule_reminder_seen():
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({"error": "로그인이 필요합니다."}), 401
+    data = request.get_json() or {}
+    ids = data.get('ids') or []
+    from models import ScheduleReminderLog
+    for l in ScheduleReminderLog.query.filter(ScheduleReminderLog.id.in_(ids), ScheduleReminderLog.user_id == uid).all():
+        l.seen = True
+    db.session.commit()
+    return jsonify({"success": True})
+
+def run_notification_check():
+    from datetime import datetime, timedelta
+    import calendar as _cal
+    from run import app
+    from models import TongBotSchedule, ScheduleReminderLog
+    with app.app_context():
+        now = datetime.utcnow()
+        scheds = TongBotSchedule.query.filter(TongBotSchedule.reminder_minutes > 0).all()
+        def _add_months(dt, n):
+            y, m = dt.year, dt.month + n
+            while m > 12:
+                m -= 12; y += 1
+            last = _cal.monthrange(y, m)[1]
+            return dt.replace(year=y, month=m, day=min(dt.day, last))
+        def nth_wd(y, m, wd, n):
+            d = 1
+            while datetime(y, m, d).weekday() != wd:
+                d += 1
+            d += (n - 1) * 7
+            if d > _cal.monthrange(y, m)[1]:
+                return -1
+            return d
+        def gen_occ(s, start_dt, end_dt):
+            out = []
+            ev = s.event_date
+            if not s.is_recurring:
+                if start_dt <= ev <= end_dt:
+                    out.append(ev)
+                return out
+            end = s.repeat_end_date or (datetime(2999, 12, 31) if s.repeat_infinite else ev)
+            if end > end_dt:
+                end = end_dt
+            rt = s.repeat_type or ''
+            interval = s.repeat_interval or 1
+            wd_mask = s.repeat_weekdays or 0
+            wom = s.repeat_week_of_month or 0
+            moy = s.repeat_month_of_year or 0
+            cur = max(ev, datetime(start_dt.year, start_dt.month, start_dt.day))
+            while cur <= end:
+                if wd_mask:
+                    wd = cur.weekday()
+                    if wd_mask & (1 << wd):
+                        ok = True
+                        if moy and cur.month != moy:
+                            ok = False
+                        elif wom and cur.day != nth_wd(cur.year, cur.month, wd, wom):
+                            ok = False
+                        if ok:
+                            out.append(datetime(cur.year, cur.month, cur.day, ev.hour, ev.minute))
+                    cur += timedelta(days=1)
+                elif rt == 'daily':
+                    if (cur - ev).days % interval == 0:
+                        out.append(datetime(cur.year, cur.month, cur.day, ev.hour, ev.minute))
+                    cur += timedelta(days=1)
+                elif rt == 'weekly':
+                    if cur.weekday() == ev.weekday() and ((cur - ev).days // 7) % interval == 0:
+                        out.append(datetime(cur.year, cur.month, cur.day, ev.hour, ev.minute))
+                    cur += timedelta(days=1)
+                elif rt == 'monthly':
+                    if cur.day == ev.day:
+                        months = (cur.year - ev.year) * 12 + (cur.month - ev.month)
+                        if months % interval == 0:
+                            out.append(datetime(cur.year, cur.month, cur.day, ev.hour, ev.minute))
+                        cur = _add_months(cur, 1)
+                    else:
+                        cur += timedelta(days=1)
+                elif rt == 'yearly':
+                    if cur.month == ev.month and cur.day == ev.day:
+                        if (cur.year - ev.year) % interval == 0:
+                            out.append(datetime(cur.year, cur.month, cur.day, ev.hour, ev.minute))
+                        cur = _add_months(cur, 12)
+                    else:
+                        cur += timedelta(days=1)
+                else:
+                    cur += timedelta(days=1)
+            return out
+        for s in scheds:
+            minutes = s.reminder_minutes or 0
+            if minutes <= 0:
+                continue
+            window_end = now + timedelta(minutes=minutes)
+            occs = gen_occ(s, now - timedelta(days=2), window_end)
+            for dt in occs:
+                reminder_t = dt - timedelta(minutes=minutes)
+                if reminder_t <= now < dt:
+                    occ_date = dt.strftime('%Y-%m-%d')
+                    exists = ScheduleReminderLog.query.filter_by(schedule_id=s.id, occ_date=occ_date).first()
+                    if not exists:
+                        db.session.add(ScheduleReminderLog(user_id=s.user_id, schedule_id=s.id, occ_date=occ_date, title=s.title, event_date=dt, seen=False))
+        db.session.commit()
+
+
 
 @tongbot_bp.route('/schedule')
 def schedule_popup():

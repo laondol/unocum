@@ -349,6 +349,13 @@ class TongBotSchedule(db.Model):
     is_recurring = db.Column(db.Boolean, default=False)
     repeat_type = db.Column(db.String(20), default='')
     repeat_end_date = db.Column(db.DateTime, nullable=True)
+    repeat_interval = db.Column(db.Integer, default=1)
+    repeat_infinite = db.Column(db.Boolean, default=False)
+    repeat_weekdays = db.Column(db.Integer, default=0)  # bitmask: Mon=1<<0 .. Sun=1<<6
+    repeat_week_of_month = db.Column(db.Integer, default=0)  # 0=매주, 1-5=N번째
+    repeat_month_of_year = db.Column(db.Integer, default=0)  # 0=매년아님, 1-12=해당월
+    reminder_minutes = db.Column(db.Integer, default=0)  # 0=알림안함, 10/30/60/1440(1일전)
+    repeat_exceptions = db.Column(db.Text, default='')  # JSON list of 'YYYY-MM-DD' dates to skip
 
 class ChatRoom(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -662,3 +669,15 @@ class SharedRoute(db.Model):
     source_schedule_id = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+
+
+class ScheduleReminderLog(db.Model):
+    __tablename__ = 'schedule_reminder_log'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    schedule_id = db.Column(db.Integer, db.ForeignKey('tong_bot_schedule.id'))
+    occ_date = db.Column(db.String(20))
+    title = db.Column(db.String(200))
+    event_date = db.Column(db.DateTime)
+    sent_at = db.Column(db.DateTime, default=datetime.now)
+    seen = db.Column(db.Boolean, default=False)
