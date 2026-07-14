@@ -352,24 +352,39 @@ def _parse_schedule_from_text(msg, uid):
     return result
 
 def _geocode_location(loc_name):
-    """장소명 → (lat,lng) 좌표"""
+    """location name -> (lat,lng); keyword->address->trim-trailing-token fallback"""
     if not loc_name:
         return None, None
     try:
         kakao_key = current_app.config.get('KAKAO_REST_API_KEY','')
         if not kakao_key:
             return None, None
-        resp = requests.get('https://dapi.kakao.com/v2/local/search/keyword.json', params={
-            'query': loc_name, 'size': 1
-        }, headers={'Authorization': f'KakaoAK {kakao_key}'}, timeout=2)
-        if resp.status_code == 200:
-            docs = resp.json().get('documents', [])
-            if docs:
-                return float(docs[0].get('y',0)), float(docs[0].get('x',0))
+        def _one(query):
+            try:
+                resp = requests.get('https://dapi.kakao.com/v2/local/search/keyword.json', params={'query':query,'size':1}, headers={'Authorization':f'KakaoAK {kakao_key}'}, timeout=2)
+                if resp.status_code == 200:
+                    docs = resp.json().get('documents', [])
+                    if docs:
+                        return float(docs[0].get('y',0)), float(docs[0].get('x',0))
+                resp = requests.get('https://dapi.kakao.com/v2/local/search/address.json', params={'query':query}, headers={'Authorization':f'KakaoAK {kakao_key}'}, timeout=2)
+                if resp.status_code == 200:
+                    docs = resp.json().get('documents', [])
+                    if docs:
+                        return float(docs[0].get('y',0)), float(docs[0].get('x',0))
+            except:
+                pass
+            return None
+        res = _one(loc_name)
+        if res:
+            return res
+        tokens = loc_name.split()
+        for i in range(1, min(len(tokens), 3)):
+            res = _one(' '.join(tokens[:-i]))
+            if res:
+                return res
     except:
         pass
     return None, None
-
 def _resolve_location(location_name, uid):
     """카카오 키워드 검색으로 장소→좌표,주소,소요시간"""
     if not location_name:
@@ -1138,8 +1153,8 @@ def _ensure_day_routes(uid, evt_date, exclude_ids=None):
     if not user: return []
     home_addr = f"{user.town or ''} {user.village or ''}".strip()
     if user.curr_address: home_addr = user.curr_address
-    home_lat = user.curr_latitude
-    home_lng = user.curr_longitude
+    home_lat = user.curr_latitude or user.reg_latitude
+    home_lng = user.curr_longitude or user.reg_longitude
     day_start = evt_date.replace(hour=0, minute=0, second=0)
     day_end = evt_date.replace(hour=23, minute=59, second=59)
     if user.temp_address and user.temp_latitude and user.temp_longitude and user.temp_start_date and user.temp_end_date:
@@ -1164,6 +1179,9 @@ def _ensure_day_routes(uid, evt_date, exclude_ids=None):
         db.session.delete(m)
     db.session.flush()
     # Get non-이동/귀가 events with locations, sorted (include all-day for 귀가 logic)
+    if not (home_lat and home_lng):
+        # no home coordinates -> cannot compute routes
+        return []
     all_day_events = TongBotSchedule.query.filter(
         TongBotSchedule.user_id == uid,
         TongBotSchedule.event_date >= day_start,
@@ -1229,6 +1247,9 @@ def _ensure_day_routes(uid, evt_date, exclude_ids=None):
         last_evt = all_events[-1]
         last_loc = last_evt.location
         last_lat, last_lng = _geocode_location(last_loc) or (None, None)
+        if not (last_lat and last_lng) and prev_lat and prev_lng:
+            last_loc = prev_location or last_loc
+            last_lat, last_lng = prev_lat, prev_lng
         skip_return = False
         return_title = "집으로 이동"
         return_dest = home_addr
