@@ -17,6 +17,12 @@ body{background:#f8f9fa;font-size:0.9rem;}
 .cal-day.event-blue::after{display:block;background:#0d6efd;}
 .cal-day.event-green::after{display:block;background:#198754;}
 .cal-day.event-gray::after{display:block;background:#adb5bd;}
+.recur-box{display:inline-block;border:2px solid #6f42c1;border-radius:4px;min-width:1.5em;padding:0 3px;line-height:1.2;font-weight:700;}
+.cal-day.event-recur{background:#f3ecfd;}
+.chip{display:inline-block;font-size:0.72rem;font-weight:700;padding:1px 6px;border-radius:10px;line-height:1.4;vertical-align:middle;}
+.chip-move{background:#e7f1ff;color:#0d6efd;border:1px solid #b6d4ff;}
+.chip-mail{background:#f1f3f5;color:#495057;border:1px solid #dee2e6;}
+.evt-move{border-left:3px solid #0d6efd;}
 .cal-day.today.event-red::after,.cal-day.today.event-blue::after,.cal-day.today.event-green::after,.cal-day.today.event-gray::after{background:#0d6e5e;}
 .cal-day.selstart{background:#0d6efd;color:#fff;font-weight:bold;}
 .cal-day.cal-sel{background:#cfe2ff;}
@@ -180,6 +186,8 @@ body{background:#f8f9fa;font-size:0.9rem;}
 
 <script>
 let calYear, calMonth, schedules = [], friends = [], selDate = null;
+function scheduleType(s){ if (s.title && (s.title.includes('이동') || s.title.includes('집으'))) return 'move'; return 'mail'; }
+function typeChip(s){ return scheduleType(s)==='move' ? '<span class="chip chip-move">🚌 이동</span> ' : '<span class="chip chip-mail">✉ 메일</span> '; }
 let repeatOn = false, addCalMode = 'start', addCalYear, addCalMonth;
 
 fetch('/api/chat/friends').then(r=>r.json()).then(d => {
@@ -254,7 +262,9 @@ function renderCal() {
             else if (colors.includes('green')) cls = 'event-green';
             else cls = 'event-gray';
         }
-        html += '<div class="cal-day '+(today?'today ':'')+cls+(ds===selDate?' selected':'')+'" onclick="showDay(\''+ds+'\')">'+d+'</div>';
+        const hasRecur = evts.some(s => s.is_recurring);
+        const numHtml = hasRecur ? '<span class="recur-box">'+d+'</span>' : d;
+        html += '<div class="cal-day '+(today?'today ':'')+cls+(hasRecur?' event-recur':'')+(ds===selDate?' selected':'')+'" onclick="showDay(\''+ds+'\')">'+numHtml+'</div>';
     }
     document.getElementById('calGrid').innerHTML = html;
 }
@@ -290,7 +300,7 @@ function showDay(date) {
             var _rm = {'daily':'일','weekly':'주','monthly':'월','yearly':'년'}[s.repeat_type] || '';
             repTxt = ' 🔁매'+(s.repeat_interval||1)+_rm+(s.repeat_infinite ? '(무한)' : '');
         }
-        h += '<div class="border-bottom py-1 mb-1 small"><strong>'+badge+' '+s.title+repTxt+'</strong><br>🕐 '+time+loc+accomm+'<br>';
+        h += '<div class="border-bottom py-1 mb-1 small'+(scheduleType(s)==='move'?' evt-move':'')+'"><strong>'+badge+' '+typeChip(s)+s.title+repTxt+'</strong><br>🕐 '+time+loc+accomm+'<br>';
         if ((s.title && (s.title.includes('이동') || s.title.includes('집으로'))) && s.content) {
             try {
                 var r = JSON.parse(s.content);
@@ -345,7 +355,7 @@ function renderEventList() {
     el.innerHTML = schedules.map(s => {
         const badge = {'red':'🔴','blue':'🔵','green':'🟢','gray':'⚪'}[s.color||'gray']||'⚪';
         const time = s.event_date ? s.event_date.split(' ')[1].substring(0,5) : '';
-        return '<div class="border-bottom py-1"><strong>'+badge+' '+s.title+'</strong><br><small>🕐 '+time+'</small>'+(s.location?'<br><small>📍 '+s.location+'</small>':'')+'<br><button class="btn btn-sm btn-outline-secondary mt-1 me-1" onclick="editEvent(\'' + s.id + '\')">✏️</button><button class="btn btn-sm btn-outline-danger mt-1" onclick="confirmDelete(\'' + s.id + '\')">✕</button></div>';
+        return '<div class="border-bottom py-1'+(scheduleType(s)==='move'?' evt-move':'')+'"><strong>'+badge+' '+typeChip(s)+s.title+'</strong><br><small>🕐 '+time+'</small>'+(s.location?'<br><small>📍 '+s.location+'</small>':'')+'<br><button class="btn btn-sm btn-outline-secondary mt-1 me-1" onclick="editEvent(\'' + s.id + '\')">✏️</button><button class="btn btn-sm btn-outline-danger mt-1" onclick="confirmDelete(\'' + s.id + '\')">✕</button></div>';
     }).join('');
 }
 
