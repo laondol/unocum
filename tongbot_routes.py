@@ -1132,6 +1132,51 @@ def bot_schedule_calc_time():
     except Exception as e:
         return jsonify({"error": str(e)})
 
+def _gen_occurrence_dates(start_date, repeat_type, end_date):
+    """Return list of date objects for recurring occurrences (inclusive of start).
+
+    Semantics mirror the schedule display expansion:
+    daily=every day, weekly=same weekday, monthly=same day-of-month,
+    yearly=same month/day. Returns [start_date] when not recurring.
+    """
+    if isinstance(start_date, datetime):
+        start_date = start_date.date()
+    if end_date and isinstance(end_date, datetime):
+        end_date = end_date.date()
+    if not repeat_type:
+        return [start_date]
+    results = [start_date]
+    if not end_date or end_date < start_date:
+        return results
+    cur = start_date + timedelta(days=1)
+    while cur <= end_date:
+        if repeat_type == 'daily':
+            pass
+        elif repeat_type == 'weekly':
+            if cur.weekday() != start_date.weekday():
+                cur += timedelta(days=1)
+                continue
+        elif repeat_type == 'monthly':
+            try:
+                cand = cur.replace(day=start_date.day)
+            except ValueError:
+                cur += timedelta(days=1)
+                continue
+            if cand != cur:
+                cur += timedelta(days=1)
+                continue
+        elif repeat_type == 'yearly':
+            if cur.month != start_date.month or cur.day != start_date.day:
+                cur += timedelta(days=1)
+                continue
+        else:
+            cur += timedelta(days=1)
+            continue
+        results.append(cur)
+        cur += timedelta(days=1)
+    return results
+
+
 def _ensure_day_routes(uid, evt_date, exclude_ids=None):
     """Recalculate all 이동/귀가 routes for a given day based on current non-이동/귀가 events."""
     user = User.query.get(uid)
@@ -1184,6 +1229,37 @@ def _ensure_day_routes(uid, evt_date, exclude_ids=None):
         TongBotSchedule.location != '',
         TongBotSchedule.is_allday != True
     ).order_by(TongBotSchedule.event_date.asc()).all()
+    # Virtual-expand recurring events whose occurrence falls on this day (day 2+)
+    try:
+        from types import SimpleNamespace
+        rec_bases = TongBotSchedule.query.filter(
+            TongBotSchedule.user_id == uid,
+            TongBotSchedule.is_recurring == True,
+            TongBotSchedule.event_date <= day_end,
+            TongBotSchedule.repeat_end_date >= day_start,
+            ~TongBotSchedule.title.like('%이동%'),
+            ~TongBotSchedule.title.like('%귀가%'),
+        ).all()
+        for base in rec_bases:
+            b_date = base.event_date
+            if not b_date or b_date.date() == evt_date.date():
+                continue  # base day already covered by DB query above
+            occ = _gen_occurrence_dates(b_date, base.repeat_type, base.repeat_end_date)
+            if evt_date.date() not in occ:
+                continue
+            occ_dt = datetime(evt_date.year, evt_date.month, evt_date.day, b_date.hour, b_date.minute)
+            occ_end = None
+            if base.end_date:
+                occ_end = datetime(evt_date.year, evt_date.month, evt_date.day, base.end_date.hour, base.end_date.minute)
+            vevt = SimpleNamespace(id=f"rec-{base.id}-{evt_date.date()}", title=base.title,
+                                   location=base.location, event_date=occ_dt, end_date=occ_end,
+                                   is_allday=base.is_allday)
+            if base.is_allday:
+                all_day_events.append(vevt)
+            else:
+                events.append(vevt)
+    except Exception:
+        pass
     if not events and not all_day_events: return []
     auto_created = []
     prev_location = None
@@ -1309,35 +1385,18 @@ def bot_schedule():
         # Expand recurring events
         recurring_items = [it for it in result_list if it.get('is_recurring') and it.get('end_date')]
         for rit in recurring_items:
-            base_s = next(s for s in schedules if s.id == rit['id'])
             try:
-                from datetime import timedelta
-                start_dt = datetime.strptime(rit['event_date'][:10], '%Y-%m-%d')
-                end_dt = datetime.strptime(rit['end_date'][:10], '%Y-%m-%d')
-                rt = rit['repeat_type']
-                cur = start_dt + timedelta(days=1)
-                while cur <= end_dt:
-                    if rt == 'daily':
-                        pass
-                    elif rt == 'weekly' and cur.weekday() != start_dt.weekday():
-                        cur += timedelta(days=1)
-                        continue
-                    elif rt == 'monthly' and cur.day != start_dt.day:
-                        cur += timedelta(days=1)
-                        if cur.day == start_dt.day: continue
-                        if cur.month != (cur - timedelta(days=1)).month: cur = cur.replace(day=start_dt.day) if start_dt.day <= 28 else cur
-                        cur += timedelta(days=1)
-                        continue
-                    elif rt == 'yearly' and (cur.month != start_dt.month or cur.day != start_dt.day):
-                        cur += timedelta(days=1)
+                start_d = datetime.strptime(rit['event_date'][:10], '%Y-%m-%d').date()
+                end_d = datetime.strptime(rit['end_date'][:10], '%Y-%m-%d').date()
+                for occ in _gen_occurrence_dates(start_d, rit['repeat_type'], end_d):
+                    if occ == start_d:
                         continue
                     new_item = dict(rit)
-                    new_item['id'] = f"{rit['id']}_{cur.strftime('%Y%m%d')}"
-                    new_item['event_date'] = cur.strftime('%Y-%m-%d') + rit['event_date'][10:]
+                    new_item['id'] = f"{rit['id']}_{occ.strftime('%Y%m%d')}"
+                    new_item['event_date'] = occ.strftime('%Y-%m-%d') + rit['event_date'][10:]
                     if rit.get('end_date'):
-                        new_item['end_date'] = cur.strftime('%Y-%m-%d') + rit['end_date'][10:]
+                        new_item['end_date'] = occ.strftime('%Y-%m-%d') + rit['end_date'][10:]
                     result_list.append(new_item)
-                    cur += timedelta(days=1)
             except:
                 pass
         return jsonify({"schedules": result_list})
@@ -1365,7 +1424,12 @@ def bot_schedule():
     db.session.add(s)
     db.session.flush()
 
-    auto_created = _ensure_day_routes(uid, s.event_date)
+    auto_created = []
+    for _occ in _gen_occurrence_dates(s.event_date, s.repeat_type, s.repeat_end_date):
+        _occ_dt = datetime(_occ.year, _occ.month, _occ.day, s.event_date.hour, s.event_date.minute)
+        _res = _ensure_day_routes(uid, _occ_dt)
+        if _res:
+            auto_created.extend(_res)
     db.session.commit()
     return jsonify({"success": True, "id": s.id, "auto_created": auto_created})
 
@@ -1380,6 +1444,9 @@ def bot_schedule_update():
     old_date = s.event_date
     old_end = s.end_date
     old_loc = s.location
+    old_is_recurring = s.is_recurring
+    old_repeat_type = s.repeat_type
+    old_repeat_end = s.repeat_end_date
     if data.get('title'): s.title = data['title']
     if data.get('location') is not None: s.location = data['location']
     if data.get('description'): s.description = data['description']
@@ -1408,8 +1475,13 @@ def bot_schedule_update():
         date_changed = data.get('event_date') is not None and new_date != old_date
         end_changed = data.get('end_date') is not None and new_end != old_end
         if loc_changed or date_changed or end_changed:
-            recalc_dates = {old_date.replace(hour=0, minute=0, second=0)}
-            recalc_dates.add(new_date.replace(hour=0, minute=0, second=0))
+            recalc_dates = {old_date.replace(hour=0, minute=0, second=0), new_date.replace(hour=0, minute=0, second=0)}
+            if old_is_recurring and old_repeat_end:
+                for _d in _gen_occurrence_dates(old_date, old_repeat_type, old_repeat_end):
+                    recalc_dates.add(datetime(_d.year, _d.month, _d.day))
+            if s.is_recurring and s.repeat_end_date:
+                for _d in _gen_occurrence_dates(s.event_date, s.repeat_type, s.repeat_end_date):
+                    recalc_dates.add(datetime(_d.year, _d.month, _d.day))
             for rd in recalc_dates:
                 _ensure_day_routes(uid, rd)
             db.session.commit()
@@ -1423,12 +1495,21 @@ def bot_schedule_delete():
     s = TongBotSchedule.query.get(data.get('id'))
     if not s or s.user_id != uid: return jsonify({"error":"권한없음"}),403
     evt_date = s.event_date
+    was_recurring = s.is_recurring
+    rec_type = s.repeat_type
+    rec_end = s.repeat_end_date
     is_move = s.title and ('이동' in s.title or '귀가' in s.title)
     db.session.delete(s)
     db.session.flush()
     auto_created = []
     if not is_move:
-        auto_created = _ensure_day_routes(uid, evt_date)
+        if was_recurring and rec_end:
+            for _d in _gen_occurrence_dates(evt_date, rec_type, rec_end):
+                _r = _ensure_day_routes(uid, datetime(_d.year, _d.month, _d.day))
+                if _r:
+                    auto_created.extend(_r)
+        else:
+            auto_created = _ensure_day_routes(uid, evt_date)
     db.session.commit()
     return jsonify({"success":True, "auto_created": auto_created})
 
