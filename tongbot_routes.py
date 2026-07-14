@@ -1802,7 +1802,7 @@ def bot_schedule_delete():
     if not is_move:
         if _was_recurring and _rec_end:
             _base = type('DB', (), {'event_date': evt_date, 'is_recurring': True, 'repeat_type': _rec_type, 'repeat_interval': _rec_interval, 'repeat_weekdays': _rec_weekdays, 'repeat_week_of_month': _rec_wom, 'repeat_month_of_year': _rec_moy, 'repeat_infinite': _rec_infinite, 'repeat_end_date': _rec_end, 'repeat_exceptions': ''})()
-            for _d in _gen_occurrences(_base):
+            for _d in [evt_date.date()] + list(_gen_occurrences(_base)):
                 _r = _ensure_day_routes(uid, datetime(_d.year, _d.month, _d.day))
                 if _r:
                     auto_created.extend(_r)
