@@ -1,4 +1,6 @@
 import random, string, re, requests, json
+import calendar
+from types import SimpleNamespace
 from sqlalchemy import or_
 from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template, current_app
 from models import db, User, TongBot, TongBotDraft, TongBotSchedule, ChatRoom, ChatMessage, Message, FriendCache, BotKnowledge, StoreInfo, ShareReport, SharedRoute
@@ -360,7 +362,7 @@ def _geocode_location(loc_name):
         if not kakao_key:
             return None, None
         resp = requests.get('https://dapi.kakao.com/v2/local/search/keyword.json', params={
-            'query': loc_name, 'size': 1
+            'query': (loc_name.split('(')[0].strip() or loc_name), 'size': 1
         }, headers={'Authorization': f'KakaoAK {kakao_key}'}, timeout=2)
         if resp.status_code == 200:
             docs = resp.json().get('documents', [])
@@ -1132,6 +1134,161 @@ def bot_schedule_calc_time():
     except Exception as e:
         return jsonify({"error": str(e)})
 
+def _is_occurrence(base, target):
+    start = getattr(base, 'event_date', None)
+    if not start:
+        return False
+    start_d = start.date() if hasattr(start, 'date') else start
+    if target == start_d:
+        return True
+    if target < start_d:
+        return False
+    if not getattr(base, 'is_recurring', False):
+        return False
+    if getattr(base, 'repeat_infinite', False):
+        end_d = datetime(2999, 12, 31).date()
+    else:
+        end_dt = getattr(base, 'repeat_end_date', None)
+        if not end_dt:
+            return False
+        end_d = end_dt.date() if hasattr(end_dt, 'date') else end_dt
+    if target > end_d:
+        return False
+    rt = getattr(base, 'repeat_type', '') or ''
+    interval = getattr(base, 'repeat_interval', 1) or 1
+    wd_mask = getattr(base, 'repeat_weekdays', 0) or 0
+    moy = getattr(base, 'repeat_month_of_year', 0) or 0
+    wom = getattr(base, 'repeat_week_of_month', 0) or 0
+    exc = set()
+    try:
+        exc = set(json.loads(getattr(base, 'repeat_exceptions', '') or '[]'))
+    except Exception:
+        exc = set()
+    if target.strftime('%Y-%m-%d') in exc:
+        return False
+    if wd_mask:
+        wd = target.weekday()
+        if not (wd_mask & (1 << wd)):
+            return False
+        if moy and target.month != moy:
+            return False
+        if wom:
+            d = 1
+            while datetime(target.year, target.month, d).weekday() != wd:
+                d += 1
+            d += (wom - 1) * 7
+            if d > calendar.monthrange(target.year, target.month)[1]:
+                return False
+            if target.day != d:
+                return False
+        return True
+    if rt == 'daily':
+        return (target - start_d).days % interval == 0
+    if rt == 'weekly':
+        if target.weekday() != start_d.weekday():
+            return False
+        return ((target - start_d).days // 7) % interval == 0
+    if rt == 'monthly':
+        if target.day != start_d.day:
+            return False
+        months = (target.year - start_d.year) * 12 + (target.month - start_d.month)
+        return months % interval == 0
+    if rt == 'yearly':
+        if target.month != start_d.month or target.day != start_d.day:
+            return False
+        return (target.year - start_d.year) % interval == 0
+    return False
+
+
+def _gen_occurrences(base):
+    import calendar as _cal
+    start = getattr(base, 'event_date', None)
+    if not start:
+        return []
+    start_d = start.date() if hasattr(start, 'date') else start
+    if getattr(base, 'repeat_infinite', False):
+        end_d = datetime(2999, 12, 31).date()
+    else:
+        end_dt = getattr(base, 'repeat_end_date', None)
+        if not end_dt:
+            return []
+        end_d = end_dt.date() if hasattr(end_dt, 'date') else end_dt
+    rt = getattr(base, 'repeat_type', '') or ''
+    interval = getattr(base, 'repeat_interval', 1) or 1
+    wd_mask = getattr(base, 'repeat_weekdays', 0) or 0
+    moy = getattr(base, 'repeat_month_of_year', 0) or 0
+    wom = getattr(base, 'repeat_week_of_month', 0) or 0
+    exc = set()
+    try:
+        exc = set(json.loads(getattr(base, 'repeat_exceptions', '') or '[]'))
+    except Exception:
+        exc = set()
+
+    def _add_months(dt, n):
+        y, m = dt.year, dt.month + n
+        while m > 12:
+            m -= 12
+            y += 1
+        last = _cal.monthrange(y, m)[1]
+        return dt.replace(year=y, month=m, day=min(dt.day, last))
+
+    def _nth_weekday_day(y, m, wd, n):
+        d = 1
+        while datetime(y, m, d).weekday() != wd:
+            d += 1
+        d += (n - 1) * 7
+        if d > _cal.monthrange(y, m)[1]:
+            return -1
+        return d
+
+    out = []
+    emitted = 0
+    cur = start_d + timedelta(days=1)
+    guard = 0
+    while cur <= end_d and emitted < 120 and guard < 600000:
+        guard += 1
+        do_emit = False
+        nxt = cur + timedelta(days=1)
+        if wd_mask:
+            wd = cur.weekday()
+            if wd_mask & (1 << wd):
+                ok = True
+                if moy and cur.month != moy:
+                    ok = False
+                elif wom and cur.day != _nth_weekday_day(cur.year, cur.month, wd, wom):
+                    ok = False
+                if ok:
+                    do_emit = True
+        elif rt == 'daily':
+            if (cur - start_d).days % interval == 0:
+                do_emit = True
+            nxt = cur + timedelta(days=1)
+        elif rt == 'weekly':
+            if cur.weekday() == start_d.weekday() and ((cur - start_d).days // 7) % interval == 0:
+                do_emit = True
+            nxt = cur + timedelta(days=1)
+        elif rt == 'monthly':
+            if cur.day == start_d.day:
+                months = (cur.year - start_d.year) * 12 + (cur.month - start_d.month)
+                if months % interval == 0:
+                    do_emit = True
+                nxt = _add_months(cur, 1)
+            else:
+                nxt = cur + timedelta(days=1)
+        elif rt == 'yearly':
+            if cur.month == start_d.month and cur.day == start_d.day:
+                if (cur.year - start_d.year) % interval == 0:
+                    do_emit = True
+                nxt = _add_months(cur, 12)
+            else:
+                nxt = cur + timedelta(days=1)
+        if do_emit and cur.strftime('%Y-%m-%d') not in exc:
+            emitted += 1
+            out.append(cur)
+        cur = nxt
+    return out
+
+
 def _ensure_day_routes(uid, evt_date, exclude_ids=None):
     """Recalculate all 이동/귀가 routes for a given day based on current non-이동/귀가 events."""
     user = User.query.get(uid)
@@ -1187,6 +1344,34 @@ def _ensure_day_routes(uid, evt_date, exclude_ids=None):
         TongBotSchedule.location != '',
         TongBotSchedule.is_allday != True
     ).order_by(TongBotSchedule.event_date.asc()).all()
+    rec_bases = TongBotSchedule.query.filter(
+        TongBotSchedule.user_id == uid,
+        TongBotSchedule.is_recurring == True,
+        TongBotSchedule.event_date <= day_end,
+        or_(TongBotSchedule.repeat_end_date >= day_start, TongBotSchedule.repeat_infinite == True),
+        ~TongBotSchedule.title.like('%이동%'),
+        ~TongBotSchedule.title.like('%귀가%'),
+    ).all()
+    for base in rec_bases:
+        b_date = base.event_date
+        if not b_date:
+            continue
+        if b_date.date() == evt_date.date():
+            continue
+        if not _is_occurrence(base, evt_date.date()):
+            continue
+        occ_dt = datetime(evt_date.year, evt_date.month, evt_date.day, b_date.hour, b_date.minute)
+        occ_end = None
+        if base.end_date:
+            occ_end = datetime(evt_date.year, evt_date.month, evt_date.day, base.end_date.hour, base.end_date.minute)
+        vevt = SimpleNamespace(id="rec-%s-%s" % (base.id, evt_date.date()), title=base.title,
+                               location=base.location, event_date=occ_dt, end_date=occ_end,
+                               is_allday=base.is_allday)
+        if base.is_allday:
+            all_day_events.append(vevt)
+        else:
+            events.append(vevt)
+
     if not events and not all_day_events: return []
     auto_created = []
     prev_location = None
@@ -1244,7 +1429,7 @@ def _ensure_day_routes(uid, evt_date, exclude_ids=None):
                     return_title = "임시숙소로 이동"
                     return_dest = f"[임시] {user.temp_address}"
                     return_lat, return_lng = user.temp_latitude, user.temp_longitude
-        if not skip_return and last_lat and last_lng and return_lat and return_lng and haversine_km(last_lat, last_lng, return_lat, return_lng) > 1.0:
+        if not skip_return and last_lat and last_lng and return_lat and return_lng:
             target_arrival = "22:00"
             plan_home = plan_segment(last_loc, last_lat, last_lng, return_dest, return_lat, return_lng, target_arrival,
                 home_town=user.town or '', home_village=user.village or '',
@@ -1445,11 +1630,26 @@ def bot_schedule_delete():
     if not s or s.user_id != uid: return jsonify({"error":"권한없음"}),403
     evt_date = s.event_date
     is_move = s.title and ('이동' in s.title or '귀가' in s.title)
+    _was_recurring = s.is_recurring
+    _rec_type = s.repeat_type
+    _rec_interval = s.repeat_interval
+    _rec_weekdays = s.repeat_weekdays
+    _rec_wom = s.repeat_week_of_month
+    _rec_moy = s.repeat_month_of_year
+    _rec_infinite = s.repeat_infinite
+    _rec_end = s.repeat_end_date
     db.session.delete(s)
     db.session.flush()
     auto_created = []
     if not is_move:
-        auto_created = _ensure_day_routes(uid, evt_date)
+        if _was_recurring and _rec_end:
+            _base = type('DB', (), {'event_date': evt_date, 'is_recurring': True, 'repeat_type': _rec_type, 'repeat_interval': _rec_interval, 'repeat_weekdays': _rec_weekdays, 'repeat_week_of_month': _rec_wom, 'repeat_month_of_year': _rec_moy, 'repeat_infinite': _rec_infinite, 'repeat_end_date': _rec_end, 'repeat_exceptions': ''})()
+            for _d in [evt_date.date()] + list(_gen_occurrences(_base)):
+                _r = _ensure_day_routes(uid, datetime(_d.year, _d.month, _d.day))
+                if _r:
+                    auto_created.extend(_r)
+        else:
+            auto_created = _ensure_day_routes(uid, evt_date)
     db.session.commit()
     return jsonify({"success":True, "auto_created": auto_created})
 
