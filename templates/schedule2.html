@@ -65,12 +65,11 @@ body{background:#f8f9fa;font-size:0.9rem;}
             <div class="col-4 d-flex align-items-end gap-2" style="position:relative;">
                 <button type="button" class="btn btn-sm btn-outline-secondary" id="btnRepeat" onclick="toggleRepeat()">🔁 반복</button>
                 <div id="repeatOptions" style="display:none; position:absolute; top:100%; left:0; z-index:30; background:#fff; border:1px solid #ced4da; border-radius:8px; padding:8px; box-shadow:0 4px 12px rgba(0,0,0,.15);" class="gap-1 align-items-center flex-wrap">
-                    <span class="small">매</span>
-                    <input type="number" id="addRepeatInterval" class="form-control form-control-sm" style="width:64px;" min="1" max="365" value="1">
-                    <label class="small"><input type="radio" name="repeatType" value="daily"> 일</label>
-                    <label class="small"><input type="radio" name="repeatType" value="weekly"> 주</label>
-                    <label class="small"><input type="radio" name="repeatType" value="monthly"> 월</label>
-                    <label class="small"><input type="radio" name="repeatType" value="yearly"> 년</label>
+                    <input type="number" id="addRepeatInterval" class="form-control form-control-sm" style="width:48px;" min="1" max="365" value="1">
+                    <label class="small"><input type="radio" name="repeatType" value="daily"> 매일</label>
+                    <label class="small"><input type="radio" name="repeatType" value="weekly"> 매주</label>
+                    <label class="small"><input type="radio" name="repeatType" value="monthly"> 매월</label>
+                    <label class="small"><input type="radio" name="repeatType" value="yearly"> 매년</label>
                         <div class="border-top mt-1 pt-1 w-100">
                             <div class="small fw-bold mb-1">요일 반복 (체크 시 날짜반복 무시)</div>
                             <div class="d-flex gap-1 flex-wrap">
@@ -351,11 +350,11 @@ function renderEventList() {
 }
 
 function addOnDate(date) {
-    document.getElementById('addDate').value = date;
-    document.getElementById('addEndDate').value = date;
     document.getElementById('accommodationSection').style.display = 'none';
     document.getElementById('addAccommodation').value = '';
     switchTab('add');
+    document.getElementById('addDate').value = date;
+    document.getElementById('addEndDate').value = date;
 }
 
 function changeMonth(d) {
@@ -537,7 +536,18 @@ function getWeekdayMask() {
 function updateRepeatMode() {
     var wd = getWeekdayMask();
     var rbs = document.getElementsByName('repeatType');
-    for (var i=0;i<rbs.length;i++) rbs[i].disabled = !!wd;
+    for (var i=0;i<rbs.length;i++) {
+        var v = rbs[i].value;
+        // 요일 반복은 매주/매월 만 허용 (매일/매년 비활성)
+        rbs[i].disabled = !!wd && (v === 'daily' || v === 'yearly');
+    }
+    if (wd) {
+        var sel = false;
+        for (var i=0;i<rbs.length;i++) { if (rbs[i].checked && !rbs[i].disabled) { sel = true; break; } }
+        if (!sel) {
+            for (var i=0;i<rbs.length;i++) { if (rbs[i].value === 'weekly') { rbs[i].checked = true; break; } }
+        }
+    }
 }
 
 function memoExec(cmd){ var ed=document.getElementById('memoEditor'); ed.focus(); try{ document.execCommand(cmd, false, null); }catch(e){} }
@@ -752,6 +762,9 @@ function saveEvent() {
     if (isRecurring) {
         var rbs = document.getElementsByName('repeatType');
         for (var i=0;i<rbs.length;i++) { if(rbs[i].checked) { repeatType = rbs[i].value; break; } }
+    }
+    if (isRecurring && repeatWeekdays && repeatType !== 'weekly' && repeatType !== 'monthly') {
+        return alert('요일 반복은 매주 또는 매월 중 하나를 선택하세요.');
     }
     if (!title || !date) return alert('제목과 날짜를 입력하세요.');
     var evt = isAllDay ? date+'T00:00' : (start ? date+'T'+start : date+'T09:00');

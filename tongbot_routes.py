@@ -1204,6 +1204,40 @@ def _ensure_day_routes(uid, evt_date, exclude_ids=None):
         TongBotSchedule.location != '',
         TongBotSchedule.is_allday != True
     ).order_by(TongBotSchedule.event_date.asc()).all()
+    # Virtual-expand recurring occurrences that fall on this day (day 2+)
+    try:
+        from types import SimpleNamespace
+        rec_bases = TongBotSchedule.query.filter(
+            TongBotSchedule.user_id == uid,
+            TongBotSchedule.is_recurring == True,
+            TongBotSchedule.event_date <= day_end,
+            or_(TongBotSchedule.repeat_end_date >= day_start, TongBotSchedule.repeat_infinite == True),
+            ~TongBotSchedule.title.like('%이동%'),
+            ~TongBotSchedule.title.like('%귀가%'),
+        ).all()
+        for base in rec_bases:
+            b_date = base.event_date
+            if not b_date:
+                continue
+            if b_date.date() == evt_date.date():
+                continue
+            if not _is_occurrence(base, evt_date.date()):
+                continue
+            occ_dt = datetime(evt_date.year, evt_date.month, evt_date.day, b_date.hour, b_date.minute)
+            occ_end = None
+            if base.end_date:
+                occ_end = datetime(evt_date.year, evt_date.month, evt_date.day, base.end_date.hour, base.end_date.minute)
+            vevt = SimpleNamespace(id="rec-%s-%s" % (base.id, evt_date.date()), title=base.title,
+                                   location=base.location, event_date=occ_dt, end_date=occ_end,
+                                   is_allday=base.is_allday)
+            if base.is_allday:
+                all_day_events.append(vevt)
+            else:
+                events.append(vevt)
+    except Exception:
+        pass
+
+
     if not events and not all_day_events: return []
     auto_created = []
     prev_location = None
@@ -1264,7 +1298,7 @@ def _ensure_day_routes(uid, evt_date, exclude_ids=None):
                     return_title = "임시숙소로 이동"
                     return_dest = f"[임시] {user.temp_address}"
                     return_lat, return_lng = user.temp_latitude, user.temp_longitude
-        if not skip_return and last_lat and last_lng and return_lat and return_lng and haversine_km(last_lat, last_lng, return_lat, return_lng) > 1.0:
+        if not skip_return and last_lat and last_lng and return_lat and return_lng:
             target_arrival = "22:00"
             plan_home = plan_segment(last_loc, last_lat, last_lng, return_dest, return_lat, return_lng, target_arrival,
                 home_town=user.town or '', home_village=user.village or '',
@@ -1470,7 +1504,13 @@ def bot_schedule():
     db.session.add(s)
     db.session.flush()
 
-    auto_created = _ensure_day_routes(uid, s.event_date)
+    auto_created = []
+    _days = [s.event_date.date()] + _gen_occurrences(s)
+    for _occ in _days:
+        _occ_dt = datetime(_occ.year, _occ.month, _occ.day, s.event_date.hour, s.event_date.minute)
+        _res = _ensure_day_routes(uid, _occ_dt)
+        if _res:
+            auto_created.extend(_res)
     db.session.commit()
     return jsonify({"success": True, "id": s.id, "auto_created": auto_created})
 
@@ -1648,6 +1688,14 @@ def bot_schedule_update():
     old_date = s.event_date
     old_end = s.end_date
     old_loc = s.location
+    old_is_recurring = s.is_recurring
+    old_repeat_type = s.repeat_type
+    old_repeat_interval = s.repeat_interval
+    old_repeat_weekdays = s.repeat_weekdays
+    old_repeat_wom = s.repeat_week_of_month
+    old_repeat_moy = s.repeat_month_of_year
+    old_repeat_infinite = s.repeat_infinite
+    old_repeat_end = s.repeat_end_date
     if data.get('title'): s.title = data['title']
     if data.get('location') is not None: s.location = data['location']
     if data.get('description'): s.description = data['description']
@@ -1679,9 +1727,15 @@ def bot_schedule_update():
         loc_changed = data.get('location') is not None and new_loc != old_loc
         date_changed = data.get('event_date') is not None and new_date != old_date
         end_changed = data.get('end_date') is not None and new_end != old_end
-        if loc_changed or date_changed or end_changed:
-            recalc_dates = {old_date.replace(hour=0, minute=0, second=0)}
-            recalc_dates.add(new_date.replace(hour=0, minute=0, second=0))
+        if loc_changed or date_changed or end_changed or (old_is_recurring != s.is_recurring) or (old_repeat_type != s.repeat_type) or (old_repeat_weekdays != s.repeat_weekdays) or (old_repeat_wom != s.repeat_week_of_month) or (old_repeat_moy != s.repeat_month_of_year) or (old_repeat_infinite != s.repeat_infinite) or (old_repeat_end != s.repeat_end_date):
+            recalc_dates = {old_date.replace(hour=0, minute=0, second=0), new_date.replace(hour=0, minute=0, second=0)}
+            if old_is_recurring and old_repeat_end:
+                _old_base = type('OB', (), {'event_date': old_date, 'is_recurring': True, 'repeat_type': old_repeat_type, 'repeat_interval': old_repeat_interval, 'repeat_weekdays': old_repeat_weekdays, 'repeat_week_of_month': old_repeat_wom, 'repeat_month_of_year': old_repeat_moy, 'repeat_infinite': old_repeat_infinite, 'repeat_end_date': old_repeat_end, 'repeat_exceptions': ''})()
+                for _d in _gen_occurrences(_old_base):
+                    recalc_dates.add(datetime(_d.year, _d.month, _d.day))
+            if s.is_recurring and s.repeat_end_date:
+                for _d in _gen_occurrences(s):
+                    recalc_dates.add(datetime(_d.year, _d.month, _d.day))
             for rd in recalc_dates:
                 _ensure_day_routes(uid, rd)
             db.session.commit()
@@ -1712,6 +1766,8 @@ def bot_schedule_delete():
             if occ_date[:10] not in exc:
                 exc.append(occ_date[:10])
             s.repeat_exceptions = _json.dumps(exc, ensure_ascii=False)
+            if occ:
+                _ensure_day_routes(uid, datetime(occ.year, occ.month, occ.day, s.event_date.hour, s.event_date.minute))
             db.session.commit()
             return jsonify({"success": True})
         if mode == 'this_after':
@@ -1721,14 +1777,37 @@ def bot_schedule_delete():
                 s.end_date = occ - timedelta(days=1)
                 s.repeat_infinite = False
                 db.session.commit()
+                if not is_move:
+                    _tail_end = s.repeat_end_date.date() if s.repeat_end_date else (occ + timedelta(days=730)).date()
+                    _cur = occ.date()
+                    _g = 0
+                    while _cur <= _tail_end and _g < 2000:
+                        _g += 1
+                        _ensure_day_routes(uid, datetime(_cur.year, _cur.month, _cur.day))
+                        _cur += timedelta(days=1)
                 return jsonify({"success": True})
     # 전체 삭제 (기본)
     evt_date = s.event_date
+    _was_recurring = s.is_recurring
+    _rec_type = s.repeat_type
+    _rec_interval = s.repeat_interval
+    _rec_weekdays = s.repeat_weekdays
+    _rec_wom = s.repeat_week_of_month
+    _rec_moy = s.repeat_month_of_year
+    _rec_infinite = s.repeat_infinite
+    _rec_end = s.repeat_end_date
     db.session.delete(s)
     db.session.flush()
     auto_created = []
     if not is_move:
-        auto_created = _ensure_day_routes(uid, evt_date)
+        if _was_recurring and _rec_end:
+            _base = type('DB', (), {'event_date': evt_date, 'is_recurring': True, 'repeat_type': _rec_type, 'repeat_interval': _rec_interval, 'repeat_weekdays': _rec_weekdays, 'repeat_week_of_month': _rec_wom, 'repeat_month_of_year': _rec_moy, 'repeat_infinite': _rec_infinite, 'repeat_end_date': _rec_end, 'repeat_exceptions': ''})()
+            for _d in _gen_occurrences(_base):
+                _r = _ensure_day_routes(uid, datetime(_d.year, _d.month, _d.day))
+                if _r:
+                    auto_created.extend(_r)
+        else:
+            auto_created = _ensure_day_routes(uid, evt_date)
     db.session.commit()
     return jsonify({"success":True, "auto_created": auto_created})
 
@@ -2340,3 +2419,159 @@ def bot_route_shared_list():
         "total_min":r.total_min,"distance_km":r.distance_km,
         "creator_id":r.creator_id
     } for r in routes]})
+
+
+def _is_occurrence(base, target):
+    # O(1) check whether `target` (date) is an occurrence of recurring `base`
+    start = getattr(base, 'event_date', None)
+    if not start:
+        return False
+    start_d = start.date() if hasattr(start, 'date') else start
+    if target == start_d:
+        return True
+    if target < start_d:
+        return False
+    if not getattr(base, 'is_recurring', False):
+        return False
+    if getattr(base, 'repeat_infinite', False):
+        end_d = datetime(2999, 12, 31).date()
+    else:
+        end_dt = getattr(base, 'repeat_end_date', None)
+        if not end_dt:
+            return False
+        end_d = end_dt.date() if hasattr(end_dt, 'date') else end_dt
+    if target > end_d:
+        return False
+    rt = getattr(base, 'repeat_type', '') or ''
+    interval = getattr(base, 'repeat_interval', 1) or 1
+    wd_mask = getattr(base, 'repeat_weekdays', 0) or 0
+    moy = getattr(base, 'repeat_month_of_year', 0) or 0
+    wom = getattr(base, 'repeat_week_of_month', 0) or 0
+    exc = set()
+    try:
+        exc = set(json.loads(getattr(base, 'repeat_exceptions', '') or '[]'))
+    except Exception:
+        exc = set()
+    if target.strftime('%Y-%m-%d') in exc:
+        return False
+    if wd_mask:
+        wd = target.weekday()
+        if not (wd_mask & (1 << wd)):
+            return False
+        if moy and target.month != moy:
+            return False
+        if wom:
+            d = 1
+            while datetime(target.year, target.month, d).weekday() != wd:
+                d += 1
+            d += (wom - 1) * 7
+            if d > calendar.monthrange(target.year, target.month)[1]:
+                return False
+            if target.day != d:
+                return False
+        return True
+    if rt == 'daily':
+        return (target - start_d).days % interval == 0
+    if rt == 'weekly':
+        if target.weekday() != start_d.weekday():
+            return False
+        return ((target - start_d).days // 7) % interval == 0
+    if rt == 'monthly':
+        if target.day != start_d.day:
+            return False
+        months = (target.year - start_d.year) * 12 + (target.month - start_d.month)
+        return months % interval == 0
+    if rt == 'yearly':
+        if target.month != start_d.month or target.day != start_d.day:
+            return False
+        return (target.year - start_d.year) % interval == 0
+    return False
+
+
+def _gen_occurrences(base):
+    # Return list of occurrence date objects (start+1 .. end), capped at 120, mirroring GET expansion
+    import calendar as _cal
+    start = getattr(base, 'event_date', None)
+    if not start:
+        return []
+    start_d = start.date() if hasattr(start, 'date') else start
+    if getattr(base, 'repeat_infinite', False):
+        end_d = datetime(2999, 12, 31).date()
+    else:
+        end_dt = getattr(base, 'repeat_end_date', None)
+        if not end_dt:
+            return []
+        end_d = end_dt.date() if hasattr(end_dt, 'date') else end_dt
+    rt = getattr(base, 'repeat_type', '') or ''
+    interval = getattr(base, 'repeat_interval', 1) or 1
+    wd_mask = getattr(base, 'repeat_weekdays', 0) or 0
+    moy = getattr(base, 'repeat_month_of_year', 0) or 0
+    wom = getattr(base, 'repeat_week_of_month', 0) or 0
+    exc = set()
+    try:
+        exc = set(json.loads(getattr(base, 'repeat_exceptions', '') or '[]'))
+    except Exception:
+        exc = set()
+
+    def _add_months(dt, n):
+        y, m = dt.year, dt.month + n
+        while m > 12:
+            m -= 12
+            y += 1
+        last = _cal.monthrange(y, m)[1]
+        return dt.replace(year=y, month=m, day=min(dt.day, last))
+
+    def _nth_weekday_day(y, m, wd, n):
+        d = 1
+        while datetime(y, m, d).weekday() != wd:
+            d += 1
+        d += (n - 1) * 7
+        if d > _cal.monthrange(y, m)[1]:
+            return -1
+        return d
+
+    out = []
+    emitted = 0
+    cur = start_d + timedelta(days=1)
+    guard = 0
+    while cur <= end_d and emitted < 120 and guard < 600000:
+        guard += 1
+        do_emit = False
+        nxt = cur + timedelta(days=1)
+        if wd_mask:
+            wd = cur.weekday()
+            if wd_mask & (1 << wd):
+                ok = True
+                if moy and cur.month != moy:
+                    ok = False
+                elif wom and cur.day != _nth_weekday_day(cur.year, cur.month, wd, wom):
+                    ok = False
+                if ok:
+                    do_emit = True
+        elif rt == 'daily':
+            if (cur - start_d).days % interval == 0:
+                do_emit = True
+        elif rt == 'weekly':
+            if cur.weekday() == start_d.weekday() and ((cur - start_d).days // 7) % interval == 0:
+                do_emit = True
+        elif rt == 'monthly':
+            if cur.day == start_d.day:
+                months = (cur.year - start_d.year) * 12 + (cur.month - start_d.month)
+                if months % interval == 0:
+                    do_emit = True
+                nxt = _add_months(cur, 1)
+            else:
+                nxt = cur + timedelta(days=1)
+        elif rt == 'yearly':
+            if cur.month == start_d.month and cur.day == start_d.day:
+                if (cur.year - start_d.year) % interval == 0:
+                    do_emit = True
+                nxt = _add_months(cur, 12)
+            else:
+                nxt = cur + timedelta(days=1)
+        if do_emit and cur.strftime('%Y-%m-%d') not in exc:
+            emitted += 1
+            out.append(cur)
+        cur = nxt
+    return out
+
