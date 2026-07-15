@@ -265,7 +265,7 @@ function renderCal() {
         }
         const hasRecur = evts.some(s => s.is_recurring);
         const numHtml = hasRecur ? '<span class="recur-box">'+d+'</span>' : d;
-        html += '<div class="cal-day '+(today?'today ':'')+cls+(hasRecur?' event-recur':'')+(ds===selDate?' selected':'')+'" onclick="showDay(\''+ds+'\')">'numHtml'</div>';
+        html += '<div class="cal-day '+(today?'today ':'')+cls+(hasRecur?' event-recur':'')+(ds===selDate?' selected':'')+'" onclick="showDay(\''+ds+'\')">'+numHtml+'</div>';
     }
     document.getElementById('calGrid').innerHTML = html;
 }
