@@ -18,7 +18,7 @@ interface ShareDetailData {
   ai_confidence: number; ai_region_news: string
   ai_danger_alert: boolean
   like_count: number; dislike_count: number
-  status: string; created_at: string
+  status: string; created_at: string; moderation_at?: string | null
   nearby_shares: NearbyShare[]
   local_news: LocalNews[]
   local_links: LocalLink[]
@@ -32,6 +32,11 @@ export default function ShareDetail() {
   const [myId, setMyId] = useState<number | null>(null)
   const [commentText, setCommentText] = useState('')
   const [replyTo, setReplyTo] = useState<{ id: number; author: string } | null>(null)
+  const [watermarkText, setWatermarkText] = useState('')
+  const [watermarkPos, setWatermarkPos] = useState('bottom-right')
+  const [watermarkOpacity, setWatermarkOpacity] = useState(0.5)
+  const [watermarkTarget, setWatermarkTarget] = useState('')
+  const [wmApplying, setWmApplying] = useState(false)
 
   useEffect(() => {
     fetch(`/api/share/report/${id}`).then(r => r.json()).then(setR)
@@ -97,6 +102,19 @@ export default function ShareDetail() {
       .catch(e => alert('오류: ' + e))
   }
 
+  const applyWatermark = (imagePath: string) => {
+    if (!watermarkText.trim()) { alert('워터마크 텍스트를 입력하세요'); return }
+    setWmApplying(true)
+    fetch('/api/share/watermark', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image_path: imagePath, text: watermarkText, position: watermarkPos, opacity: watermarkOpacity })
+    }).then(r => r.json()).then(d => {
+      setWmApplying(false)
+      if (d.status === 'success') { alert('워터마크가 적용되었습니다.'); location.reload() }
+      else alert(d.msg || '워터마크 실패')
+    }).catch(() => { setWmApplying(false); alert('워터마크 적용 중 오류') })
+  }
+
   if (!r) return <div className="text-center py-5"><div className="spinner-border" /></div>
 
   const extraImages = r.extra_images ? r.extra_images.split(',').filter(Boolean) : []
@@ -110,25 +128,9 @@ export default function ShareDetail() {
         <a href="/share" className="btn btn-sm btn-outline-secondary mb-3">← 공유마당으로</a>
         <div className="card border-0 shadow-sm" style={{borderRadius: 18}}>
           <div className="card-body p-5 text-center">
-            {r.status === 'pending_person' ? (
-              <>
-                <div className="fs-1 mb-3">👤</div>
-                <h5 className="fw-bold">인물 초상권 보호 대상</h5>
-                <p className="text-muted small">이 콘텐츠는 작성자와 관리자만 확인할 수 있습니다.</p>
-              </>
-            ) : r.status === 'flagged' ? (
-              <>
-                <div className="fs-1 mb-3">🚫</div>
-                <h5 className="fw-bold">개인정보 보호 대상</h5>
-                <p className="text-muted small">개인정보(얼굴, 번호판 등) 노출로 보류된 콘텐츠입니다.</p>
-              </>
-            ) : (
-              <>
-                <div className="fs-1 mb-3">⏳</div>
-                <h5 className="fw-bold">검토 중</h5>
-                <p className="text-muted small">이 콘텐츠는 현재 검토 중입니다.</p>
-              </>
-            )}
+            <div className="fs-1 mb-3">🚧</div>
+            <h5 className="fw-bold">아직 공개되지 않은 콘텐츠입니다</h5>
+            <p className="text-muted small">검토가 완료되면 모든 회원에게 공개됩니다.</p>
           </div>
         </div>
       </div>
@@ -141,12 +143,9 @@ export default function ShareDetail() {
 
       {isBlocked && isAuthor && (
         <div className="alert alert-warning small mb-3">
-          {r.status === 'pending_person' ? (
-            <>👤 인물 초상권 보호로 <strong>보류</strong>되었습니다. <a href={`/share-report/accept-person/${r.id}`} className="alert-link">본인 책임 하에 공개</a>할 수 있습니다.</>
-          ) : r.status === 'flagged' ? (
-            <>🚫 개인정보 보호로 <strong>차단</strong>되었습니다. 관리자에게 문의하세요.</>
-          ) : (
-            <>⏳ <strong>검토 중</strong>인 콘텐츠입니다.</>
+          ⏳ <strong>검토 중</strong>인 콘텐츠입니다. 작성자 본인에게만 표시되며, 검열 완료 후 모든 회원에게 공개됩니다.
+          {r.moderation_at && (
+            <> 30일 동안 수정·보완되지 않으면 자동 삭제됩니다. (보류일: {new Date(r.moderation_at).toLocaleDateString()})</>
           )}
         </div>
       )}
@@ -156,11 +155,6 @@ export default function ShareDetail() {
           <div className="d-flex gap-2 flex-wrap mb-3">
             <span className="badge bg-info">{r.ai_category}</span>
             <span className="badge bg-light text-dark">{r.town} {r.village}</span>
-            {isBlocked && (
-              <span className={`badge ${r.status === 'flagged' ? 'bg-danger' : r.status === 'pending_person' ? 'bg-secondary' : 'bg-warning text-dark'}`}>
-                {r.status === 'pending_person' ? '인물보류' : r.status === 'flagged' ? '차단됨' : '승인대기'}
-              </span>
-            )}
           </div>
           <h3 className="fw-bold mb-3">{r.title}</h3>
 
@@ -296,10 +290,50 @@ export default function ShareDetail() {
         </>
       )}
 
-      {r.image_path && !r.video_path && isAuthor && (
+          {r.image_path && !r.video_path && isAuthor && (
         <div className="text-center mb-3">
-          <button onClick={mosaicShare} className="btn btn-sm btn-warning">🎭 AI 모자이크 처리</button>
+          <button onClick={mosaicShare} className="btn btn-sm btn-warning">AI 모자이크 처리</button>
           <small className="d-block text-muted mt-1">얼굴/번호판을 자동으로 모자이크합니다</small>
+          <button onClick={() => setWatermarkTarget(r.image_path || '')} className="btn btn-sm btn-info mt-2">워터마크 추가</button>
+          <small className="d-block text-muted mt-1">사진에 워터마크 텍스트를 추가합니다</small>
+        </div>
+      )}
+
+      {watermarkTarget && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#fff', borderRadius: 12, maxWidth: '92vw', maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee' }}>
+              <strong>워터마크 추가</strong>
+              <button type="button" onClick={() => setWatermarkTarget('')} style={{ border: 'none', background: 'none', fontSize: '1.3rem' }}>&times;</button>
+            </div>
+            <div style={{ padding: 12 }}>
+              <div className="mb-2">
+                <label className="form-label small fw-bold">워터마크 텍스트</label>
+                <input type="text" className="form-control" value={watermarkText} onChange={e => setWatermarkText(e.target.value)} placeholder="예: 양평군청" />
+              </div>
+              <div className="mb-2">
+                <label className="form-label small fw-bold">위치</label>
+                <select className="form-select" value={watermarkPos} onChange={e => setWatermarkPos(e.target.value)}>
+                  <option value="bottom-right">우측 하단</option>
+                  <option value="bottom-left">좌측 하단</option>
+                  <option value="top-right">우측 상단</option>
+                  <option value="top-left">좌측 상단</option>
+                  <option value="center">가운데</option>
+                </select>
+              </div>
+              <div className="mb-2">
+                <label className="form-label small fw-bold">불투명도: {Math.round(watermarkOpacity * 100)}%</label>
+                <input type="range" className="form-range" min="0.1" max="1" step="0.1" value={watermarkOpacity} onChange={e => setWatermarkOpacity(parseFloat(e.target.value))} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 6, padding: 8, borderTop: '1px solid #eee' }}>
+              <span style={{ flex: 1 }} />
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setWatermarkTarget('')}>취소</button>
+              <button type="button" className="btn btn-success btn-sm" onClick={() => { applyWatermark(watermarkTarget); setWatermarkTarget('') }} disabled={wmApplying}>
+                {wmApplying ? '적용 중...' : '워터마크 적용'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

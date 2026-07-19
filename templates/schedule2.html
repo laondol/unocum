@@ -37,7 +37,7 @@ body{background:#f8f9fa;font-size:0.9rem;}
 <div class="d-flex gap-2 mb-3">
     <button class="btn btn-sm btn-outline-secondary" onclick="switchTab('view')">📅 달력</button>
     <button class="btn btn-sm btn-success" onclick="switchTab('add')" id="btnAdd">➕ 일정등록</button>
-    <button class="btn btn-sm btn-outline-secondary ms-auto position-relative" onclick="toggleBell()">🔔<span id="bellBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none; font-size:0.6rem;">0</span></button>
+    <button id="bellBtn" class="btn btn-sm btn-outline-secondary ms-auto position-relative" onclick="toggleBell()">🔔<span id="bellBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none; font-size:0.6rem;">0</span></button>
 </div>
 <div id="bellPanel" class="card p-2 shadow" style="display:none; position:fixed; right:10px; top:54px; z-index:70; width:280px; max-height:60vh; overflow:auto;"></div>
 
@@ -61,17 +61,17 @@ body{background:#f8f9fa;font-size:0.9rem;}
         <h6 class="mb-3">새 일정</h6>
         <input id="addTitle" class="form-control form-control-sm mb-2" placeholder="제목">
         <div class="row g-2 mb-2">
-            <div class="col-4"><label class="small d-block">시작일</label><input type="date" id="addDate" class="form-control form-control-sm" onfocus="showAddCal('start', this)" onclick="showAddCal('start', this)" onchange="toggleAccommodation();"></div>
+             <div class="col-4"><label class="small d-block">시작일</label><input type="date" id="addDate" class="form-control form-control-sm" onfocus="showAddCal('start', this)" onclick="showAddCal('start', this)" onchange="toggleAccommodation(); updateOccCount();"></div>
             <div class="col-4"><label class="small d-block">시작시간</label><input type="time" id="addStart" class="form-control form-control-sm"></div>
             <div class="col-4 d-flex align-items-end"><label class="small mb-0"><input type="checkbox" id="addAllDay" onchange="toggleAllDay()"> 종일</label></div>
         </div>
         <div class="row g-2 mb-2">
-            <div class="col-4"><label class="small d-block">종료일</label><input type="date" id="addEndDate" class="form-control form-control-sm" onfocus="showAddCal('end', this)" onclick="showAddCal('end', this)" onchange="toggleAccommodation();"></div>
+             <div class="col-4"><label class="small d-block">종료일</label><input type="date" id="addEndDate" class="form-control form-control-sm" onfocus="showAddCal('end', this)" onclick="showAddCal('end', this)" onchange="toggleAccommodation(); updateOccCount();"></div>
             <div class="col-4"><label class="small d-block">종료시간</label><input type="time" id="addEnd" class="form-control form-control-sm"></div>
             <div class="col-4 d-flex align-items-end gap-2" style="position:relative;">
                 <button type="button" class="btn btn-sm btn-outline-secondary" id="btnRepeat" onclick="toggleRepeat()">🔁 반복</button>
                 <div id="repeatOptions" style="display:none; position:absolute; top:100%; left:0; z-index:30; background:#fff; border:1px solid #ced4da; border-radius:8px; padding:8px; box-shadow:0 4px 12px rgba(0,0,0,.15);" class="gap-1 align-items-center flex-wrap">
-                    <input type="number" id="addRepeatInterval" class="form-control form-control-sm" style="width:48px;" min="1" max="365" value="1">
+                    <input type="number" id="addRepeatInterval" class="form-control form-control-sm" style="width:48px;" min="1" max="365" value="1" onchange="updateRepeatMode(); updateOccCount();">
                     <label class="small"><input type="radio" name="repeatType" value="daily"> 매일</label>
                     <label class="small"><input type="radio" name="repeatType" value="weekly"> 매주</label>
                     <label class="small"><input type="radio" name="repeatType" value="monthly"> 매월</label>
@@ -79,17 +79,17 @@ body{background:#f8f9fa;font-size:0.9rem;}
                         <div class="border-top mt-1 pt-1 w-100">
                             <div class="small fw-bold mb-1">요일 반복 (체크 시 날짜반복 무시)</div>
                             <div class="d-flex gap-1 flex-wrap">
-                                <label class="small"><input type="checkbox" class="wd-cb" value="0" onchange="updateRepeatMode()"> 월</label>
-                                <label class="small"><input type="checkbox" class="wd-cb" value="1" onchange="updateRepeatMode()"> 화</label>
-                                <label class="small"><input type="checkbox" class="wd-cb" value="2" onchange="updateRepeatMode()"> 수</label>
-                                <label class="small"><input type="checkbox" class="wd-cb" value="3" onchange="updateRepeatMode()"> 목</label>
-                                <label class="small"><input type="checkbox" class="wd-cb" value="4" onchange="updateRepeatMode()"> 금</label>
-                                <label class="small"><input type="checkbox" class="wd-cb" value="5" onchange="updateRepeatMode()"> 토</label>
-                                <label class="small"><input type="checkbox" class="wd-cb" value="6" onchange="updateRepeatMode()"> 일</label>
+                                <label class="small"><input type="checkbox" class="wd-cb" value="0" onchange="updateRepeatMode(); updateOccCount();"> 월</label>
+                                <label class="small"><input type="checkbox" class="wd-cb" value="1" onchange="updateRepeatMode(); updateOccCount();"> 화</label>
+                                <label class="small"><input type="checkbox" class="wd-cb" value="2" onchange="updateRepeatMode(); updateOccCount();"> 수</label>
+                                <label class="small"><input type="checkbox" class="wd-cb" value="3" onchange="updateRepeatMode(); updateOccCount();"> 목</label>
+                                <label class="small"><input type="checkbox" class="wd-cb" value="4" onchange="updateRepeatMode(); updateOccCount();"> 금</label>
+                                <label class="small"><input type="checkbox" class="wd-cb" value="5" onchange="updateRepeatMode(); updateOccCount();"> 토</label>
+                                <label class="small"><input type="checkbox" class="wd-cb" value="6" onchange="updateRepeatMode(); updateOccCount();"> 일</label>
                             </div>
                             <div class="d-flex align-items-center gap-1 mt-1">
                                 <span class="small">매</span>
-                                <select id="addRepeatWeekOfMonth" class="form-select form-select-sm" style="width:auto;">
+                                    <select id="addRepeatWeekOfMonth" class="form-select form-select-sm" style="width:auto;" onchange="updateOccCount()">
                                     <option value="0">매주</option>
                                     <option value="1">1번째</option>
                                     <option value="2">2번째</option>
@@ -101,7 +101,7 @@ body{background:#f8f9fa;font-size:0.9rem;}
                             </div>
                             <div class="d-flex align-items-center gap-1 mt-1">
                                 <span class="small">매년</span>
-                                <select id="addRepeatMonthOfYear" class="form-select form-select-sm" style="width:auto;">
+                                    <select id="addRepeatMonthOfYear" class="form-select form-select-sm" style="width:auto;" onchange="updateOccCount()">
                                     <option value="0">매년 아님</option>
                                     <option value="1">1월</option>
                                     <option value="2">2월</option>
@@ -118,13 +118,24 @@ body{background:#f8f9fa;font-size:0.9rem;}
                                 </select>
                                 <span class="small">에만</span>
                             </div>
-                        </div>
+                            <div class="border-top mt-1 pt-1 w-100">
+                                <div class="small fw-bold mb-1">발생 횟수 (최대 120회)</div>
+                                <div class="small">예상: <span id="occCount">–</span>회 <span id="occWarn" class="text-danger" style="display:none;">⚠ 120회 초과 시 처음 120회만 저장됩니다</span></div>
+                            </div>
+                            <div class="border-top mt-1 pt-1 w-100">
+                                <div class="small fw-bold mb-1">제외일 (반복에서 뺌)</div>
+                                <div class="d-flex align-items-center gap-1">
+                                    <input type="date" id="addExceptDate" class="form-control form-control-sm" style="width:auto;">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary py-0" onclick="addExceptionDate()">추가</button>
+                                </div>
+                                <div id="exceptList" class="d-flex flex-wrap gap-1 mt-1"><span class="text-muted small">없음</span></div>
+                            </div>
                         <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 ms-1" onclick="closeRepeatOptions()">확인</button>
                 </div>
             </div>
         </div>
         <div class="row g-2 mb-2">
-            <div class="col-6"><label class="small d-block">알림</label><select id="addReminder" class="form-control form-control-sm"><option value="0">알림 안 함</option><option value="10">10분 전</option><option value="30">30분 전</option><option value="60">1시간 전</option><option value="1440">1일 전</option></select></div>
+            <div class="col-6"><label class="small d-block">알림</label><select id="addReminder" class="form-control form-control-sm"><option value="0">알림 안 함</option><option value="-1">정각</option><option value="10">10분 전</option><option value="30">30분 전</option><option value="60">1시간 전</option><option value="1440">1일 전</option></select></div>
         </div>
         <div id="addCalPopup" style="display:none; position:absolute; z-index:40; background:#fff; border:1px solid #ced4da; border-radius:8px; padding:8px; box-shadow:0 4px 12px rgba(0,0,0,.15); width:260px;">
             <div class="d-flex justify-content-between align-items-center mb-1">
@@ -184,680 +195,13 @@ body{background:#f8f9fa;font-size:0.9rem;}
 <div id="tabList" style="display:none;"><div id="eventList" class="small"></div></div>
 </div>
 
-<script>
-let calYear, calMonth, schedules = [], friends = [], selDate = null;
-function scheduleType(s){ if (s.title && (s.title.includes('이동') || s.title.includes('집으'))) return 'move'; return 'mail'; }
-function typeChip(s){ return scheduleType(s)==='move' ? '<span class="chip chip-move">🚌 이동</span> ' : '<span class="chip chip-mail">✉ 메일</span> '; }
-let repeatOn = false, addCalMode = 'start', addCalYear, addCalMonth;
-
-fetch('/api/chat/friends').then(r=>r.json()).then(d => {
-    friends = d.friends || [];
-    renderFriendCheckboxes();
-});
-loadEvents();
-renderCal();
-
-function renderFriendCheckboxes() {
-    var box = document.getElementById('friendCheckboxes');
-    if (!friends.length) { box.innerHTML = '<div class="text-muted">벗이 없습니다</div>'; return; }
-    box.innerHTML = friends.map(function(f){
-        var name = f.username || f.name || f;
-        return '<label class="d-block"><input type="checkbox" class="friend-cb" value="'+f.id+'"> '+name+'</label>';
-    }).join('');
-}
-renderCal();
-
-function switchTab(t) {
-    ['tabView','tabAdd','tabList','tabFav'].forEach(id => document.getElementById(id).style.display='none');
-    document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).style.display = '';
-    if (t === 'add') {
-        document.getElementById('editId').value = '';
-        document.getElementById('saveBtn').textContent = '저장';
-        document.querySelector('#tabAdd h6').textContent = '새 일정';
-        document.getElementById('accommodationSection').style.display = 'none';
-        repeatOn = false; setRepeatOptionsVisible(false);
-        document.getElementById('addCalPopup').style.display = 'none';
-        // 이전 입력값 초기화 (새 일정 진입 시)
-        ['addTitle','addLoc','memoEditor','addStart','addEnd','addDate','addEndDate','addAccommodation','numInput'].forEach(function(x){ var el=document.getElementById(x); if(el) el.value=''; });
-        var today = new Date().toISOString().slice(0,10);
-        document.getElementById('addDate').value = today;
-        document.getElementById('addEndDate').value = today;
-        document.getElementById('addAllDay').checked = false;
-        document.getElementById('addReminder').value = 0;
-        document.getElementById('addRepeatInterval').value = 1;
-        document.querySelectorAll('.wd-cb').forEach(function(cb){ cb.checked=false; });
-        document.getElementById('addRepeatWeekOfMonth').value = 0;
-        document.getElementById('addRepeatMonthOfYear').value = 0;
-        if (document.getElementById('numPanel')) document.getElementById('numPanel').style.display='none';
-        toggleAllDay();
-    }
-}
-
-function loadEvents() {
-    return fetch('/api/bot/schedule?_='+Date.now()).then(r=>r.json()).then(d => {
-        schedules = d.schedules || [];
-        renderCal();
-        renderEventList();
-        document.getElementById('dayEvents').innerHTML = '';
-    });
-}
-
-function renderCal() {
-    const now = new Date();
-    if (!calYear) { calYear = now.getFullYear(); calMonth = now.getMonth()+1; }
-    document.getElementById('calTitle').textContent = calYear+'년 '+calMonth+'월';
-    const firstDay = new Date(calYear, calMonth-1, 1).getDay();
-    const lastDate = new Date(calYear, calMonth, 0).getDate();
-    let html = '';
-    for (let i = 0; i < firstDay; i++) html += '<div></div>';
-    for (let d = 1; d <= lastDate; d++) {
-        const ds = calYear+'-'+String(calMonth).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-        const today = now.getFullYear()===calYear && now.getMonth()+1===calMonth && now.getDate()===d;
-        const evts = schedules.filter(s => s.event_date && s.event_date.startsWith(ds));
-        let cls = '';
-        if (evts.length) {
-            const colors = evts.map(s => s.color||'gray');
-            if (colors.includes('red')) cls = 'event-red';
-            else if (colors.includes('blue')) cls = 'event-blue';
-            else if (colors.includes('green')) cls = 'event-green';
-            else cls = 'event-gray';
-        }
-        const hasRecur = evts.some(s => s.is_recurring);
-        const numHtml = hasRecur ? '<span class="recur-box">'+d+'</span>' : d;
-        html += '<div class="cal-day '+(today?'today ':'')+cls+(hasRecur?' event-recur':'')+(ds===selDate?' selected':'')+'" onclick="showDay(\''+ds+'\')">'+numHtml+'</div>';
-    }
-    document.getElementById('calGrid').innerHTML = html;
-}
-
-function showDay(date) {
-    selDate = date;
-    renderCal();
-    const evts = schedules.filter(s => s.event_date && s.event_date.startsWith(date));
-    // 종일 일정 먼저 정렬
-    evts.sort((a, b) => {
-        const aAll = a.is_allday === true;
-        const bAll = b.is_allday === true;
-        if (aAll && !bAll) return -1;
-        if (!aAll && bAll) return 1;
-        return (a.event_date || '').localeCompare(b.event_date || '');
-    });
-    const el = document.getElementById('dayEvents');
-    if (!evts.length) { el.innerHTML = '<div class="text-muted small py-2">일정 없음</div><button class="btn btn-sm btn-success mt-1" onclick="addOnDate(\''+date+'\')">➕ '+date+' 일정추가</button>'; return; }
-    // 종일 일정 먼저 정렬
-    evts.sort((a, b) => (a.is_allday === b.is_allday ? 0 : a.is_allday ? -1 : 1));
-    let h = '<div class="d-flex justify-content-between align-items-center mb-2"><span class="small fw-bold">'+date+'</span><button class="btn btn-sm btn-success" onclick="addOnDate(\''+date+'\')">➕ '+date+' 일정추가</button></div>';
-    evts.forEach(s => {
-        const badge = {'red':'🔴','blue':'🔵','green':'🟢','gray':'⚪'}[s.color||'gray']||'⚪';
-        const time = s.event_date ? s.event_date.split(' ')[1].substring(0,5) : '';
-        let loc = s.location ? '<br>📍 '+s.location : '';
-        var accomm = '';
-        if (s.memo && s.memo.includes('[숙소:')) {
-            var m = s.memo.match(/\[숙소:([^\]]+)\]/);
-            if (m) accomm = '<br>🏠 숙소: '+m[1];
-        }
-        var repTxt = '';
-        if (s.is_recurring && s.repeat_type) {
-            var _rm = {'daily':'일','weekly':'주','monthly':'월','yearly':'년'}[s.repeat_type] || '';
-            repTxt = ' 🔁매'+(s.repeat_interval||1)+_rm+(s.repeat_infinite ? '(무한)' : '');
-        }
-        h += '<div class="border-bottom py-1 mb-1 small'+(scheduleType(s)==='move'?' evt-move':'')+'"><strong>'+badge+' '+typeChip(s)+s.title+repTxt+'</strong><br>🕐 '+time+loc+accomm+'<br>';
-        if ((s.title && (s.title.includes('이동') || s.title.includes('집으로'))) && s.content) {
-            try {
-                var r = JSON.parse(s.content);
-                if (r && r.from_lat && r.to_lat) {
-                    var dl = encodeURIComponent(s.departure_location || '출발');
-                    var al = encodeURIComponent(s.return_location || s.location || '도착');
-                    h += '<div class="d-flex gap-1 mt-1 flex-wrap">';
-// 이동 일정: event_date=출발시간, end_date=도착시간 (저장시간을 UTC로 간주)
-                    var ts = s.end_date || s.event_date;
-                    var arrTs = '';
-                    if (ts) {
-                        try {
-                            var parts = ts.split(' ');
-                            var dateParts = parts[0].split('-');
-                            var timeParts = parts[1].split(':');
-                            var year = parseInt(dateParts[0]);
-                            var month = parseInt(dateParts[1]) - 1;
-                            var day = parseInt(dateParts[2]);
-                            var hour = parseInt(timeParts[0]);
-                            var minute = parseInt(timeParts[1]);
-                            // 저장된 시간을 UTC로 간주 (hour - 9 안 함)
-                            var d = new Date(Date.UTC(year, month, day, hour, minute));
-                            if (!isNaN(d.getTime())) arrTs = Math.floor(d.getTime()/1000);
-                        } catch(e) {}
-                    }
-                    var fromLat = parseFloat(r.from_lat).toFixed(7);
-                    var fromLng = parseFloat(r.from_lng).toFixed(7);
-                    var toLat = parseFloat(r.to_lat).toFixed(7);
-                    var toLng = parseFloat(r.to_lng).toFixed(7);
-                    var isHome = s.title && s.title.includes('집으로');
-                    var dataParam;
-                    if (isHome) {
-                        dataParam = '!3m1!4b1!4m4!4m3!2m1!6e2!3e3';
-                    } else {
-                        dataParam = '!3m1!4b1!4m6!4m5!2m3!6e1!7e2!8j' + (arrTs || '') + '!3e3';
-                    }
-                    h += '<a class="btn btn-sm btn-outline-danger py-0" target="_blank" href="https://www.google.co.kr/maps/dir/'+fromLat+','+fromLng+'/'+toLat+','+toLng+'/data='+dataParam+'">🌐Google</a>';
-                    h += '<a class="btn btn-sm btn-outline-info py-0" target="_blank" href="https://map.naver.com/p/directions/'+r.from_lng+','+r.from_lat+','+dl+'/'+r.to_lng+','+r.to_lat+','+al+'/-/transit">🗺️네이버</a>';
-                    h += '<a class="btn btn-sm btn-outline-success py-0" target="_blank" href="https://map.kakao.com/link/by/traffic/'+dl+','+r.from_lat+','+r.from_lng+'/'+al+','+r.to_lat+','+r.to_lng+'">📱카카오</a>';
-                    h += '</div>';
-                }
-            } catch(e){}
-        }
-        h += '<br><button class="btn btn-sm btn-outline-info py-0 mt-1 me-1" onclick="showDetail(\'' + s.id + '\')">🔍</button><button class="btn btn-sm btn-outline-secondary py-0 mt-1 me-1" onclick="editEvent(\'' + s.id + '\')">✏️</button><button class="btn btn-sm btn-outline-danger py-0 mt-1" onclick="confirmDelete(\'' + s.id + '\')">✕</button></div>';
-    });
-    el.innerHTML = h;
-}
-
-function renderEventList() {
-    const el = document.getElementById('eventList');
-    if (!schedules.length) { el.innerHTML = '<div class="text-muted">일정 없음</div>'; return; }
-    el.innerHTML = schedules.map(s => {
-        const badge = {'red':'🔴','blue':'🔵','green':'🟢','gray':'⚪'}[s.color||'gray']||'⚪';
-        const time = s.event_date ? s.event_date.split(' ')[1].substring(0,5) : '';
-        return '<div class="border-bottom py-1'+(scheduleType(s)==='move'?' evt-move':'')+'"><strong>'+badge+' '+typeChip(s)+s.title+'</strong><br><small>🕐 '+time+'</small>'+(s.location?'<br><small>📍 '+s.location+'</small>':'')+'<br><button class="btn btn-sm btn-outline-secondary mt-1 me-1" onclick="editEvent(\'' + s.id + '\')">✏️</button><button class="btn btn-sm btn-outline-danger mt-1" onclick="confirmDelete(\'' + s.id + '\')">✕</button></div>';
-    }).join('');
-}
-
-function addOnDate(date) {
-    document.getElementById('accommodationSection').style.display = 'none';
-    document.getElementById('addAccommodation').value = '';
-    switchTab('add');
-    document.getElementById('addDate').value = date;
-    document.getElementById('addEndDate').value = date;
-}
-
-function changeMonth(d) {
-    calMonth += d;
-    if (calMonth > 12) { calMonth = 1; calYear++; }
-    if (calMonth < 1) { calMonth = 12; calYear--; }
-    renderCal();
-}
-
-function editEvent(id) {
-    var sid = String(id);
-    var bid = sid.indexOf('_') >= 0 ? sid.split('_')[0] : sid;
-    var s = schedules.find(function(x){ return String(x.id) === bid; });
-    if (!s) return;
-    switchTab('add');
-    document.querySelector('#tabAdd h6').textContent = '일정 수정';
-    document.getElementById('editId').value = bid;
-    document.getElementById('addTitle').value = s.title || '';
-    if (s.event_date) {
-        var parts = s.event_date.split(' ');
-        document.getElementById('addDate').value = parts[0];
-        document.getElementById('addStart').value = parts.length>1 ? parts[1].substring(0,5) : '';
-        if (s.end_date) {
-            var ep = s.end_date.split(' ');
-            document.getElementById('addEndDate').value = ep[0];
-            document.getElementById('addEnd').value = ep[1].substring(0,5);
-        } else {
-            document.getElementById('addEndDate').value = parts[0];
-        }
-    }
-    document.getElementById('addLoc').value = s.location || '';
-    var memoVal = '';
-    if (s.memo && s.memo.trim()) memoVal = s.memo;
-    else if (s.description && s.description.trim()) memoVal = s.description;
-    else if (s.content) { try { var cc = JSON.parse(s.content); if (cc && cc.compact) memoVal = cc.compact; } catch(e){} }
-    document.getElementById('memoEditor').innerHTML = memoVal.replace(/\[숙소:[^\]]+\]/g,'').trim();
-    var am = s.memo ? s.memo.match(/\[숙소:([^\]]+)\]/) : null;
-    if (am) {
-        document.getElementById('addAccommodation').value = am[1];
-    } else {
-        document.getElementById('addAccommodation').value = '';
-    }
-    if (am || (document.getElementById('addDate').value !== document.getElementById('addEndDate').value)) {
-        document.getElementById('accommodationSection').style.display = '';
-    } else {
-        document.getElementById('accommodationSection').style.display = 'none';
-    }
-    document.getElementById('addAllDay').checked = s.is_allday || false;
-    repeatOn = s.is_recurring || false;
-    setRepeatOptionsVisible(repeatOn);
-    if (s.is_recurring && s.repeat_type) {
-        var rbs = document.getElementsByName('repeatType');
-        for (var i=0;i<rbs.length;i++) { rbs[i].checked = rbs[i].value === s.repeat_type; }
-    }
-    document.getElementById('addRepeatInterval').value = s.repeat_interval || 1;
-    var wmask = s.repeat_weekdays || 0;
-    document.querySelectorAll('.wd-cb').forEach(function(cb){ cb.checked = !!(wmask & (1 << parseInt(cb.value))); });
-    document.getElementById('addRepeatWeekOfMonth').value = s.repeat_week_of_month || 0;
-    document.getElementById('addRepeatMonthOfYear').value = s.repeat_month_of_year || 0;
-    document.getElementById('addReminder').value = s.reminder_minutes || 0;
-    updateRepeatMode();
-    if (s.repeat_infinite) {
-        var _ed = new Date(document.getElementById('addDate').value + 'T00:00');
-        _ed.setDate(_ed.getDate() - 1);
-        document.getElementById('addEndDate').value = _ed.toISOString().slice(0,10);
-    }
-    renderAddCal();
-    toggleAllDay();
-    document.getElementById('saveBtn').textContent = '수정';
-}
-
-function toggleAccommodation() {
-    var sd = document.getElementById('addDate').value;
-    var ed = document.getElementById('addEndDate').value;
-    var val = document.getElementById('addAccommodation').value.trim();
-    if (sd && ed && sd !== ed) {
-        document.getElementById('accommodationSection').style.display = '';
-    } else if (!val) {
-        document.getElementById('accommodationSection').style.display = 'none';
-    }
-}
-
-function toggleAllDay() {
-    var checked = document.getElementById('addAllDay').checked;
-    document.getElementById('addStart').disabled = checked;
-    document.getElementById('addEnd').disabled = checked;
-    if (checked) {
-        document.getElementById('addStart').value = '';
-        document.getElementById('addEnd').value = '';
-    }
-}
-
-function setRepeatOptionsVisible(v) {
-    document.getElementById('repeatOptions').style.display = v ? 'flex' : 'none';
-    repeatOn = v;
-    var b = document.getElementById('btnRepeat');
-    b.classList.toggle('btn-primary', v);
-    b.classList.toggle('btn-outline-secondary', !v);
-}
-function toggleRepeat() {
-    repeatOn = !repeatOn;
-    setRepeatOptionsVisible(repeatOn);
-}
-function closeRepeatOptions() {
-    document.getElementById('repeatOptions').style.display = 'none';
-    var b = document.getElementById('btnRepeat');
-    b.classList.add('btn-primary');
-    b.classList.remove('btn-outline-secondary');
-}
-
-function renderAddCal() {
-    const now = new Date();
-    if (!addCalYear) { addCalYear = now.getFullYear(); addCalMonth = now.getMonth()+1; }
-    document.getElementById('addCalTitle').textContent = addCalYear+'년 '+addCalMonth+'월';
-    const firstDay = new Date(addCalYear, addCalMonth-1, 1).getDay();
-    const lastDate = new Date(addCalYear, addCalMonth, 0).getDate();
-    const sd = document.getElementById('addDate').value;
-    const ed = document.getElementById('addEndDate').value;
-    let html = '';
-    for (let i = 0; i < firstDay; i++) html += '<div></div>';
-    for (let d = 1; d <= lastDate; d++) {
-        const ds = addCalYear+'-'+String(addCalMonth).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-        const isToday = now.getFullYear()===addCalYear && now.getMonth()+1===addCalMonth && now.getDate()===d;
-        let cls = 'cal-day';
-        if (ds === sd || ds === ed) cls += ' selstart';
-        else if (sd && ed && ds > sd && ds < ed) cls += ' cal-sel';
-        if (isToday) cls += ' today';
-        html += '<div class="'+cls+'" onclick="addCalClick(\''+ds+'\')">'+d+'</div>';
-    }
-    document.getElementById('addCalGrid').innerHTML = html;
-}
-function showAddCal(mode, inputEl) {
-    addCalMode = mode;
-    var popup = document.getElementById('addCalPopup');
-    if (inputEl && inputEl.offsetParent) {
-        popup.style.top = (inputEl.offsetTop + inputEl.offsetHeight + 4) + 'px';
-        popup.style.left = inputEl.offsetLeft + 'px';
-    }
-    document.getElementById('addCalHint').textContent = (mode === 'start' ? '시작일' : '종료일') + '을 선택하세요. 시작일보다 앞으로 정하면 무한반복됩니다.';
-    renderAddCal();
-    popup.style.display = '';
-}
-function addCalClick(ds) {
-    if (addCalMode === 'start') {
-        document.getElementById('addDate').value = ds;
-    } else {
-        document.getElementById('addEndDate').value = ds;
-    }
-    toggleAccommodation();
-    renderAddCal();
-}
-function addChangeMonth(d) {
-    addCalMonth += d;
-    if (addCalMonth > 12) { addCalMonth = 1; addCalYear++; }
-    if (addCalMonth < 1) { addCalMonth = 12; addCalYear--; }
-    renderAddCal();
-}
-document.addEventListener('click', function(e){
-    var t = e.target;
-    var p = document.getElementById('addCalPopup');
-    if (p && p.style.display !== 'none') {
-        if (!p.contains(t) && t !== document.getElementById('addDate') && t !== document.getElementById('addEndDate')) {
-            p.style.display = 'none';
-        }
-    }
-    var r = document.getElementById('repeatOptions');
-    if (r && r.style.display !== 'none') {
-        if (!r.contains(t) && t !== document.getElementById('btnRepeat')) {
-            r.style.display = 'none';
-        }
-    }
-});
-
-function getWeekdayMask() {
-    var mask = 0;
-    document.querySelectorAll('.wd-cb').forEach(function(cb){ if (cb.checked) mask |= (1 << parseInt(cb.value)); });
-    return mask;
-}
-function updateRepeatMode() {
-    var wd = getWeekdayMask();
-    var rbs = document.getElementsByName('repeatType');
-    for (var i=0;i<rbs.length;i++) {
-        var v = rbs[i].value;
-        // 요일 반복은 매주/매월 만 허용 (매일/매년 비활성)
-        rbs[i].disabled = !!wd && (v === 'daily' || v === 'yearly');
-    }
-    if (wd) {
-        var sel = false;
-        for (var i=0;i<rbs.length;i++) { if (rbs[i].checked && !rbs[i].disabled) { sel = true; break; } }
-        if (!sel) {
-            for (var i=0;i<rbs.length;i++) { if (rbs[i].value === 'weekly') { rbs[i].checked = true; break; } }
-        }
-    }
-}
-
-function memoExec(cmd){ var ed=document.getElementById('memoEditor'); ed.focus(); try{ document.execCommand(cmd, false, null); }catch(e){} }
-var savedRange = null;
-function saveRange(){ var ed=document.getElementById('memoEditor'); var sel=window.getSelection(); if(sel && sel.rangeCount>0){ var r=sel.getRangeAt(0); try{ if(ed.contains(r.commonAncestorContainer)) savedRange=r.cloneRange(); }catch(e){} } }
-if(document.getElementById('memoEditor')){ document.getElementById('memoEditor').addEventListener('keyup', saveRange); document.getElementById('memoEditor').addEventListener('mouseup', saveRange); }
-function memoForeColor(c){ var ed=document.getElementById('memoEditor'); ed.focus(); if(savedRange){ var sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(savedRange); } try{ document.execCommand('styleWithCSS', false, true); document.execCommand('foreColor', false, c); }catch(e){} }
-function memoBackColor(c){ var ed=document.getElementById('memoEditor'); ed.focus(); if(savedRange){ var sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(savedRange); } try{ document.execCommand('styleWithCSS', false, true); document.execCommand('hiliteColor', false, c); }catch(e){} }
-function memoLink(){
-    var url = prompt('링크 주소를 입력하세요 (예: https://...)');
-    if(!url) return;
-    var ed=document.getElementById('memoEditor'); ed.focus();
-    var sel = window.getSelection();
-    if(sel && sel.toString()){ try{ document.execCommand('createLink', false, url); }catch(e){ insertMemoHtml('<a href="'+url+'" target="_blank">'+sel.toString()+'</a>'); } }
-    else { insertMemoHtml('<a href="'+url+'" target="_blank">'+url+'</a>'); }
-}
-function insertMemoHtml(html){
-    var ed = document.getElementById('memoEditor'); ed.focus();
-    if(savedRange){ var sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(savedRange); }
-    var ok=false; try{ ok = document.execCommand('insertHTML', false, html); }catch(e){}
-    if(!ok){ ed.innerHTML += html; }
-}
-var numColor = '#1971ef';
-function buildNumColors(){
-    var cs = [['#1971ef','#fff'],['#2e7d32','#fff'],['#e53935','#fff'],['#fdd835','#222'],['#fb8c00','#fff'],['#8e24aa','#fff'],['#607d8b','#fff'],['#222222','#fff']];
-    var box = document.getElementById('numColors'); if(!box) return; box.innerHTML='';
-    cs.forEach(function(c){
-        var b=document.createElement('button'); b.type='button';
-        b.style.cssText='width:24px;height:24px;border-radius:50%;border:2px solid '+(numColor===c[0]?'#0d6efd':'#fff')+';background:'+c[0]+';cursor:pointer;';
-        b.onclick=function(){ numColor=c[0]; buildNumColors(); };
-        box.appendChild(b);
-    });
-}
-function numBadgeClick(){
-    if(savedRange && !savedRange.collapsed){ insertNumBadge(); }
-    else { toggleNumPanel(); }
-}
-function toggleNumPanel(){
-    var p=document.getElementById('numPanel');
-    if(!p) return;
-    p.style.display = (p.style.display==='none' || !p.style.display) ? 'block' : 'none';
-    if(p.style.display==='block'){ if(!document.getElementById('numColors').children.length) buildNumColors(); document.getElementById('numInput').focus(); }
-}
-function insertNumBadge(){
-    var inp=document.getElementById('numInput'); var txt=(inp.value||'').trim();
-    if(!txt){ alert('번호를 입력하세요'); return; }
-    var tc = (numColor==='#fdd835') ? '#222222' : '#ffffff';
-    var html = '<span contenteditable="false" class="memo-num" style="display:inline-flex;align-items:center;justify-content:center;min-width:1.6em;height:1.6em;padding:0 .4em;margin:0 1px;border-radius:50%;background:'+numColor+';color:'+tc+';font-size:0.85em;font-weight:700;line-height:1;vertical-align:middle;">'+txt.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</span>';
-    insertMemoHtml(html);
-    document.getElementById('numPanel').style.display='none';
-    inp.value='';
-}
-function uploadMemoFiles(input){
-    var files = input.files;
-    if(!files || !files.length) return;
-    var fd = new FormData();
-    for(var i=0;i<files.length;i++) fd.append('file', files[i]);
-    fetch('/api/bot/schedule/attachment', {method:'POST', body:fd})
-    .then(function(r){return r.json();})
-    .then(function(d){
-        if(d.urls){
-            d.urls.forEach(function(u){
-                var isImg = /\.(png|jpe?g|gif|webp)$/i.test(u);
-                if(isImg) insertMemoHtml('<img src="'+u+'" style="max-width:220px; max-height:220px; display:block; margin:4px 0; border:1px solid #ddd; border-radius:6px;">');
-                else insertMemoHtml('<a href="'+u+'" target="_blank" style="display:inline-block; margin:4px 0; padding:4px 8px; border:1px solid #ced4da; border-radius:6px;">📎 '+u.split('/').pop()+'</a>');
-            });
-        } else if(d.error){ alert(d.error); }
-        input.value='';
-    }).catch(function(e){ alert('업로드 실패'); input.value=''; });
-}
-var _drawing=false, _drawCtx=null;
-function openDraw(){
-    var m=document.getElementById('drawModal'); m.style.display='flex';
-    var c=document.getElementById('drawCanvas');
-    if(!_drawCtx){ _drawCtx=c.getContext('2d'); }
-    c.onpointerdown=drawStart; c.onpointermove=drawMove; window.onpointerup=drawEnd;
-}
-function closeDraw(){ document.getElementById('drawModal').style.display='none'; }
-function drawStart(e){ _drawing=true; drawDot(e); }
-function drawMove(e){ if(_drawing) drawDot(e); }
-function drawEnd(){ _drawing=false; }
-function drawDot(e){
-    if(!_drawCtx) return;
-    var c=document.getElementById('drawCanvas');
-    var rect=c.getBoundingClientRect();
-    var x=(e.clientX-rect.left)*(c.width/rect.width);
-    var y=(e.clientY-rect.top)*(c.height/rect.height);
-    _drawCtx.fillStyle=document.getElementById('drawColor').value;
-    var sz=parseInt(document.getElementById('drawSize').value)||3;
-    _drawCtx.beginPath(); _drawCtx.arc(x,y,sz/2,0,Math.PI*2); _drawCtx.fill();
-}
-function drawClear(){ if(_drawCtx){ _drawCtx.clearRect(0,0,320,220); } }
-function drawSave(){
-    var c=document.getElementById('drawCanvas');
-    c.toBlob(function(blob){
-        if(!blob){ closeDraw(); return; }
-        var fd=new FormData(); fd.append('file', blob, 'draw_'+Date.now()+'.png');
-        fetch('/api/bot/schedule/attachment', {method:'POST', body:fd})
-        .then(function(r){return r.json();})
-        .then(function(d){ if(d.urls && d.urls[0]) insertMemoHtml('<img src="'+d.urls[0]+'" style="max-width:220px; max-height:220px; display:block; margin:4px 0; border:1px solid #ddd; border-radius:6px;">'); closeDraw(); })
-        .catch(function(){ closeDraw(); });
-    }, 'image/png');
-}
-function showDetail(id){
-    var s=null, baseId=String(id).split('_')[0];
-    for(var i=0;i<schedules.length;i++){ if(String(schedules[i].id)===String(id)){ s=schedules[i]; break; } }
-    if(!s) return;
-    document.getElementById('detailTitle').textContent = s.title || '(제목없음)';
-    var meta=[];
-    if(s.event_date) meta.push('🕐 '+s.event_date.replace('T',' ').substring(0,16));
-    if(s.location) meta.push('📍 '+s.location);
-    if(s.memo && s.memo.indexOf('[숙소:')>=0){ var m=s.memo.match(/\[숙소:([^\]]+)\]/); if(m) meta.push('🏠 '+m[1]); }
-    document.getElementById('detailMeta').innerHTML = meta.join('<br>');
-    var mv = s.memo ? s.memo.replace(/\[숙소:[^\]]+\]/g,'') : '';
-    document.getElementById('detailMemo').innerHTML = mv || '<span class="text-muted">메모 없음</span>';
-    document.getElementById('detailEditBtn').onclick = function(){ closeDetail(); editEvent(baseId); };
-    document.getElementById('detailModal').style.display='flex';
-}
-function closeDetail(){ document.getElementById('detailModal').style.display='none'; }
-
-let shownReminderIds = new Set();
-function beep(){
-  try{
-    var Ctx = window.AudioContext || window.webkitAudioContext;
-    if(!Ctx) return;
-    var ctx = new Ctx();
-    var o = ctx.createOscillator();
-    var g = ctx.createGain();
-    o.connect(g); g.connect(ctx.destination);
-    o.type='sine'; o.frequency.value=880;
-    g.gain.setValueAtTime(0.0001, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime+0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+0.5);
-    o.start(); o.stop(ctx.currentTime+0.5);
-  }catch(e){}
-}
-function fireNotification(r){
-  beep();
-  try{ if(navigator.vibrate) navigator.vibrate([200,100,200]); }catch(e){}
-  if('Notification' in window && Notification.permission==='granted'){
-    try{ new Notification(r.title, {body:(r.event_date||'')+' 알림', icon:'🔔'}); }catch(e){}
-  } else {
-    var t=document.createElement('div');
-    t.className='toast align-items-center text-bg-primary border-0';
-    t.style.cssText='position:fixed;top:60px;right:10px;z-index:80;';
-    t.innerHTML='<div class="d-flex"><div class="toast-body">🔔 '+r.title+' ('+(r.event_date||'')+')</div></div>';
-    document.body.appendChild(t);
-    setTimeout(function(){ if(t.parentNode) t.parentNode.removeChild(t); }, 6000);
-  }
-  markReminderSeen([r.id]);
-}
-function markReminderSeen(ids){
-  if(!ids || !ids.length) return;
-  fetch('/api/bot/schedule/reminder/seen', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ids:ids})})
-    .then(function(){ checkReminders(); })
-    .catch(function(){});
-}
-function checkReminders(){
-  fetch('/api/bot/schedule/reminders')
-    .then(function(r){return r.json();})
-    .then(function(d){
-      var list=d.reminders||[];
-      list.forEach(function(r){
-        if(!shownReminderIds.has(r.id)){ shownReminderIds.add(r.id); fireNotification(r); }
-      });
-      renderBellPanel(list);
-    })
-    .catch(function(){});
-}
-function renderBellPanel(list){
-  list = list || [];
-  var badge=document.getElementById('bellBadge');
-  if(list.length>0){ badge.style.display=''; badge.textContent=list.length; }
-  else { badge.style.display='none'; }
-  var p=document.getElementById('bellPanel');
-  if(!p) return;
-  if(!list.length){ p.innerHTML='<div class="small text-muted">알림 없음</div>'; return; }
-  var h='<div class="small fw-bold mb-2">알림 ('+list.length+')</div>';
-  list.forEach(function(r){
-    h+='<div class="border-bottom py-1 small"><div><strong>🔔 '+r.title+'</strong></div><div class="text-muted">'+r.event_date+'</div><button class="btn btn-sm btn-outline-secondary py-0 mt-1" onclick="markReminderSeen(['+r.id+'])">확인</button></div>';
-  });
-  p.innerHTML=h;
-}
-function toggleBell(){
-  if('Notification' in window && Notification.permission==='default'){ Notification.requestPermission(); }
-  var p=document.getElementById('bellPanel');
-  if(p.style.display==='none' || !p.style.display){ p.style.display='block'; checkReminders(); }
-  else { p.style.display='none'; }
-}
-function startReminderPoll(){ checkReminders(); setInterval(checkReminders, 20000); }
-startReminderPoll();
-var saving = false;
-function saveEvent() {
-    if (saving) return;
-    var id = document.getElementById('editId').value;
-    var title = document.getElementById('addTitle').value.trim();
-    var date = document.getElementById('addDate').value;
-    var endDate = document.getElementById('addEndDate').value;
-    var start = document.getElementById('addStart').value;
-    var end = document.getElementById('addEnd').value;
-    var loc = document.getElementById('addLoc').value.trim();
-    var memo = document.getElementById('memoEditor').innerHTML.trim();
-    var accommodation = document.getElementById('addAccommodation').value.trim();
-    var isAllDay = document.getElementById('addAllDay').checked;
-    var isRecurring = repeatOn;
-    var repeatType = '';
-    var repeatInterval = parseInt(document.getElementById('addRepeatInterval').value) || 1;
-    var repeatInfinite = !!(isRecurring && endDate && endDate < date);
-    var repeatWeekdays = getWeekdayMask();
-    var repeatWeekOfMonth = parseInt(document.getElementById('addRepeatWeekOfMonth').value) || 0;
-    var repeatMonthOfYear = parseInt(document.getElementById('addRepeatMonthOfYear').value) || 0;
-    if (isRecurring) {
-        var rbs = document.getElementsByName('repeatType');
-        for (var i=0;i<rbs.length;i++) { if(rbs[i].checked) { repeatType = rbs[i].value; break; } }
-    }
-    if (isRecurring && repeatWeekdays && repeatType !== 'weekly' && repeatType !== 'monthly') {
-        return alert('요일 반복은 매주 또는 매월 중 하나를 선택하세요.');
-    }
-    if (!title || !date) return alert('제목과 날짜를 입력하세요.');
-    var evt = isAllDay ? date+'T00:00' : (start ? date+'T'+start : date+'T09:00');
-    if (accommodation) memo = (memo ? memo : '')+'<br>[숙소:'+accommodation+']';
-    var cbs = document.querySelectorAll('.friend-cb:checked');
-    var invited = [];
-    cbs.forEach(function(cb){ invited.push(parseInt(cb.value)); });
-    var data = {title, event_date: evt, location: loc, memo, invited: JSON.stringify(invited), is_allday: isAllDay, is_recurring: isRecurring, repeat_type: repeatType, repeat_interval: repeatInterval, repeat_infinite: repeatInfinite, repeat_weekdays: repeatWeekdays, repeat_week_of_month: repeatWeekOfMonth, repeat_month_of_year: repeatMonthOfYear, reminder_minutes: parseInt(document.getElementById('addReminder').value) || 0};
-    if (end && !isAllDay) data.end_date = (endDate && endDate !== date ? endDate : date)+'T'+end;
-    if (isAllDay) data.end_date = endDate ? endDate+'T23:59' : date+'T23:59';
-    if (repeatInfinite) data.end_date = '';
-    if (id) data.id = parseInt(id);
-    var url = id ? '/api/bot/schedule/update' : '/api/bot/schedule';
-    saving = true;
-    var btn = document.getElementById('saveBtn');
-    if (btn) { btn.disabled = true; btn.textContent = '저장 중...'; }
-    fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
-    .then(function(r){return r.json()}).then(function(d){
-        if (d.success) {
-            document.getElementById('editId').value = '';
-            ['addTitle','addLoc','memoEditor','addStart','addEnd','addEndDate','addAccommodation'].forEach(function(x){
-                var el = document.getElementById(x);
-                if (el) el.value = '';
-            });
-            document.getElementById('addAllDay').checked = false;
-            repeatOn = false;
-            document.getElementById('addRepeatInterval').value = 1;
-            setRepeatOptionsVisible(false);
-            document.getElementById('addStart').disabled = false;
-            document.getElementById('addEnd').disabled = false;
-            alert(id?'수정 완료':'등록 완료');
-            loadEvents().then(() => switchTab('view'));
-        } else {
-            alert(d.error || '저장 실패');
-        }
-    })
-    .catch(function(e){ alert('저장 중 오류: '+e); })
-    .finally(function(){
-        saving = false;
-        var b = document.getElementById('saveBtn');
-        if (b) { b.disabled = false; b.textContent = document.getElementById('editId').value ? '수정' : '저장'; }
-    });
-}
-
-function deleteEvent(id, mode, date) {
-    var body = { id: id };
-    if (mode) body.mode = mode;
-    if (date) body.date = date;
-    fetch('/api/bot/schedule/delete', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
-    .then(function(r){ return r.json(); }).then(function(d){
-        if (d.success) loadEvents();
-    });
-}
-
-var delPending = null;
-function confirmDelete(id) {
-    var ev = null;
-    for (var i=0;i<schedules.length;i++){ if (String(schedules[i].id)===String(id)) { ev = schedules[i]; break; } }
-    if (!ev) return;
-    if (ev.is_recurring) {
-        var baseId = id, date = (ev.event_date||'').slice(0,10);
-        var sid = String(id);
-        if (sid.indexOf('_') >= 0) {
-            var parts = sid.split('_');
-            baseId = parts[0];
-            date = parts[1].replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
-        }
-        delPending = { baseId: baseId, date: date };
-        document.getElementById('delModal').style.display = 'flex';
-    } else {
-        if (confirm('삭제할까요?')) deleteEvent(id, 'all', null);
-    }
-}
-function closeDel() { document.getElementById('delModal').style.display = 'none'; delPending = null; }
-function doDelete(mode) {
-    if (!delPending) return;
-    var p = delPending;
-    closeDel();
-    deleteEvent(p.baseId, mode, p.date);
-}
-
-
-</script>
+<script src="/static/js/schedule/state.js?v=3"></script>
+<script src="/static/js/schedule/calendar.js?v=3"></script>
+<script src="/static/js/schedule/repeat.js?v=3"></script>
+<script src="/static/js/schedule/memo.js?v=3"></script>
+<script src="/static/js/schedule/reminder.js?v=3"></script>
+<script src="/static/js/schedule/events.js?v=3"></script>
+<script src="/static/js/schedule/app.js?v=3"></script>
 <div id="delModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:50; align-items:center; justify-content:center;">
   <div style="background:#fff; border-radius:12px; padding:16px; width:280px; max-width:90%; box-shadow:0 8px 24px rgba(0,0,0,.2);">
     <div class="fw-bold mb-1">반복 일정 삭제</div>

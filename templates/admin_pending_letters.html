@@ -1,0 +1,104 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container" style="max-width: 900px;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold text-primary">📨 관리자 보류 편지함</h3>
+        <a href="/message/inbox" class="btn btn-sm btn-outline-secondary">← 편지함으로</a>
+    </div>
+
+    <div class="alert alert-info small">
+        <strong>공동 관리 편지함:</strong> 전체관리자에게 보내는 편지와 마을지기에게 보내는 편지가 1차 AI 검토 후 이곳에 모입니다.
+        <br>승인 시 실제 수신자에게 전달, 반려 시 발송자에게 AI관리자 명의로 통보됩니다.
+    </div>
+
+    {% if pending_letters %}
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>발송자</th>
+                    <th>제목</th>
+                    <th>수신 유형</th>
+                    <th>발송일시</th>
+                    <th>상태</th>
+                    <th>처리</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in pending_letters %}
+                <tr>
+                    <td>{{ m.sender_name }} (ID: {{ m.sender_id }})</td>
+                    <td>{{ m.subject }}</td>
+                    <td>
+                        {% if m.original_receiver_type == 'global' %}
+                            <span class="badge bg-danger">전체관리자</span>
+                        {% else %}
+                            <span class="badge bg-primary">{{ m.town }} {{ m.village }} 마을지기</span>
+                        {% endif %}
+                    </td>
+                    <td class="small">{{ m.created_at.strftime('%m/%d %H:%M') }}</td>
+                    <td><span class="badge bg-warning text-dark">심사 대기</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-success" onclick="approveLetter({{ m.id }})">승인</button>
+                        <button class="btn btn-sm btn-danger" onclick="rejectLetter({{ m.id }})">반려</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="text-center py-5 text-muted">심사 대기 중인 편지가 없습니다.</div>
+    {% endif %}
+</div>
+
+<!-- 반려 사유 모달 -->
+<div class="modal fade" id="rejectModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 p-3" style="border-radius: 16px;">
+            <div class="modal-header border-0 pb-2">
+                <h6 class="fw-bold">편지 반려</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="rejectForm">
+                <input type="hidden" name="msg_id" id="rejectMsgId">
+                <div class="modal-body">
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold">반려 사유 (필수)</label>
+                        <textarea name="reason" class="form-control form-control-sm" rows="3" required placeholder="예: 광고성 내용, 부적절한 표현, 개인정보 포함 등"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">취소</button>
+                    <button class="btn btn-sm btn-danger" type="submit">반려 확정</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function approveLetter(msgId) {
+    if (!confirm('이 편지를 승인하여 실제 수신자에게 전달하시겠습니까?')) return;
+    fetch('/message/admin/pending/' + msgId + '/approve', {method: 'POST'})
+        .then(r => r.json()).then(d => {
+            if (d.success) { alert('승인 완료'); location.reload(); }
+            else alert('오류: ' + d.error);
+        });
+}
+function rejectLetter(msgId) {
+    document.getElementById('rejectMsgId').value = msgId;
+    new bootstrap.Modal(document.getElementById('rejectModal')).show();
+}
+document.getElementById('rejectForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var msgId = document.getElementById('rejectMsgId').value;
+    var formData = new FormData(this);
+    fetch('/message/admin/pending/' + msgId + '/reject', {method: 'POST', body: formData})
+        .then(r => r.json()).then(d => {
+            if (d.success) { alert('반려 완료'); location.reload(); }
+            else alert('오류: ' + d.error);
+        });
+});
+</script>
+{% endblock %}

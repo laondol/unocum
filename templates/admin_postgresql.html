@@ -1,0 +1,37 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container mt-4" style="max-width: 1000px;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold text-primary">{{ 'database 2' | title }}DB 관리 (PostgreSQL)</h3>
+        <a href="/admin" class="btn btn-sm btn-outline-secondary">&larr; 관리자 메인</a>
+    </div>
+
+    <div class="alert alert-info small">
+        연결: localhost:5432 / yp_dev_db<br>
+        테이블: {{ tables|length }}개
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover table-sm align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>#</th>
+                    <th>테이블 명</th>
+                    <th>레코드 수</th>
+                    <th>프라이머리 키</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in tables %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td class="fw-bold">{{ t.name }}</td>
+                    <td>{{ t.rows | comma }}</td>
+                    <td><small class="text-muted">{{ t.name }}_id</small></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

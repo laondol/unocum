@@ -204,8 +204,16 @@ class Message(db.Model):
     subject = db.Column(db.String(200))
     content = db.Column(db.Text)
     is_read = db.Column(db.Boolean, default=False)
+    is_public = db.Column(db.Boolean, default=False)
+    letter_type = db.Column(db.String(20), default='private')
     attachment = db.Column(db.String(500))
     created_at = db.Column(db.DateTime, default=datetime.now)
+    # 관리자 편지 관련
+    town = db.Column(db.String(50))
+    village = db.Column(db.String(50))
+    original_receiver_type = db.Column(db.String(20))  # 'global', 'village'
+    moderation_status = db.Column(db.String(20), default='approved')  # 'approved', 'pending', 'rejected'
+    rejection_reason = db.Column(db.Text)
 
 class ShareReport(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -243,6 +251,8 @@ class ShareReport(db.Model):
     canonical_name = db.Column(db.String(200))
     canonical_source = db.Column(db.String(50))
     smartplace_url = db.Column(db.String(500))
+    store_suggestion_id = db.Column(db.Integer, db.ForeignKey('store_suggestion.id'), nullable=True)
+    sub_category = db.Column(db.String(50), default='')
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now)
 
@@ -259,6 +269,51 @@ class StoreInfo(db.Model):
     store_homepage = db.Column(db.String(500))  # 가게 자체 홈페이지
     smartplace = db.Column(db.String(500))
     phone = db.Column(db.String(30))
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+
+class StoreSuggestion(db.Model):
+    """회원이 제안한 가게명 + 투표(경쟁 요소). place_id(카카오) 기준으로 묶음."""
+    id = db.Column(db.Integer, primary_key=True)
+    place_id = db.Column(db.String(50), nullable=False)  # 카카오 place id
+    name = db.Column(db.String(200), nullable=False)     # 제안된 가게명
+    suggested_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    vote_count = db.Column(db.Integer, default=1)
+    lat = db.Column(db.Float)
+    lon = db.Column(db.Float)
+    address = db.Column(db.String(200))
+    place_url = db.Column(db.String(500))
+    phone = db.Column(db.String(30))
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+    @property
+    def top_name(self):
+        # 같은 place_id 중 최다 투표 이름
+        from sqlalchemy import func
+        row = db.session.query(StoreSuggestion.name, func.sum(StoreSuggestion.vote_count).label('v'))\
+                        .filter_by(place_id=self.place_id).group_by(StoreSuggestion.name)\
+                        .order_by(func.sum(StoreSuggestion.vote_count).desc()).first()
+        return row[0] if row else self.name
+
+
+class StoreMenu(db.Model):
+    """가게 메뉴 (AI가 식사/음료/디저트/기타로 자동 분류)"""
+    id = db.Column(db.Integer, primary_key=True)
+    store_suggestion_id = db.Column(db.Integer, db.ForeignKey('store_suggestion.id'), nullable=True)
+    place_id = db.Column(db.String(50), nullable=True)
+    name = db.Column(db.String(200), nullable=False)
+    sub_category = db.Column(db.String(20), default='기타')  # 식사/음료/디저트/기타
+    price = db.Column(db.String(30))
+    description = db.Column(db.Text)
+    ai_generated = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+
+class StoreSuggestionVote(db.Model):
+    """가게명 제안 투표 이력 (회원별)"""
+    id = db.Column(db.Integer, primary_key=True)
+    suggestion_id = db.Column(db.Integer, db.ForeignKey('store_suggestion.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.now)
 
 class ConstructionNotice(db.Model):
@@ -298,6 +353,27 @@ class HeritageStamp(db.Model):
     heritage_lat = db.Column(db.Float)
     heritage_lng = db.Column(db.Float)
     stamped_at = db.Column(db.DateTime, default=datetime.now)
+
+class PublicFacility(db.Model):
+    """공중화장실 등 생활안전지도 편의시설 (safemap IF_0132 등)"""
+    id = db.Column(db.Integer, primary_key=True)
+    facility_type = db.Column(db.String(50), default='toilet')  # toilet, parking, ...
+    name = db.Column(db.String(300), nullable=False)
+    address = db.Column(db.String(300))
+    latitude = db.Column(db.Float)
+    longitude = db.Column(db.Float)
+    open_hr = db.Column(db.String(100))
+    tel = db.Column(db.String(30))
+    manager = db.Column(db.String(100))
+    emergency_bell = db.Column(db.Boolean, default=False)
+    cctv = db.Column(db.Boolean, default=False)
+    source = db.Column(db.String(50))          # safemap_toilet
+    source_url = db.Column(db.String(200))     # objt id / num
+    town = db.Column(db.String(50))
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now)
+
 
 class TongBot(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -356,6 +432,10 @@ class TongBotSchedule(db.Model):
     repeat_month_of_year = db.Column(db.Integer, default=0)  # 0=매년아님, 1-12=해당월
     reminder_minutes = db.Column(db.Integer, default=0)  # 0=알림안함, 10/30/60/1440(1일전)
     repeat_exceptions = db.Column(db.Text, default='')  # JSON list of 'YYYY-MM-DD' dates to skip
+    # --- 모듈화: parent_id 기반 발생일/경로 추적 ---
+    kind = db.Column(db.String(20), default='base')  # 'base' | 'occurrence' | 'route'
+    parent_id = db.Column(db.Integer, db.ForeignKey('tong_bot_schedule.id', ondelete='CASCADE'), nullable=True)
+    occ_date = db.Column(db.Date, nullable=True)  # 발생일 실제 날짜 (occurrence 전용)
 
 class ChatRoom(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -681,3 +761,159 @@ class ScheduleReminderLog(db.Model):
     event_date = db.Column(db.DateTime)
     sent_at = db.Column(db.DateTime, default=datetime.now)
     seen = db.Column(db.Boolean, default=False)
+
+
+class MessageReminderLog(db.Model):
+    __tablename__ = 'message_reminder_log'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    message_id = db.Column(db.Integer, db.ForeignKey('message.id'))
+    sender_name = db.Column(db.String(50))
+    subject = db.Column(db.String(200))
+    sent_at = db.Column(db.DateTime, default=datetime.now)
+    seen = db.Column(db.Boolean, default=False)
+
+
+class PushSubscription(db.Model):
+    __tablename__ = 'push_subscription'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    endpoint = db.Column(db.Text, nullable=False)
+    p256dh = db.Column(db.Text, nullable=False)
+    auth = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+
+# ═══════════════════ EPUB (위치기반 콘텐츠 에디터) ═══════════════════
+
+class EpubBook(db.Model):
+    __tablename__ = "epub_book"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    title = db.Column(db.String(300), nullable=False)
+    description = db.Column(db.Text, default="")
+    layout_type = db.Column(db.String(30), default="newsletter")  # newsletter/guidebook/journal
+    template_id = db.Column(db.Integer, db.ForeignKey("epub_template.id"), nullable=True)
+    town = db.Column(db.String(50), default="")
+    village = db.Column(db.String(50), default="")
+    cover_image = db.Column(db.String(500), default="")
+    status = db.Column(db.String(20), default="draft")  # draft/published
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    pages = db.relationship("EpubPage", backref="book", lazy="dynamic", cascade="all, delete-orphan")
+
+
+class EpubPage(db.Model):
+    __tablename__ = "epub_page"
+    id = db.Column(db.Integer, primary_key=True)
+    book_id = db.Column(db.Integer, db.ForeignKey("epub_book.id"), nullable=False)
+    order_index = db.Column(db.Integer, default=0)
+    title = db.Column(db.String(200), default="")
+    content = db.Column(db.Text, default="")
+    latitude = db.Column(db.Float, nullable=True)
+    longitude = db.Column(db.Float, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    media = db.relationship("EpubMedia", backref="page", lazy="dynamic", cascade="all, delete-orphan")
+
+
+class EpubMedia(db.Model):
+    __tablename__ = "epub_media"
+    id = db.Column(db.Integer, primary_key=True)
+    page_id = db.Column(db.Integer, db.ForeignKey("epub_page.id"), nullable=False)
+    file_path = db.Column(db.String(500), nullable=False)
+    media_type = db.Column(db.String(20), default="image")  # image/video
+    latitude = db.Column(db.Float, nullable=True)
+    longitude = db.Column(db.Float, nullable=True)
+    caption = db.Column(db.String(500), default="")
+    alt_text = db.Column(db.String(300), default="")
+    order_index = db.Column(db.Integer, default=0)
+    editor_state = db.Column(db.Text, nullable=True)  # JSON
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+
+class EpubTemplate(db.Model):
+    __tablename__ = "epub_template"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, default="")
+    layout_type = db.Column(db.String(30), default="newsletter")
+    sections = db.Column(db.Text, default="[]")  # JSON array
+    style_guide = db.Column(db.Text, default="{}")  # JSON object
+    is_default = db.Column(db.Boolean, default=False)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+
+class EpubStyleGuide(db.Model):
+    __tablename__ = "epub_style_guide"
+    id = db.Column(db.Integer, primary_key=True)
+    template_id = db.Column(db.Integer, db.ForeignKey("epub_template.id"), nullable=True)
+    font_family = db.Column(db.String(100), default="Noto Sans KR, sans-serif")
+    font_size_h1 = db.Column(db.String(20), default="24px")
+    font_size_h2 = db.Column(db.String(20), default="18px")
+    font_size_h3 = db.Column(db.String(20), default="16px")
+    font_size_body = db.Column(db.String(20), default="15px")
+    color_primary = db.Column(db.String(20), default="#2c5f2d")
+    color_secondary = db.Column(db.String(20), default="#97bc62")
+    line_height = db.Column(db.Float, default=1.8)
+    margin = db.Column(db.String(20), default="16px")
+    image_width = db.Column(db.String(20), default="100%")
+    image_border_radius = db.Column(db.String(20), default="12px")
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+
+class GuideSection(db.Model):
+    __tablename__ = "guide_section"
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    content = db.Column(db.Text, default="")
+    icon = db.Column(db.String(50), default="")
+    order_index = db.Column(db.Integer, default=0)
+    parent_id = db.Column(db.Integer, db.ForeignKey("guide_section.id"), nullable=True)
+    layout_type = db.Column(db.String(30), default="card")
+    style_json = db.Column(db.Text, default="{}")
+    language = db.Column(db.String(10), default="ko")
+    status = db.Column(db.String(20), default="published")
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    children = db.relationship("GuideSection", backref=db.backref("parent", remote_side=[id]),
+                               foreign_keys=[parent_id], order_by="GuideSection.order_index")
+
+    def to_dict(self):
+        return {
+            "id": self.id, "title": self.title, "content": self.content,
+            "icon": self.icon, "order_index": self.order_index, "parent_id": self.parent_id,
+            "layout_type": self.layout_type, "style_json": __import__('json').loads(self.style_json or "{}"),
+            "language": self.language, "status": self.status,
+            "children": [c.to_dict() for c in self.children],
+        }
+
+
+class GuideTemplate(db.Model):
+    __tablename__ = "guide_template"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, default="")
+    html_content = db.Column(db.Text, default="")
+    source_type = db.Column(db.String(30), default="manual")
+    source_id = db.Column(db.Integer, nullable=True)
+    layout_type = db.Column(db.String(30), default="card")
+    style_guide = db.Column(db.Text, default="{}")
+    preview_image = db.Column(db.String(500), default="")
+    is_active = db.Column(db.Boolean, default=True)
+    is_featured = db.Column(db.Boolean, default=False)
+    use_count = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+
+    def to_dict(self):
+        return {
+            "id": self.id, "name": self.name, "description": self.description,
+            "html_content": self.html_content, "source_type": self.source_type,
+            "source_id": self.source_id, "layout_type": self.layout_type,
+            "style_guide": __import__('json').loads(self.style_guide or "{}"),
+            "preview_image": self.preview_image,
+            "is_active": self.is_active, "is_featured": self.is_featured,
+            "use_count": self.use_count,
+            "created_at": self.created_at.strftime('%Y-%m-%d %H:%M') if self.created_at else None,
+        }

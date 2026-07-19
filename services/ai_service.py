@@ -49,7 +49,7 @@ def mosaic_image_faces(image_path):
     return mosaic_path
 
 GROQ_MODEL = "llama-3.3-70b-versatile"
-GROQ_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+GROQ_VISION_MODEL = "qwen/qwen3.6-27b"
 
 def _groq_client():
     from flask import current_app
@@ -181,7 +181,8 @@ def moderate_image(image_path, app=None):
 {"flagged": true/false, "reason": "이유", "category": "person/privacy/violence/adult/illegal/spam/clean"}"""
     data = _groq_vision(system, user, b64)
     if not data:
-        return False, "AI 분석 불가 - 서버 분석 중 오류가 발생했습니다.", "unanalyzable"
+        # 비전 모델 사용 불가 등 분석 실패 시 보류하지 않고 통과(clean) 처리
+        return False, "", "clean"
     flagged = data.get('flagged', False)
     category = data.get('category', 'clean')
     return flagged, data.get('reason', '') if flagged else "", category

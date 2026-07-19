@@ -85,6 +85,29 @@ function showInline(type) {
             html += '</div>';
             el.innerHTML = html;
         });
+    } else if (type === 'facility') {
+        el.innerHTML = '<div class="text-center py-2"><span class="spinner-border spinner-border-sm"></span> 편의시설 불러오는 중...</div>';
+        fetch('/api/facilities?type=toilet').then(function(r){return r.json()}).then(function(d){
+            var facs = d.facilities || [];
+            if (!facs.length) { el.innerHTML = '<div class="text-muted text-center py-3 small">근처 공중화장실 정보가 없습니다.<br>관리자 메뉴에서 편의시설을 동기화해 주세요.</div>'; return; }
+            var html = '<div class="small mb-1 text-muted">생활안전지도(행정안전부) 공중화장실 · 양평군</div><div class="row g-2">';
+            facs.forEach(function(f){
+                var dir = (f.latitude!=null && f.longitude!=null) ? 'https://www.google.com/maps/dir/?api=1&destination='+f.latitude+','+f.longitude : '#';
+                var kakao = (f.latitude!=null && f.longitude!=null) ? 'https://map.kakao.com/link/to/'+encodeURIComponent(f.name)+','+f.latitude+','+f.longitude : '#';
+                html += '<div class="col-12"><div class="card border-0 shadow-sm" style="border-radius:16px;border-left:4px solid #198754;">';
+                html += '<div class="card-body p-2"><div class="d-flex justify-content-between"><h6 class="fw-bold mb-1 small">'+f.name+'</h6>'+(f.distance_km!=null?'<span class="badge bg-light text-dark">'+f.distance_km+'km</span>':'')+'</div>';
+                if (f.address) html += '<div class="small text-muted">'+f.address+'</div>';
+                var tags = [];
+                if (f.open_hr) tags.push('개방 '+f.open_hr);
+                if (f.emergency_bell) tags.push('<span class="text-danger">비상벨</span>');
+                if (f.cctv) tags.push('<span class="text-primary">CCTV</span>');
+                if (tags.length) html += '<div class="small mt-1">'+tags.join(' · ')+'</div>';
+                if (f.latitude!=null) html += '<div class="mt-1"><a class="btn btn-sm btn-outline-secondary" href="'+dir+'" target="_blank">길찾기(구글)</a> <a class="btn btn-sm btn-outline-success" href="'+kakao+'" target="_blank">카카오맵</a></div>';
+                html += '</div></div>';
+            });
+            html += '</div>';
+            el.innerHTML = html;
+        }).catch(function(){ el.innerHTML = '<div class="text-danger">불러오기 실패</div>'; });
     } else if (type === 'alert') {
         var alHtml = document.getElementById('alertList');
         if (alHtml && alHtml.innerHTML.trim()) {
@@ -98,12 +121,13 @@ function showInline(type) {
 // ---- switchTab ----
 
 function switchTab(type) {
-    ['heritageSection','scenerySection','homeSection','localStoresSection'].forEach(function(id){ document.getElementById(id).style.display='none'; });
+    ['heritageSection','scenerySection','homeSection','localStoresSection','facilitySection'].forEach(function(id){ document.getElementById(id).style.display='none'; });
     document.querySelectorAll('.notice-item').forEach(function(item){ item.style.display='none'; });
     if (document.getElementById('emptyNotices')) document.getElementById('emptyNotices').style.display='none';
     if (document.getElementById('alertList')) document.getElementById('alertList').style.display='none';
     var tl = document.getElementById('trafficLive'); if (tl) tl.style.display='none';
     if (type === 'localstore') { document.getElementById('localStoresSection').style.display=''; loadLocalStores(); }
+    else if (type === 'facility') { var fsec=document.getElementById('facilitySection'); if(fsec) fsec.style.display=''; loadFacility(); }
     else if (type === 'traffic') {
         document.querySelectorAll('.notice-item').forEach(function(item){
             var dt = item.dataset.type;
@@ -153,11 +177,7 @@ document.querySelectorAll('#infoTabs .nav-link').forEach(function(tab){
                 if (emptyEl) emptyEl.style.display='';
                 break;
             case 'building':
-                document.querySelectorAll('.notice-item').forEach(function(item){
-                    var dt = item.dataset.type;
-                    if (dt==='building_permit') item.style.display='';
-                });
-                if (emptyEl && !document.querySelector('.notice-item:not([style*="display:none"])')) emptyEl.style.display='';
+                loadBuilding();
                 break;
         }
     });
@@ -267,6 +287,32 @@ function loadLocalStores() {
     }).catch(function(){ el.innerHTML = '<div class="alert alert-danger">사용자 정보를 불러올 수 없습니다.</div>'; });
 }
 
+function loadFacility() {
+    var el = document.getElementById('facilityContent');
+    if (!el) return;
+    el.innerHTML = '<div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> 편의시설 불러오는 중...</div>';
+    fetch('/api/facilities?type=toilet').then(function(r){return r.json()}).then(function(d){
+        var facs = d.facilities || [];
+        if (!facs.length) { el.innerHTML = '<div class="text-muted text-center py-3 small">근처 공중화장실 정보가 없습니다.<br>관리자 메뉴에서 편의시설을 동기화해 주세요.</div>'; return; }
+        var html = '<div class="small mb-1 text-muted">생활안전지도(행정안전부) 공중화장실 · 양평군</div><div class="row g-2">';
+        facs.forEach(function(f){
+            var dir = (f.latitude!=null && f.longitude!=null) ? 'https://www.google.com/maps/dir/?api=1&destination='+f.latitude+','+f.longitude : '#';
+            var kakao = (f.latitude!=null && f.longitude!=null) ? 'https://map.kakao.com/link/to/'+encodeURIComponent(f.name)+','+f.latitude+','+f.longitude : '#';
+            html += '<div class="col-12"><div class="card border-0 shadow-sm" style="border-radius:16px;border-left:4px solid #198754;">';
+            html += '<div class="card-body p-2"><div class="d-flex justify-content-between"><h6 class="fw-bold mb-1 small">'+f.name+'</h6>'+(f.distance_km!=null?'<span class="badge bg-light text-dark">'+f.distance_km+'km</span>':'')+'</div>';
+            if (f.address) html += '<div class="small text-muted">'+f.address+'</div>';
+            var tags = [];
+            if (f.open_hr) tags.push('개방 '+f.open_hr);
+            if (f.emergency_bell) tags.push('<span class="text-danger">비상벨</span>');
+            if (f.cctv) tags.push('<span class="text-primary">CCTV</span>');
+            if (tags.length) html += '<div class="small mt-1">'+tags.join(' · ')+'</div>';
+            if (f.latitude!=null) html += '<div class="mt-1"><a class="btn btn-sm btn-outline-secondary" href="'+dir+'" target="_blank">길찾기(구글)</a> <a class="btn btn-sm btn-outline-success" href="'+kakao+'" target="_blank">카카오맵</a></div>';
+            html += '</div></div>';
+        });
+        html += '</div>';
+        el.innerHTML = html;
+    }).catch(function(){ el.innerHTML = '<div class="text-danger">불러오기 실패</div>'; });
+}
 // ---- 집으로 ----
 
 function loadHome() {
@@ -439,3 +485,67 @@ function submitManualLoc(loc, gps_lat, gps_lng) {
         if (d.alerts > 0) { var b = document.getElementById('sceneryBadge'); b.textContent = d.alerts; b.classList.remove('d-none'); }
     }).catch(function(){});
 })();
+
+// ---- 건축공사 (위치기반 우선) ----
+
+function loadBuilding() {
+    var listEl = document.getElementById('noticeList');
+    var emptyEl = document.getElementById('emptyNotices');
+    if (emptyEl) emptyEl.style.display = 'none';
+    if (listEl) listEl.style.display = '';
+
+    function render(items, town, village) {
+        if (listEl) {
+            listEl.innerHTML = '';
+            if (!items || items.length === 0) {
+                if (emptyEl) {
+                    emptyEl.style.display = '';
+                    var where = (town && village) ? (town + ' ' + village)
+                              : (town || village || '현재 위치');
+                    emptyEl.innerHTML = '<div class="fs-1 mb-3">🏗️</div>'
+                        + '<p><strong>' + where + '</strong> 근처에는 건축 관련 내용이 없습니다.</p>'
+                        + '<p class="small text-muted">현재 진행 중이거나 허가된 건축공사 정보가 없습니다. 특별한 내용이 없습니다.</p>'
+                        + '<p class="small"><a href="/construction/refresh">정보 갱신하기</a></p>';
+                }
+                return;
+            }
+            items.forEach(function(n){
+                if (n.notice_type !== 'building_permit') return;
+                var dist = (n.distance_km != null) ? ('📍 ' + n.distance_km + 'km · ') : '';
+                var html = '<div class="col-12 notice-item" data-type="' + n.notice_type + '">'
+                    + '<div class="card border-0 shadow-sm" style="border-radius:16px;">'
+                    + '<div class="card-body p-3">'
+                    + '<div class="d-flex justify-content-between"><h6 class="fw-bold mb-2">' + (n.title || '건축공사') + '</h6>'
+                    + '<span class="badge bg-info">🏗️ 건축공사</span></div>'
+                    + (n.description ? '<p class="small text-muted mb-2">' + n.description + '</p>' : '')
+                    + '<div class="d-flex gap-3 flex-wrap small text-muted">'
+                    + (n.location ? '<span>📍 ' + n.location + '</span>' : '')
+                    + (dist ? '<span>' + dist + '</span>' : '')
+                    + (n.start_date ? '<span>📅 ' + n.start_date + '</span>' : '')
+                    + '</div>'
+                    + (n.latitude && n.longitude ? '<a href="https://maps.google.com/?q=' + n.latitude + ',' + n.longitude + '" target="_blank" class="btn btn-sm btn-outline-secondary mt-2">🗺️ 지도보기</a>' : '')
+                    + '</div></div></div>';
+                listEl.insertAdjacentHTML('beforeend', html);
+            });
+        }
+    }
+
+    if (!navigator.geolocation) {
+        // GPS 미지원: 저장된 위치 기준
+        fetch('/api/construction/notices').then(function(r){return r.json();}).then(function(d){
+            render(d.notices, d.town, d.village);
+        }).catch(function(){ render([], '', ''); });
+        return;
+    }
+    navigator.geolocation.getCurrentPosition(function(pos){
+        var lat = pos.coords.latitude, lng = pos.coords.longitude;
+        fetch('/api/construction/notices?lat=' + lat + '&lng=' + lng).then(function(r){return r.json();}).then(function(d){
+            render(d.notices, d.town, d.village);
+        }).catch(function(){ render([], '', ''); });
+    }, function(){
+        // 위치 권한 거부: 저장된 위치 기준
+        fetch('/api/construction/notices').then(function(r){return r.json();}).then(function(d){
+            render(d.notices, d.town, d.village);
+        }).catch(function(){ render([], '', ''); });
+    }, { enableHighAccuracy: true, timeout: 10000 });
+}

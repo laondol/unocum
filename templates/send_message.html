@@ -1,24 +1,207 @@
 {% extends 'layout.html' %}
 {% block content %}
-<div class="container mt-4" style="max-width: 600px;">
-    <a href="/user/{{ receiver.id }}" class="btn btn-sm btn-outline-secondary mb-3">← 돌아가기</a>
-    <h3 class="fw-bold mb-4">📝 쪽지 보내기</h3>
-    <div class="card border-0 shadow-sm p-4" style="border-radius: 18px;">
-        <div class="mb-3">
-            <label class="form-label small fw-bold">받는 분</label>
-            <input type="text" class="form-control bg-light" value="{{ receiver.real_name }} ({{ receiver.username }})" readonly>
+<div class="container mt-4" style="max-width: 700px;">
+    <a href="/message/inbox" class="btn btn-sm btn-outline-secondary mb-3">← 편지함으로</a>
+    <h3 class="fw-bold mb-2">📝 편지 보내기</h3>
+    <input type="hidden" name="admin_type" id="adminTypeInput" value="{{ admin_type or '' }}">
+    <div class="mb-3 d-flex justify-content-between align-items-center">
+        <div>
+            <span class="text-muted">받는 분: </span>
+            <strong>{{ receiver.real_name or receiver.username }}</strong>
+            {% if admin_type == 'global' %}<span class="badge bg-danger ms-1">전체관리자</span>{% endif %}
+            {% if admin_type == 'village' %}<span class="badge bg-primary ms-1">마을지기</span>{% endif %}
+            {% if not admin_type %}<span class="badge bg-success ms-1">벗</span>{% endif %}
         </div>
-        <form method="POST">
+        <div class="text-end">
+            <span class="small text-muted">坭: </span>
+            <strong class="small {% if user_points < letter_cost %}text-danger{% else %}text-success{% endif %}">{{ user_points | comma }}坭</strong>
+            <span class="small text-muted">(발송 시 {{ letter_cost }}坭 차감)</span>
+        </div>
+    </div>
+
+    <!-- ⚠️ 공개편지 안내 (관리자/마을지기에게 보낼 때만) -->
+    {% if is_admin or is_village_leader %}
+    <div class="alert alert-warning border-0 mb-3" style="border-radius:14px; background:#fff8e1;">
+        <div class="fw-bold mb-1">⚠️ 공개편지 안내</div>
+        <div class="small text-muted mb-2">
+            관리자(함사양){% if is_village_leader %}/ 마을지기{% endif %}에게 보내는 편지는 <strong>공개형</strong>으로 관리됩니다.
+            <br>관리자와 책임자가 열람할 수 있으며, 필요시 공개될 수 있습니다.
+            <br>개인적인 내용이 아닌 공적 편지로 활용해 주세요.
+        </div>
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="agreePublic" required>
+            <label class="form-check-label small" for="agreePublic">
+                위 내용을 확인하고 동의합니다
+            </label>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ⚠️ 행동강령 동의 (항상 표시) -->
+    <div class="alert alert-info border-0 mb-3" style="border-radius:14px; background:#e3f2fd;">
+        <div class="fw-bold mb-1">📋 행동강령 준수 동의</div>
+        <div class="small text-muted mb-2">
+            편지는 상호 존중과 배려를 바탕으로 작성해야 합니다.
+            {% if not is_admin and not is_village_leader %}
+            <br>벗에게 보내는 편지는 개인편지로 분류되며, 내용이 부적절하다고 판단될 경우
+            관리자에게 중재를 요청받을 수 있고, 회원자격이 박탈될 수 있습니다.
+            {% endif %}
+            <br>불법, 협박, 명예훼손 등 법적 문제가 있는 내용은 엄격히 금지됩니다.
+        </div>
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="agreeConduct" required>
+            <label class="form-check-label small" for="agreeConduct">
+                행동강령을 준수하겠습니다
+            </label>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm p-4" style="border-radius: 18px;">
+        <form id="letterForm" method="POST">
+            <input type="hidden" name="subject" id="subjectInput">
+            <input type="hidden" name="content" id="contentInput">
+            <input type="hidden" name="agree_public" id="agreePublicInput">
+            <input type="hidden" name="agree_conduct" id="agreeConductInput">
             <div class="mb-3">
                 <label class="form-label fw-bold">제목</label>
-                <input type="text" name="subject" class="form-control" required placeholder="제목을 입력하세요">
+                <input type="text" class="form-control" id="subjectField" required placeholder="제목을 입력하세요">
             </div>
             <div class="mb-3">
                 <label class="form-label fw-bold">내용</label>
-                <textarea name="content" class="form-control" rows="6" required placeholder="내용을 입력하세요"></textarea>
+                <div class="border rounded-top p-2 bg-light d-flex flex-wrap gap-1" id="editorToolbar">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="editorCmd('bold')" title="굵게"><b>B</b></button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="editorCmd('italic')" title="기울임"><i>I</i></button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="editorCmd('underline')" title="밑줄"><u>U</u></button>
+                    <div class="vr mx-1"></div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="editorCmd('insertUnorderedList')" title="글머리">• 목록</button>
+                    <div class="vr mx-1"></div>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="insertLink()" title="링크 삽입">🔗 링크</button>
+                    <div class="vr mx-1"></div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="editorCmd('removeFormat')" title="서식 지우기">🗑️</button>
+                </div>
+                <div id="editor" contenteditable="true" class="border border-top-0 rounded-bottom p-3" style="min-height:200px; max-height:400px; overflow-y:auto; background:#fdfdf8; font-size:15px; line-height:1.8; outline:none;"></div>
             </div>
-            <button type="submit" class="btn btn-success w-100 py-2 fw-bold" style="border-radius:12px;">보내기</button>
+            <button type="submit" class="btn btn-success w-100 py-2 fw-bold" style="border-radius:12px;">
+                💌 보내기 ({{ letter_cost }}坭 차감)
+            </button>
         </form>
     </div>
 </div>
+
+<!-- 링크 입력 모달 -->
+<div class="modal fade" id="linkModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 p-3" style="border-radius: 16px;">
+            <div class="modal-header border-0 pb-2"><h6 class="fw-bold">🔗 링크 삽입</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-2">
+                    <label class="form-label small fw-bold">표시할 텍스트</label>
+                    <input type="text" class="form-control form-control-sm" id="linkText" placeholder="텍스트 입력">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small fw-bold">URL</label>
+                    <input type="url" class="form-control form-control-sm" id="linkUrl" placeholder="https://example.com">
+                </div>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">취소</button>
+                <button class="btn btn-sm btn-primary" onclick="confirmInsertLink()">삽입</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+var editor = document.getElementById('editor');
+var savedSelection = null;
+
+function editorCmd(cmd, val) {
+    document.execCommand(cmd, false, val || null);
+    editor.focus();
+}
+
+function saveSelection() {
+    var sel = window.getSelection();
+    if (sel.rangeCount > 0) savedSelection = sel.getRangeAt(0);
+}
+
+function restoreSelection() {
+    if (savedSelection) {
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(savedSelection);
+    }
+}
+
+function insertLink() {
+    saveSelection();
+    var sel = window.getSelection();
+    if (sel.toString()) document.getElementById('linkText').value = sel.toString();
+    else document.getElementById('linkText').value = '';
+    document.getElementById('linkUrl').value = '';
+    new bootstrap.Modal(document.getElementById('linkModal')).show();
+}
+
+function confirmInsertLink() {
+    var text = document.getElementById('linkText').value.trim();
+    var url = document.getElementById('linkUrl').value.trim();
+    if (!url) return alert('URL을 입력하세요.');
+    if (!text) text = url;
+    restoreSelection();
+    var a = document.createElement('a');
+    a.href = url;
+    a.textContent = text;
+    a.target = '_blank';
+    a.style.color = '#0d6efd';
+    a.style.textDecoration = 'underline';
+    var sel = window.getSelection();
+    if (sel.rangeCount > 0) {
+        var range = sel.getRangeAt(0);
+        range.deleteContents();
+        range.insertNode(a);
+        range.setStartAfter(a);
+        range.setEndAfter(a);
+        sel.removeAllRanges();
+        sel.addRange(range);
+    }
+    bootstrap.Modal.getInstance(document.getElementById('linkModal')).hide();
+}
+
+document.getElementById('letterForm').addEventListener('submit', function(e){
+    e.preventDefault();
+    var subj = document.getElementById('subjectField').value.trim();
+    var body = editor.innerHTML.trim();
+    if(!subj){ alert('제목을 입력하세요.'); return; }
+    if(!body || body==='<br>' || body==='<>'){ alert('내용을 입력하세요.'); return; }
+
+    var isPublicTarget = {{ 'true' if admin_type in ['global', 'village'] else 'false' }};
+    var agreePublic = document.getElementById('agreePublic').checked;
+    var agreeConduct = document.getElementById('agreeConduct').checked;
+
+    if(isPublicTarget && !agreePublic){
+        alert('공개편지 동의에 체크해 주세요.'); return;
+    }
+    if(!agreeConduct){
+        alert('행동강령 준수 동의에 체크해 주세요.'); return;
+    }
+
+    document.getElementById('subjectInput').value = subj;
+    document.getElementById('contentInput').value = body;
+    document.getElementById('agreePublicInput').value = isPublicTarget ? 'on' : '';
+    document.getElementById('agreeConductInput').value = 'on';
+
+    var formData = new FormData(this);
+    fetch(this.action, {method:'POST', body: formData})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+        if(d.success){
+            alert(d.msg || '편지가 발송되었습니다.');
+            location.href = '/message/inbox';
+        } else {
+            alert(d.error || '발송 실패');
+        }
+    })
+    .catch(function(){ alert('오류가 발생했습니다.'); });
+});
+</script>
 {% endblock %}

@@ -3,8 +3,8 @@
 <div class="container py-4" style="max-width: 500px;">
     <div class="card border-0 shadow-sm" style="border-radius: 18px;">
         <div class="card-body p-4">
-            <h4 class="fw-bold mb-4">✏️ 회원정보 수정</h4>
-            <form method="post">
+            <h4 class="fw-bold mb-4">회원정보 수정</h4>
+            <form id="profileForm">
                 <div class="mb-3">
                     <label class="form-label small fw-bold">이름 (실명)</label>
                     <input type="text" name="real_name" value="{{ user.real_name or '' }}" class="form-control" placeholder="이름">
@@ -17,12 +17,134 @@
                     <label class="form-label small fw-bold">전화번호</label>
                     <input type="tel" name="phone" value="{{ user.phone or '' }}" class="form-control" placeholder="010-1234-5678">
                 </div>
-                <button type="submit" class="btn btn-success w-100 py-2 fw-bold">저장</button>
+                <button type="button" class="btn btn-success w-100 py-2 fw-bold" id="btnSave">저장</button>
             </form>
             <div class="text-center mt-3">
                 <a href="/user/{{ user.id }}" class="text-muted small text-decoration-none">&larr; 돌아가기</a>
             </div>
         </div>
     </div>
+
+    <div class="card border-0 shadow-sm mt-4" style="border-radius: 18px;">
+        <div class="card-body p-4">
+            <h5 class="fw-bold mb-3">비밀번호 변경</h5>
+            <p class="text-muted small mb-3">이메일 인증 후 현재 비밀번호 없이 변경 가능합니다.</p>
+            <div id="pw-step1">
+                <button type="button" class="btn btn-outline-success w-100 py-2 fw-bold" id="btn-send-code">인증번호 발송</button>
+            </div>
+            <div id="pw-step2" style="display:none;">
+                <div class="mb-2">
+                    <small class="text-muted" id="pw-sent-info"></small>
+                </div>
+                <div class="mb-3">
+                    <input type="text" class="form-control" id="pw-code" placeholder="6자리 인증번호" maxlength="6" inputmode="numeric">
+                </div>
+                <div class="mb-3">
+                    <input type="password" class="form-control" id="pw-new" placeholder="새 비밀번호 (4자 이상)" minlength="4">
+                </div>
+                <div class="mb-3">
+                    <input type="password" class="form-control" id="pw-new2" placeholder="새 비밀번호 확인" minlength="4">
+                </div>
+                <div class="mb-3">
+                    <button type="button" class="btn btn-success w-100 py-2 fw-bold" id="btn-change-pw">비밀번호 변경</button>
+                </div>
+                <div id="pw-msg" class="small mt-2" style="display:none;"></div>
+            </div>
+        </div>
+    </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('btnSave').addEventListener('click', function() {
+    var btn = this;
+    btn.disabled = true;
+    btn.textContent = '저장 중...';
+    var fd = new FormData(document.getElementById('profileForm'));
+    fetch('/user/edit-profile', {
+        method: 'POST',
+        body: fd,
+        headers: {'X-Requested-With': 'XMLHttpRequest'}
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (d.status === 'success') {
+            alert(d.msg);
+            location.href = d.redirect || '/user/{{ user.id }}';
+        } else {
+            alert(d.msg || '오류가 발생했습니다.');
+            btn.disabled = false;
+            btn.textContent = '저장';
+        }
+    })
+    .catch(function() {
+        alert('오류가 발생했습니다.');
+        btn.disabled = false;
+        btn.textContent = '저장';
+    });
+});
+
+document.getElementById('btn-send-code').addEventListener('click', function() {
+    var btn = this;
+    btn.disabled = true;
+    btn.textContent = '발송 중...';
+    fetch('/user/change-password/send-code', {method:'POST'})
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.status === 'success') {
+                document.getElementById('pw-step1').style.display = 'none';
+                document.getElementById('pw-step2').style.display = 'block';
+                document.getElementById('pw-sent-info').textContent = d.msg;
+            } else {
+                alert(d.msg);
+                btn.disabled = false;
+                btn.textContent = '인증번호 발송';
+            }
+        })
+        .catch(function() {
+            alert('오류가 발생했습니다.');
+            btn.disabled = false;
+            btn.textContent = '인증번호 발송';
+        });
+});
+
+document.getElementById('btn-change-pw').addEventListener('click', function() {
+    var code = document.getElementById('pw-code').value.trim();
+    var pw = document.getElementById('pw-new').value;
+    var pw2 = document.getElementById('pw-new2').value;
+    var msgEl = document.getElementById('pw-msg');
+    var btn = this;
+    if (!code) { alert('인증번호를 입력하세요.'); return; }
+    if (!pw || pw.length < 4) { alert('비밀번호는 4자 이상이어야 합니다.'); return; }
+    if (pw !== pw2) { alert('비밀번호가 일치하지 않습니다.'); return; }
+    btn.disabled = true;
+    btn.textContent = '변경 중...';
+    fetch('/user/change-password/verify', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({code: code, password: pw})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (d.status === 'success') {
+            msgEl.style.display = 'block';
+            msgEl.className = 'small mt-2 text-success';
+            msgEl.textContent = d.msg;
+            setTimeout(function() { location.reload(); }, 1500);
+        } else {
+            msgEl.style.display = 'block';
+            msgEl.className = 'small mt-2 text-danger';
+            msgEl.textContent = d.msg;
+            btn.disabled = false;
+            btn.textContent = '비밀번호 변경';
+        }
+    })
+    .catch(function() {
+        alert('오류가 발생했습니다.');
+        btn.disabled = false;
+        btn.textContent = '비밀번호 변경';
+    });
+});
+</script>
 {% endblock %}

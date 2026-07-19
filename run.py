@@ -1,8 +1,30 @@
+import os
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env'))
 from flask import Flask
 from config import Config, DB_MODE
 from models import db, User
 from routes import register_routes
 from tongbot_routes import tongbot_bp
+from route_modules.construction_bp import construction_bp
+from route_modules.share_bp import share_bp
+from route_modules.legal_bp import legal_bp
+from route_modules.village_bp import village_bp
+from route_modules.friends_bp import friends_bp
+from route_modules.user_bp import user_bp
+from route_modules.board_bp import board_bp
+from route_modules.admin_bp import admin_bp
+from route_modules.news_bp import news_bp
+from route_modules.mypage_bp import mypage_bp
+from route_modules.search_bp import search_bp
+from route_modules.message_bp import message_bp
+from route_modules.service_bp import service_bp
+from route_modules.auth_bp import auth_bp
+from route_modules.page_bp import page_bp
+from route_modules.legal_bp import legal_bp
+from route_modules.psycho_bp import psycho_bp
+from route_modules.epub_bp import epub_bp
+from route_modules.guide_bp import guide_bp
 from werkzeug.security import generate_password_hash
 import sys
 import os
@@ -104,6 +126,24 @@ def create_app():
     # 웹 경로 등록
     register_routes(app)
     app.register_blueprint(tongbot_bp)
+    app.register_blueprint(construction_bp)
+    app.register_blueprint(share_bp)
+    app.register_blueprint(legal_bp)
+    app.register_blueprint(village_bp)
+    app.register_blueprint(friends_bp)
+    app.register_blueprint(user_bp)
+    app.register_blueprint(board_bp)
+    app.register_blueprint(admin_bp)
+    app.register_blueprint(news_bp)
+    app.register_blueprint(mypage_bp)
+    app.register_blueprint(search_bp)
+    app.register_blueprint(message_bp)
+    app.register_blueprint(service_bp)
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(page_bp)
+    app.register_blueprint(psycho_bp)
+    app.register_blueprint(epub_bp)
+    app.register_blueprint(guide_bp)
     
     # 백그라운드 캐시 갱신 스케줄러
     import threading, time
@@ -130,6 +170,25 @@ def create_app():
                 print(f'[NOTI] error: {e}')
             time.sleep(30)
     threading.Thread(target=notification_scheduler, daemon=True).start()
+
+    # 경로 재계산 주기 워커 (스레드 우선 보강용 safety net)
+    def route_recalc_scheduler():
+        import time
+        from models import User
+        time.sleep(60)  # 앱 시작 후 60초 대기
+        while True:
+            try:
+                with app.app_context():
+                    for u in User.query.all():
+                        try:
+                            from services.route_recalc import recalc_user_routes
+                            recalc_user_routes(u.id)
+                        except Exception as e:
+                            print(f'[ROUTE] user {u.id} recalc error: {e}')
+            except Exception as e:
+                print(f'[ROUTE] scheduler error: {e}')
+            time.sleep(600)  # 10분마다 전체 사용자 재계산
+    threading.Thread(target=route_recalc_scheduler, daemon=True).start()
     
     # DB 마이그레이션: 누락된 컬럼 자동 추가
     def migrate_news_article():
@@ -944,6 +1003,17 @@ def create_app():
                 print('[OK] schedule_reminder_log table created')
     except Exception as e:
         print(f'[SKIP] schedule_reminder_log migration: {e}')
+    try:
+        with app.app_context():
+            from sqlalchemy import inspect as _insp3
+            insp3 = _insp3(db.engine)
+            if 'message_reminder_log' not in insp3.get_table_names():
+                with db.engine.connect() as _c:
+                    _c.execute(db.text("CREATE TABLE message_reminder_log (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, message_id INTEGER, sender_name VARCHAR(50), subject VARCHAR(200), sent_at TIMESTAMP, seen BOOLEAN DEFAULT 0)"))
+                    _c.commit()
+                print('[OK] message_reminder_log table created')
+    except Exception as e:
+        print(f'[SKIP] message_reminder_log migration: {e}')
     except Exception as e:
         print(f'[SKIP] schedule recurring migration: {e}')
 
@@ -1007,6 +1077,20 @@ def create_app():
     return app
 
 app = create_app()
+
+
+
+@app.after_request
+def security_headers(resp):
+    resp.headers['X-Content-Type-Options'] = 'nosniff'
+    resp.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    resp.headers['X-XSS-Protection'] = '1; mode=block'
+    resp.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    if resp.mimetype == 'text/html':
+        resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        resp.headers['Pragma'] = 'no-cache'
+        resp.headers['Expires'] = '0'
+    return resp
 
 if __name__ == '__main__':
     print("[함께사는양평] 통합 관제 서버가 켜졌습니다. http://127.0.0.1:5000")

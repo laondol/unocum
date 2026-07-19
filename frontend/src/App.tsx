@@ -5,6 +5,10 @@ import ShareDetail from './pages/ShareDetail'
 import ShareReport from './pages/ShareReport'
 import ShareEdit from './pages/ShareEdit'
 import UserMyPage from './pages/UserMyPage'
+import EpubList from './pages/EpubList'
+import EpubEditor from './pages/EpubEditor'
+import GuideList from './pages/GuideList'
+import GuideTemplates from './pages/GuideTemplates'
 
 export default function App() {
   const siteName = (() => {
@@ -22,6 +26,12 @@ export default function App() {
           <Route path="/share/detail/:id" element={<ShareDetail />} />
           <Route path="/share/report" element={<ShareReport />} />
           <Route path="/share/edit/:id" element={<ShareEdit />} />
+          <Route path="/epub" element={<EpubList />} />
+          <Route path="/epub/list" element={<EpubList />} />
+          <Route path="/epub/new" element={<EpubList />} />
+          <Route path="/epub/edit/:id" element={<EpubEditor />} />
+          <Route path="/guide" element={<GuideList />} />
+          <Route path="/guide/templates" element={<GuideTemplates />} />
           <Route path="/user/:userId" element={<UserMyPage />} />
           <Route path="*" element={<ShareList />} />
         </Routes>

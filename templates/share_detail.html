@@ -12,6 +12,8 @@
             </div>
             <h3 class="fw-bold mb-3">{{ report.title }}</h3>
             
+            {% set can_view = (report.status == 'approved') or (session.get('user_id') == report.user_id) or (session.get('role') in ('admin','leader')) %}
+            {% if can_view %}
             {% if report.image_path %}
             <div class="row g-2 mb-3">
                 <div class="col-12">
@@ -29,6 +31,12 @@
 
             {% if report.drawing_path %}
             <img src="{{ report.drawing_path }}" class="img-fluid rounded mb-3" style="max-height: 400px;" alt="공유 그림">
+            {% endif %}
+            {% else %}
+            <div class="mb-3 p-4 text-center text-muted border rounded bg-light">
+                <div style="font-size:2rem;">🔍</div>
+                이미지 검토중입니다. AI가 빠르게 확인 중이며, 승인 시 바로 표시됩니다.
+            </div>
             {% endif %}
             {% if report.video_path and (report.video_path.endswith('.mp4') or report.video_path.endswith('.webm') or report.video_path.endswith('.mov')) %}
             <video controls class="w-100 rounded mb-3" style="max-height:400px;">

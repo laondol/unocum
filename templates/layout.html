@@ -88,7 +88,7 @@
                         <ul class="dropdown-menu border-0 shadow"><li class="dropdown-header-custom">제안</li><li><a class="dropdown-item" href="/main">꿈꾸기</a></li><li><a class="dropdown-item" href="/all-proposals">누구의꿈</a></li></ul></li>
                     {% if session.get('role') == 'leader' %}
                     <li class="nav-item dropdown mx-1"><a class="nav-link dropdown-toggle px-2" href="#" data-bs-toggle="dropdown">관리</a>
-                        <ul class="dropdown-menu border-0 shadow"><li class="dropdown-header-custom">관리</li><li><a class="dropdown-item" href="/admin">누구의꿈(관리)</a></li><li><a class="dropdown-item" href="/admin/users">회원관리</a></li>                            <li><a class="dropdown-item" href="/admin/news">소식(관리)</a></li><li><a class="dropdown-item" href="/admin/share-reports">공유(관리)</a></li><li><a class="dropdown-item" href="/admin/stores">🏪 동네가게(관리)</a></li><li><a class="dropdown-item" href="/admin/alerts">🚨 알림(관리)</a></li><li><div class="dropdown-divider"></div></li><li><a class="dropdown-item" href="/admin/ai-chat">🤖 관리자 AI</a></li><li><a class="dropdown-item" href="/admin/ai-feedback">📋 AI 피드백</a></li>{% if session.get('role') == 'leader' %}<li><a class="dropdown-item" href="/admin/ai-train">📚 양평AI 가르치기</a></li>{% endif %}<li><div class="dropdown-divider"></div></li>{% if 'test.unocum.kr' in request.host or 'localhost' in request.host %}<li><a class="dropdown-item" href="/admin/page-managers">🔑 페이지관리자</a></li>{% endif %}<li><a class="dropdown-item" href="/admin/message/send">쪽지 발송</a></li></ul></li>
+                        <ul class="dropdown-menu border-0 shadow"><li class="dropdown-header-custom">관리</li><li><a class="dropdown-item" href="/admin">누구의꿈(관리)</a></li><li><a class="dropdown-item" href="/admin/users">회원관리</a></li>                            <li><a class="dropdown-item" href="/admin/news">소식(관리)</a></li><li><a class="dropdown-item" href="/admin/share-reports">공유(관리)</a></li><li><a class="dropdown-item" href="/admin/stores">🏪 동네가게(관리)</a></li><li><a class="dropdown-item" href="/admin/alerts">🚨 알림(관리)</a></li><li><div class="dropdown-divider"></div></li><li><a class="dropdown-item" href="/admin/postgresql">🗄️ PostgreSQL DB</a></li><li><a class="dropdown-item" href="/admin/ai-chat">🤖 관리자 AI</a></li><li><a class="dropdown-item" href="/admin/ai-feedback">📋 AI 피드백</a></li>{% if session.get('role') == 'leader' %}<li><a class="dropdown-item" href="/admin/ai-train">📚 양평AI 가르치기</a></li>{% endif %}<li><div class="dropdown-divider"></div></li>{% if 'test.unocum.kr' in request.host or 'localhost' in request.host %}<li><a class="dropdown-item" href="/admin/page-managers">🔑 페이지관리자</a></li>{% endif %}<li><a class="dropdown-item" href="/admin/message/send">쪽지 발송</a></li></ul></li>
                     {% endif %}
                 </ul>
             </div>
@@ -276,7 +276,7 @@
         };
         // Button once-only
         document.addEventListener('click', function(e){
-            var btn = e.target.closest('button, .btn, input[type=submit], input[type=button]');
+            var btn = e.target.closest('button, .btn, input[type=button]');
             if (btn && !btn.disabled && !btn.classList.contains('no-once')) {
                 btn.disabled = true;
                 setTimeout(function(){ btn.disabled = false; }, 1000);
