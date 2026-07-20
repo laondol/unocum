@@ -1,8 +1,10 @@
 import os
 import threading
+import base64
 from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session, current_app, send_file, send_from_directory
 from datetime import datetime, timedelta
 from sqlalchemy import or_
+from werkzeug.utils import secure_filename
 from models import db, User, ShareReport, ShareComment, Message, Post, Comment, NewsArticle, VillagePage, RampApplication, PointHistory, Friend, VillageWish, LegalPost, ChatMessage, FriendGroup, LegalAppointment, TongBot, TongBotDraft, ConstructionNotice, GpsCalibration, StoreSuggestion, StoreMenu
 from services.security import save_village_file
 from services.ai_service import background_process_share, moderate_image
