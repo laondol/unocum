@@ -19,6 +19,7 @@ interface ShareDetailData {
   ai_danger_alert: boolean
   like_count: number; dislike_count: number
   status: string; created_at: string; moderation_at?: string | null
+  store_suggestion_id?: number | null; store_menus?: any[]; sub_category?: string; my_role?: string
   nearby_shares: NearbyShare[]
   local_news: LocalNews[]
   local_links: LocalLink[]
@@ -120,6 +121,8 @@ export default function ShareDetail() {
   const extraImages = r.extra_images ? r.extra_images.split(',').filter(Boolean) : []
   const catColor: Record<string, string> = { '사건': 'danger', '풍경': 'success', '맛집': 'warning' }
   const isAuthor = myId === r.user_id
+  const isAdminEditTarget = (r.my_role === 'admin' || r.my_role === 'leader') && (!r.user_id || r.user_id === 0)
+  const canEdit = isAuthor || isAdminEditTarget
   const isBlocked = r.status !== 'approved'
 
   if (isBlocked && !isAuthor) {
@@ -209,7 +212,7 @@ export default function ShareDetail() {
             {r.ai_confidence ? <span>AI 신뢰도: {Math.round(r.ai_confidence * 100)}%</span> : null}
           </div>
 
-          {isAuthor && (
+          {canEdit && (
             <div className="mt-3 d-flex gap-2">
               <a href={`/share/edit/${r.id}`} className="btn btn-sm btn-outline-primary">✏️ 수정</a>
               <button onClick={() => {

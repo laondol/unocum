@@ -31,11 +31,6 @@ export default function ShareEdit() {
   const [watermarkTarget, setWatermarkTarget] = useState('')
   const [wmApplying, setWmApplying] = useState(false)
 
-  // 메뉴 검색
-  const [menuSearchName, setMenuSearchName] = useState('')
-  const [menuSearching, setMenuSearching] = useState(false)
-  const [menuSearchResult, setMenuSearchResult] = useState<any[]>([])
-
   // 메뉴 목록
   const [storeMenus, setStoreMenus] = useState<any[]>([])
   const [newMenuName, setNewMenuName] = useState('')
@@ -75,6 +70,12 @@ export default function ShareEdit() {
         d.extra_images.split(',').filter(Boolean).forEach((p: string) => existing.push({ path: p.trim() }))
       }
       setPhotos(existing)
+      if (d.store_suggestion_id) {
+        setStoreSuggestionId(String(d.store_suggestion_id))
+        if (d.store_menus) setStoreMenus(d.store_menus)
+        const menuLines = (d.store_menus || []).map((m: any) => `${m.name} ${m.price || ''}`.trim()).join('\n')
+        if (menuLines) setMenuText(menuLines)
+      }
       originalLatRef.current = d.latitude || ''
       originalLonRef.current = d.longitude || ''
       setLoading(false)
@@ -212,21 +213,6 @@ export default function ShareEdit() {
       .then(r => r.json()).then(d => { if (d.status === 'success') setStoreMenus(prev => prev.filter(m => m.id !== menuId)) })
   }
 
-  function searchMenus() {
-    if (!menuSearchName.trim()) { alert('가게명을 입력하세요'); return }
-    setMenuSearching(true)
-    fetch('/api/share/menu-search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ store_name: menuSearchName }) })
-      .then(r => r.json()).then(d => {
-        setMenuSearchResult(d.menus || [])
-        if (d.store) setSelectedStore(`${d.store.name} (${d.store.address || ''})`)
-        setMenuSearching(false)
-        if (d.menus?.length > 0) {
-          const text = d.menus.map((m: any) => `${m.name} ${m.price || ''}`).join('\n')
-          setMenuText(text)
-        }
-      }).catch(() => setMenuSearching(false))
-  }
-
   function classifyMenu() {
     if (!menuText.trim()) { alert('메뉴를 입력하세요'); return }
     fetch('/api/share/menu-classify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: menuText }) })
@@ -358,28 +344,6 @@ export default function ShareEdit() {
                 </div>
               )}
               {selectedStore && <div className="mt-1 small text-success fw-bold">{selectedStore}</div>}
-            </div>
-
-            <div className="mb-3">
-              <label className="form-label fw-bold small">메뉴 검색 (AI 자동 추출)</label>
-              <div className="input-group">
-                <input type="text" className="form-control" value={menuSearchName} onChange={e => setMenuSearchName(e.target.value)} placeholder="가게명을 입력하면 AI가 메뉴를 추천합니다" />
-                <button type="button" className="btn btn-outline-primary" onClick={searchMenus} disabled={menuSearching}>
-                  {menuSearching ? '검색 중...' : '메뉴 검색'}
-                </button>
-              </div>
-              {menuSearchResult.length > 0 && (
-                <div className="mt-2 p-2 bg-light rounded small">
-                  <strong>검색 결과:</strong><br />
-                  {menuSearchResult.map((m: any, i: number) => (
-                    <span key={i}>
-                      <span className="badge bg-success text-white me-1 mb-1">{m.category || '기타'}</span>
-                      {m.name} {m.price && <span className="text-muted">({m.price})</span>}
-                      <br />
-                    </span>
-                  ))}
-                </div>
-              )}
             </div>
 
             {storeSuggestionId && (

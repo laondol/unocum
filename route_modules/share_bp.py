@@ -261,7 +261,10 @@ def share_report_edit(report_id):
             _df.flush()
     except Exception:
         pass
-    if report.user_id != session.get('user_id'):
+    is_admin = session.get('role') in ['admin', 'leader']
+    is_author = report.user_id == session.get('user_id')
+    is_anonymous_share = not report.user_id or report.user_id == 0
+    if not (is_author or (is_admin and is_anonymous_share)):
         return jsonify({"status": "error", "msg": "권한 없음"}), 403
     if request.method == 'POST':
         try:
@@ -527,7 +530,10 @@ def share_report_edit(report_id):
 @share_bp.route('/share-report/delete-image/<int:report_id>', methods=['POST'])
 def share_report_delete_image(report_id):
     report = ShareReport.query.get_or_404(report_id)
-    if report.user_id != session.get('user_id'):
+    is_admin = session.get('role') in ['admin', 'leader']
+    is_author = report.user_id == session.get('user_id')
+    is_anonymous_share = not report.user_id or report.user_id == 0
+    if not (is_author or (is_admin and is_anonymous_share)):
         return jsonify({"status": "error", "msg": "권한 없음"}), 403
     data = request.get_json()
     path = data.get('image_path', '')
@@ -822,6 +828,11 @@ def api_share_detail(report_id):
             c_item["replies"].append({"id": rc.id, "author": rc.author, "content": rc.content, "user_id": rc.user_id, "created_at": rc.created_at.strftime('%m/%d %H:%M') if rc.created_at else None})
         comments_data.append(c_item)
     
+    store_menus_data = []
+    if r.store_suggestion_id:
+        menus = StoreMenu.query.filter_by(store_suggestion_id=r.store_suggestion_id).all()
+        store_menus_data = [{"id": m.id, "name": m.name, "price": m.price, "sub_category": m.sub_category, "ai_generated": m.ai_generated} for m in menus]
+
     return jsonify({
         "id": r.id, "title": r.title, "description": r.description,
         "image_path": r.image_path, "extra_images": r.extra_images,
@@ -835,6 +846,11 @@ def api_share_detail(report_id):
         "like_count": r.like_count, "dislike_count": r.dislike_count,
         "status": r.status,
         "created_at": r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else None,
+        "moderation_at": r.moderation_at.strftime('%Y-%m-%d') if r.moderation_at else None,
+        "store_suggestion_id": r.store_suggestion_id,
+        "store_menus": store_menus_data,
+        "sub_category": r.sub_category or '',
+        "my_role": session.get('role') or '',
         "nearby_shares": nearby_shares,
         "local_news": local_news,
         "local_links": local_links,
