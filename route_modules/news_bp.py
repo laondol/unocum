@@ -116,6 +116,8 @@ def admin_news_toggle(news_id):
     article.is_selected = not article.is_selected
     article.updated_at = datetime.now()
     db.session.commit()
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({"status": "success", "is_selected": article.is_selected})
     return redirect(url_for('.admin_news'))
 
 @news_bp.route('/admin/news/approve/<int:news_id>/<string:tab>/<string:approver>')
@@ -135,6 +137,8 @@ def admin_news_approve(news_id, tab, approver):
             article.kr_yp_admin_approved = not article.kr_yp_admin_approved
     article.updated_at = datetime.now()
     db.session.commit()
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({"status": "success"})
     return redirect(url_for('.admin_news', tab=tab))
 
 @news_bp.route('/admin/news/delete/<int:news_id>')

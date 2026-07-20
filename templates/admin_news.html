@@ -93,30 +93,30 @@
                         {% if tab == 'world' %}
                         <!-- 세계와양평 승인 -->
                         <td>
-                            <a href="/admin/news/approve/{{ a.id }}/world/ai" class="btn btn-sm {{ 'btn-success' if a.world_ai_approved else 'btn-outline-secondary' }}" title="AI 승인 토글">
+                            <a href="/admin/news/approve/{{ a.id }}/world/ai" class="btn btn-sm {{ 'btn-success' if a.world_ai_approved else 'btn-outline-secondary' }}" title="AI 승인 토글" onclick="return toggleApprove(event, this)">
                                 {% if a.world_ai_approved %}✅{% else %}⭕{% endif %}
                             </a>
                         </td>
                         <td>
-                            <a href="/admin/news/approve/{{ a.id }}/world/admin" class="btn btn-sm {{ 'btn-primary' if a.world_admin_approved else 'btn-outline-secondary' }}" title="관리자 승인 토글">
+                            <a href="/admin/news/approve/{{ a.id }}/world/admin" class="btn btn-sm {{ 'btn-primary' if a.world_admin_approved else 'btn-outline-secondary' }}" title="관리자 승인 토글" onclick="return toggleApprove(event, this)">
                                 {% if a.world_admin_approved %}✅{% else %}⭕{% endif %}
                             </a>
                         </td>
                         {% elif tab == 'kr_yp' %}
                         <!-- 대한민국과양평 승인 -->
                         <td>
-                            <a href="/admin/news/approve/{{ a.id }}/kr_yp/ai" class="btn btn-sm {{ 'btn-success' if a.kr_yp_ai_approved else 'btn-outline-secondary' }}" title="AI 승인 토글">
+                            <a href="/admin/news/approve/{{ a.id }}/kr_yp/ai" class="btn btn-sm {{ 'btn-success' if a.kr_yp_ai_approved else 'btn-outline-secondary' }}" title="AI 승인 토글" onclick="return toggleApprove(event, this)">
                                 {% if a.kr_yp_ai_approved %}✅{% else %}⭕{% endif %}
                             </a>
                         </td>
                         <td>
-                            <a href="/admin/news/approve/{{ a.id }}/kr_yp/admin" class="btn btn-sm {{ 'btn-primary' if a.kr_yp_admin_approved else 'btn-outline-secondary' }}" title="관리자 승인 토글">
+                            <a href="/admin/news/approve/{{ a.id }}/kr_yp/admin" class="btn btn-sm {{ 'btn-primary' if a.kr_yp_admin_approved else 'btn-outline-secondary' }}" title="관리자 승인 토글" onclick="return toggleApprove(event, this)">
                                 {% if a.kr_yp_admin_approved %}✅{% else %}⭕{% endif %}
                             </a>
                         </td>
                         {% else %}
                         <td>
-                            <a href="/admin/news/toggle/{{ a.id }}" class="btn btn-sm {{ 'btn-success' if a.is_selected else 'btn-outline-secondary' }}">
+                            <a href="/admin/news/toggle/{{ a.id }}" class="btn btn-sm {{ 'btn-success' if a.is_selected else 'btn-outline-secondary' }}" onclick="return toggleApprove(event, this)">
                                 {{ '✅ 표시중' if a.is_selected else '비활성' }}
                             </a>
                         </td>
@@ -181,6 +181,31 @@ function importUrl(e) {
         else el.innerHTML = '<span class="text-danger">❌ ' + d.msg + '</span>';
     }).catch(e=>{document.getElementById('urlResult').innerHTML='<span class="text-danger">오류: '+e+'</span>';})
     .finally(()=>{btn.disabled=false; btn.innerHTML='🌐 가져오기 + AI 요약';});
+}
+function toggleApprove(e, btn) {
+    e.preventDefault();
+    fetch(btn.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    .then(r => r.json())
+    .then(d => {
+        if (d.status !== 'success') return;
+        const isToggle = btn.href.includes('/toggle/');
+        const isOn = isToggle ? btn.textContent.trim().startsWith('✅') : btn.textContent.trim() === '✅';
+        if (isToggle) {
+            btn.className = isOn ? 'btn btn-sm btn-outline-secondary' : 'btn btn-sm btn-success';
+            btn.textContent = isOn ? '비활성' : '✅ 표시중';
+        } else {
+            const isAi = btn.href.includes('/ai');
+            if (isOn) {
+                btn.className = 'btn btn-sm btn-outline-secondary';
+                btn.textContent = '⭕';
+            } else {
+                btn.className = isAi ? 'btn btn-sm btn-success' : 'btn btn-sm btn-primary';
+                btn.textContent = '✅';
+            }
+        }
+    })
+    .catch(() => {});
+    return false;
 }
 </script>
 {% endblock %}
