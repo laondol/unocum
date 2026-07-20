@@ -135,7 +135,7 @@ def admin_news_approve(news_id, tab, approver):
             article.kr_yp_admin_approved = not article.kr_yp_admin_approved
     article.updated_at = datetime.now()
     db.session.commit()
-    return redirect(url_for('admin_news', tab=tab))
+    return redirect(url_for('.admin_news', tab=tab))
 
 @news_bp.route('/admin/news/delete/<int:news_id>')
 def admin_news_delete(news_id):
