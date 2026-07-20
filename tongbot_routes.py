@@ -1,9 +1,12 @@
 import random, string, re, requests, json
-import calendar
-from types import SimpleNamespace
 from sqlalchemy import or_
-from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template, current_app
+from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template, current_app, make_response
 from models import db, User, TongBot, TongBotDraft, TongBotSchedule, ChatRoom, ChatMessage, Message, FriendCache, BotKnowledge, StoreInfo, ShareReport, SharedRoute
+from services.geo import _geocode_location
+from services.route_recalc import _ensure_day_routes
+from services.route_recalc import _is_occurrence, _gen_occurrences
+from services.route_recalc import recalc_user_routes
+from services.route_worker import enqueue_recalc
 from datetime import datetime, timedelta, timezone
 import os, uuid
 
@@ -352,25 +355,6 @@ def _parse_schedule_from_text(msg, uid):
     # 메모: 원본 메시지 저장 (출발/귀가시간은 저장 시 계산)
     result['memo'] = msg[:200]
     return result
-
-def _geocode_location(loc_name):
-    """장소명 → (lat,lng) 좌표"""
-    if not loc_name:
-        return None, None
-    try:
-        kakao_key = current_app.config.get('KAKAO_REST_API_KEY','')
-        if not kakao_key:
-            return None, None
-        resp = requests.get('https://dapi.kakao.com/v2/local/search/keyword.json', params={
-            'query': (loc_name.split('(')[0].strip() or loc_name), 'size': 1
-        }, headers={'Authorization': f'KakaoAK {kakao_key}'}, timeout=2)
-        if resp.status_code == 200:
-            docs = resp.json().get('documents', [])
-            if docs:
-                return float(docs[0].get('y',0)), float(docs[0].get('x',0))
-    except:
-        pass
-    return None, None
 
 def _resolve_location(location_name, uid):
     """카카오 키워드 검색으로 장소→좌표,주소,소요시간"""
@@ -1134,324 +1118,6 @@ def bot_schedule_calc_time():
     except Exception as e:
         return jsonify({"error": str(e)})
 
-def _is_occurrence(base, target):
-    start = getattr(base, 'event_date', None)
-    if not start:
-        return False
-    start_d = start.date() if hasattr(start, 'date') else start
-    if target == start_d:
-        return True
-    if target < start_d:
-        return False
-    if not getattr(base, 'is_recurring', False):
-        return False
-    if getattr(base, 'repeat_infinite', False):
-        end_d = datetime(2999, 12, 31).date()
-    else:
-        end_dt = getattr(base, 'repeat_end_date', None)
-        if not end_dt:
-            return False
-        end_d = end_dt.date() if hasattr(end_dt, 'date') else end_dt
-    if target > end_d:
-        return False
-    rt = getattr(base, 'repeat_type', '') or ''
-    interval = getattr(base, 'repeat_interval', 1) or 1
-    wd_mask = getattr(base, 'repeat_weekdays', 0) or 0
-    moy = getattr(base, 'repeat_month_of_year', 0) or 0
-    wom = getattr(base, 'repeat_week_of_month', 0) or 0
-    exc = set()
-    try:
-        exc = set(json.loads(getattr(base, 'repeat_exceptions', '') or '[]'))
-    except Exception:
-        exc = set()
-    if target.strftime('%Y-%m-%d') in exc:
-        return False
-    if wd_mask:
-        wd = target.weekday()
-        if not (wd_mask & (1 << wd)):
-            return False
-        if moy and target.month != moy:
-            return False
-        if wom:
-            d = 1
-            while datetime(target.year, target.month, d).weekday() != wd:
-                d += 1
-            d += (wom - 1) * 7
-            if d > calendar.monthrange(target.year, target.month)[1]:
-                return False
-            if target.day != d:
-                return False
-        return True
-    if rt == 'daily':
-        return (target - start_d).days % interval == 0
-    if rt == 'weekly':
-        if target.weekday() != start_d.weekday():
-            return False
-        return ((target - start_d).days // 7) % interval == 0
-    if rt == 'monthly':
-        if target.day != start_d.day:
-            return False
-        months = (target.year - start_d.year) * 12 + (target.month - start_d.month)
-        return months % interval == 0
-    if rt == 'yearly':
-        if target.month != start_d.month or target.day != start_d.day:
-            return False
-        return (target.year - start_d.year) % interval == 0
-    return False
-
-
-def _gen_occurrences(base):
-    import calendar as _cal
-    start = getattr(base, 'event_date', None)
-    if not start:
-        return []
-    start_d = start.date() if hasattr(start, 'date') else start
-    if getattr(base, 'repeat_infinite', False):
-        end_d = datetime(2999, 12, 31).date()
-    else:
-        end_dt = getattr(base, 'repeat_end_date', None)
-        if not end_dt:
-            return []
-        end_d = end_dt.date() if hasattr(end_dt, 'date') else end_dt
-    rt = getattr(base, 'repeat_type', '') or ''
-    interval = getattr(base, 'repeat_interval', 1) or 1
-    wd_mask = getattr(base, 'repeat_weekdays', 0) or 0
-    moy = getattr(base, 'repeat_month_of_year', 0) or 0
-    wom = getattr(base, 'repeat_week_of_month', 0) or 0
-    exc = set()
-    try:
-        exc = set(json.loads(getattr(base, 'repeat_exceptions', '') or '[]'))
-    except Exception:
-        exc = set()
-
-    def _add_months(dt, n):
-        y, m = dt.year, dt.month + n
-        while m > 12:
-            m -= 12
-            y += 1
-        last = _cal.monthrange(y, m)[1]
-        return dt.replace(year=y, month=m, day=min(dt.day, last))
-
-    def _nth_weekday_day(y, m, wd, n):
-        d = 1
-        while datetime(y, m, d).weekday() != wd:
-            d += 1
-        d += (n - 1) * 7
-        if d > _cal.monthrange(y, m)[1]:
-            return -1
-        return d
-
-    out = []
-    emitted = 0
-    cur = start_d + timedelta(days=1)
-    guard = 0
-    while cur <= end_d and emitted < 120 and guard < 600000:
-        guard += 1
-        do_emit = False
-        nxt = cur + timedelta(days=1)
-        if wd_mask:
-            wd = cur.weekday()
-            if wd_mask & (1 << wd):
-                ok = True
-                if moy and cur.month != moy:
-                    ok = False
-                elif wom and cur.day != _nth_weekday_day(cur.year, cur.month, wd, wom):
-                    ok = False
-                if ok:
-                    do_emit = True
-        elif rt == 'daily':
-            if (cur - start_d).days % interval == 0:
-                do_emit = True
-            nxt = cur + timedelta(days=1)
-        elif rt == 'weekly':
-            if cur.weekday() == start_d.weekday() and ((cur - start_d).days // 7) % interval == 0:
-                do_emit = True
-            nxt = cur + timedelta(days=1)
-        elif rt == 'monthly':
-            if cur.day == start_d.day:
-                months = (cur.year - start_d.year) * 12 + (cur.month - start_d.month)
-                if months % interval == 0:
-                    do_emit = True
-                nxt = _add_months(cur, 1)
-            else:
-                nxt = cur + timedelta(days=1)
-        elif rt == 'yearly':
-            if cur.month == start_d.month and cur.day == start_d.day:
-                if (cur.year - start_d.year) % interval == 0:
-                    do_emit = True
-                nxt = _add_months(cur, 12)
-            else:
-                nxt = cur + timedelta(days=1)
-        if do_emit and cur.strftime('%Y-%m-%d') not in exc:
-            emitted += 1
-            out.append(cur)
-        cur = nxt
-    return out
-
-
-def _ensure_day_routes(uid, evt_date, exclude_ids=None):
-    """Recalculate all 이동/귀가 routes for a given day based on current non-이동/귀가 events."""
-    user = User.query.get(uid)
-    if not user: return []
-    home_addr = f"{user.town or ''} {user.village or ''}".strip()
-    if user.curr_address: home_addr = user.curr_address
-    home_lat = user.curr_latitude
-    home_lng = user.curr_longitude
-    day_start = evt_date.replace(hour=0, minute=0, second=0)
-    day_end = evt_date.replace(hour=23, minute=59, second=59)
-    if user.temp_address and user.temp_latitude and user.temp_longitude and user.temp_start_date and user.temp_end_date:
-        if user.temp_start_date <= evt_date <= user.temp_end_date:
-            home_addr = f"[임시] {user.temp_address}"
-            home_lat = user.temp_latitude
-            home_lng = user.temp_longitude
-    if home_lat is None or home_lng is None:
-        # 집 좌표가 없으면 이동/귀가 자동경로를 만들 수 없으므로 조회만 하고 종료 (500 방지)
-        return []
-    naver_id = current_app.config.get('NAVER_CLIENT_ID', os.getenv('NAVER_CLIENT_ID', ''))
-    naver_secret = current_app.config.get('NAVER_CLIENT_SECRET', os.getenv('NAVER_CLIENT_SECRET', ''))
-    from services.directions import plan_segment, format_itinerary, format_memo_compact
-    from services.transit import haversine_km
-    # Remove existing 이동/귀가 for this day
-    q = TongBotSchedule.query.filter(
-        TongBotSchedule.user_id == uid,
-        TongBotSchedule.event_date >= day_start,
-        TongBotSchedule.event_date <= day_end,
-        or_(TongBotSchedule.title.like('%이동%'), TongBotSchedule.title.like('%귀가%'))
-    )
-    if exclude_ids:
-        q = q.filter(TongBotSchedule.id.notin_(exclude_ids))
-    for m in q.all():
-        db.session.delete(m)
-    db.session.flush()
-    # Get non-이동/귀가 events with locations, sorted (include all-day for 귀가 logic)
-    all_day_events = TongBotSchedule.query.filter(
-        TongBotSchedule.user_id == uid,
-        TongBotSchedule.event_date >= day_start,
-        TongBotSchedule.event_date <= day_end,
-        ~TongBotSchedule.title.like('%이동%'),
-        ~TongBotSchedule.title.like('%귀가%'),
-        TongBotSchedule.location != None,
-        TongBotSchedule.location != '',
-        TongBotSchedule.is_allday == True
-    ).order_by(TongBotSchedule.event_date.asc()).all()
-    events = TongBotSchedule.query.filter(
-        TongBotSchedule.user_id == uid,
-        TongBotSchedule.event_date >= day_start,
-        TongBotSchedule.event_date <= day_end,
-        ~TongBotSchedule.title.like('%이동%'),
-        ~TongBotSchedule.title.like('%귀가%'),
-        TongBotSchedule.location != None,
-        TongBotSchedule.location != '',
-        TongBotSchedule.is_allday != True
-    ).order_by(TongBotSchedule.event_date.asc()).all()
-    rec_bases = TongBotSchedule.query.filter(
-        TongBotSchedule.user_id == uid,
-        TongBotSchedule.is_recurring == True,
-        TongBotSchedule.event_date <= day_end,
-        or_(TongBotSchedule.repeat_end_date >= day_start, TongBotSchedule.repeat_infinite == True),
-        ~TongBotSchedule.title.like('%이동%'),
-        ~TongBotSchedule.title.like('%귀가%'),
-    ).all()
-    for base in rec_bases:
-        b_date = base.event_date
-        if not b_date:
-            continue
-        if b_date.date() == evt_date.date():
-            continue
-        if not _is_occurrence(base, evt_date.date()):
-            continue
-        occ_dt = datetime(evt_date.year, evt_date.month, evt_date.day, b_date.hour, b_date.minute)
-        occ_end = None
-        if base.end_date:
-            occ_end = datetime(evt_date.year, evt_date.month, evt_date.day, base.end_date.hour, base.end_date.minute)
-        vevt = SimpleNamespace(id="rec-%s-%s" % (base.id, evt_date.date()), title=base.title,
-                               location=base.location, event_date=occ_dt, end_date=occ_end,
-                               is_allday=base.is_allday)
-        if base.is_allday:
-            all_day_events.append(vevt)
-        else:
-            events.append(vevt)
-
-    if not events and not all_day_events: return []
-    auto_created = []
-    prev_location = None
-    prev_lat = prev_lng = None
-    prev_end_dt = None
-    # 이동: only for non-all-day events
-    for idx, evt in enumerate(events):
-        loc_lat, loc_lng = _geocode_location(evt.location) or (None, None)
-        if not (loc_lat and loc_lng): continue
-        if haversine_km(home_lat, home_lng, loc_lat, loc_lng) <= 1.0: continue
-        evt_start = evt.event_date
-        # 이동 from previous location to this event
-        arr_dt = evt_start - timedelta(minutes=10)
-        if idx > 0 and prev_end_dt and prev_end_dt > arr_dt:
-            arr_dt = prev_end_dt
-        if idx == 0:
-            from_time = home_addr
-            from_lat, from_lng = home_lat, home_lng
-        else:
-            from_time = prev_location
-            from_lat, from_lng = prev_lat, prev_lng
-        plan_to = plan_segment(from_time, from_lat, from_lng, evt.location, loc_lat, loc_lng,
-            arr_dt.strftime("%H:%M"), home_town=user.town or '', home_village=user.village or '',
-            naver_id=naver_id, naver_secret=naver_secret)
-        plan_to.update({"from_lat":from_lat,"from_lng":from_lng,"to_lat":loc_lat,"to_lng":loc_lng})
-        dep_dt = arr_dt - timedelta(minutes=plan_to['total_min'])
-        _compact = format_memo_compact(plan_to)
-        plan_to["compact"] = _compact
-        move = TongBotSchedule(user_id=uid, title=f"{evt.title} 이동",
-            description=format_itinerary(plan_to),
-            content=json.dumps(plan_to, ensure_ascii=False),
-            event_date=dep_dt, end_date=arr_dt, location=evt.location,
-            memo=_compact, departure_location=from_time, return_location=evt.location)
-        db.session.add(move)
-        db.session.flush()
-        auto_created.append({"id":move.id,"title":move.title,"type":"move","arrival":arr_dt.strftime("%H:%M"),"departure":dep_dt.strftime("%H:%M"),"from":from_time})
-        prev_location = evt.location
-        prev_lat, prev_lng = loc_lat, loc_lng
-        prev_end_dt = evt.end_date or (evt_start + timedelta(hours=1))
-    # 귀가: from last event (including all-day) to home/temp
-    all_events = sorted(events + all_day_events, key=lambda e: e.event_date)
-    if all_events:
-        last_evt = all_events[-1]
-        last_loc = last_evt.location
-        last_lat, last_lng = _geocode_location(last_loc) or (None, None)
-        skip_return = False
-        return_title = "집으로 이동"
-        return_dest = home_addr
-        return_lat, return_lng = home_lat, home_lng
-        if user.temp_address and user.temp_latitude and user.temp_longitude and user.temp_start_date and user.temp_end_date:
-            if user.temp_start_date <= evt_date <= user.temp_end_date:
-                if last_loc.strip() == user.temp_address.strip():
-                    skip_return = True
-                else:
-                    return_title = "임시숙소로 이동"
-                    return_dest = f"[임시] {user.temp_address}"
-                    return_lat, return_lng = user.temp_latitude, user.temp_longitude
-        if not skip_return and last_lat and last_lng and return_lat and return_lng:
-            target_arrival = "22:00"
-            plan_home = plan_segment(last_loc, last_lat, last_lng, return_dest, return_lat, return_lng, target_arrival,
-                home_town=user.town or '', home_village=user.village or '',
-                naver_id=naver_id, naver_secret=naver_secret)
-            plan_home.update({"from_lat":last_lat,"from_lng":last_lng,"to_lat":return_lat,"to_lng":return_lng})
-            _compact_home = format_memo_compact(plan_home)
-            plan_home["compact"] = _compact_home
-            ret_dep = datetime(evt_date.year, evt_date.month, evt_date.day,
-                int(plan_home['departure'].split(':')[0]), int(plan_home['departure'].split(':')[1]))
-            last_end = last_evt.end_date or (last_evt.event_date + timedelta(hours=1))
-            if ret_dep < last_end:
-                ret_dep = last_end + timedelta(minutes=5)
-            ret_arr = ret_dep + timedelta(minutes=plan_home['total_min'])
-            home_return = TongBotSchedule(user_id=uid, title=return_title,
-                description=format_itinerary(plan_home),
-                content=json.dumps(plan_home, ensure_ascii=False),
-                event_date=ret_dep, end_date=ret_arr, location=return_dest,
-                memo=_compact_home, departure_location=last_loc, return_location=return_dest)
-            db.session.add(home_return)
-            db.session.flush()
-            auto_created.append({"id":home_return.id,"title":return_title,"type":"return","departure":ret_dep.strftime("%H:%M"),"arrival":ret_arr.strftime("%H:%M")})
-    return auto_created
 
 @tongbot_bp.route('/api/bot/schedule', methods=['GET', 'POST'])
 def bot_schedule():
@@ -1484,7 +1150,8 @@ def bot_schedule():
                 "repeat_weekdays": s.repeat_weekdays or 0,
                 "repeat_week_of_month": s.repeat_week_of_month or 0,
                 "repeat_month_of_year": s.repeat_month_of_year or 0,
-                "reminder_minutes": s.reminder_minutes or 0
+                "reminder_minutes": s.reminder_minutes or 0,
+                "exceptions": s.repeat_exceptions or '',
             }
             is_move = '이동' in s.title or '귀가' in s.title
             evt = s.event_date
@@ -1501,37 +1168,98 @@ def bot_schedule():
             result_list.append(item)
 
         # Expand recurring events
-        recurring_items = [it for it in result_list if it.get('is_recurring') and it.get('end_date')]
+        recurring_items = [it for it in result_list if it.get('is_recurring') and (it.get('end_date') or it.get('repeat_infinite'))]
+        # base 발생일이 예외에 있으면 원본(base) 항목 숨김
+        _remove_ids = set()
+        for rit in recurring_items:
+            try:
+                _exc = set(json.loads(rit.get('exceptions') or '[]'))
+                if rit['event_date'][:10] in _exc:
+                    _remove_ids.add(rit['id'])
+            except:
+                pass
+        if _remove_ids:
+            result_list = [it for it in result_list if it['id'] not in _remove_ids]
         for rit in recurring_items:
             base_s = next(s for s in schedules if s.id == rit['id'])
             try:
                 from datetime import timedelta
+                import calendar as _cal
+                import json as _json
                 start_dt = datetime.strptime(rit['event_date'][:10], '%Y-%m-%d')
-                end_dt = datetime.strptime(rit['end_date'][:10], '%Y-%m-%d')
+                if rit.get('repeat_infinite'):
+                    end_dt = datetime(2999, 12, 31)
+                else:
+                    end_dt = datetime.strptime((rit.get('end_date') or '')[:10], '%Y-%m-%d')
+                exc = set()
+                try: exc = set(_json.loads(rit.get('exceptions') or '[]'))
+                except: pass
                 rt = rit['repeat_type']
+                interval = int(rit.get('repeat_interval') or 1) or 1
+                def _add_months(dt, n):
+                    y, m = dt.year, dt.month + n
+                    while m > 12:
+                        m -= 12; y += 1
+                    last = _cal.monthrange(y, m)[1]
+                    return dt.replace(year=y, month=m, day=min(dt.day, last))
+                emitted = {'n': 1}
                 cur = start_dt + timedelta(days=1)
-                while cur <= end_dt:
-                    if rt == 'daily':
-                        pass
-                    elif rt == 'weekly' and cur.weekday() != start_dt.weekday():
-                        cur += timedelta(days=1)
-                        continue
-                    elif rt == 'monthly' and cur.day != start_dt.day:
-                        cur += timedelta(days=1)
-                        if cur.day == start_dt.day: continue
-                        if cur.month != (cur - timedelta(days=1)).month: cur = cur.replace(day=start_dt.day) if start_dt.day <= 28 else cur
-                        cur += timedelta(days=1)
-                        continue
-                    elif rt == 'yearly' and (cur.month != start_dt.month or cur.day != start_dt.day):
-                        cur += timedelta(days=1)
-                        continue
-                    new_item = dict(rit)
-                    new_item['id'] = f"{rit['id']}_{cur.strftime('%Y%m%d')}"
-                    new_item['event_date'] = cur.strftime('%Y-%m-%d') + rit['event_date'][10:]
-                    if rit.get('end_date'):
-                        new_item['end_date'] = cur.strftime('%Y-%m-%d') + rit['end_date'][10:]
-                    result_list.append(new_item)
-                    cur += timedelta(days=1)
+                def _nth_weekday_day(y, m, wd, n):
+                    d = 1
+                    while datetime(y, m, d).weekday() != wd:
+                        d += 1
+                    d += (n - 1) * 7
+                    if d > _cal.monthrange(y, m)[1]:
+                        return -1
+                    return d
+                while cur <= end_dt and emitted['n'] < 120:
+                    do_emit = False
+                    nxt = cur + timedelta(days=1)
+                    wd_mask = (base_s.repeat_weekdays or 0)
+                    if wd_mask:
+                        wd = cur.weekday()
+                        if wd_mask & (1 << wd):
+                            moy = base_s.repeat_month_of_year or 0
+                            wom = base_s.repeat_week_of_month or 0
+                            ok = True
+                            if moy and cur.month != moy:
+                                ok = False
+                            elif wom and cur.day != _nth_weekday_day(cur.year, cur.month, wd, wom):
+                                ok = False
+                            if ok:
+                                do_emit = True
+                    elif rt == 'daily':
+                        if (cur - start_dt).days % interval == 0:
+                            do_emit = True
+                        nxt = cur + timedelta(days=1)
+                    elif rt == 'weekly':
+                        if cur.weekday() == start_dt.weekday() and ((cur - start_dt).days // 7) % interval == 0:
+                            do_emit = True
+                        nxt = cur + timedelta(days=1)
+                    elif rt == 'monthly':
+                        if cur.day == start_dt.day:
+                            months = (cur.year - start_dt.year) * 12 + (cur.month - start_dt.month)
+                            if months % interval == 0:
+                                do_emit = True
+                            nxt = _add_months(cur, 1)
+                        else:
+                            nxt = cur + timedelta(days=1)
+                    elif rt == 'yearly':
+                        if cur.month == start_dt.month and cur.day == start_dt.day:
+                            if (cur.year - start_dt.year) % interval == 0:
+                                do_emit = True
+                            nxt = _add_months(cur, 12)
+                        else:
+                            nxt = cur + timedelta(days=1)
+                    if do_emit and cur.strftime('%Y-%m-%d') not in exc:
+                        emitted['n'] += 1
+                        new_item = dict(rit)
+                        new_item['id'] = f"{rit['id']}_{cur.strftime('%Y%m%d')}"
+                        new_item['event_date'] = cur.strftime('%Y-%m-%d') + rit['event_date'][10:]
+                        if rit.get('end_date'):
+                            new_item['end_date'] = cur.strftime('%Y-%m-%d') + rit['end_date'][10:]
+                        result_list.append(new_item)
+                    cur = nxt
             except:
                 pass
         return jsonify({"schedules": result_list})
@@ -1540,6 +1268,10 @@ def bot_schedule():
     if data.get('end_date'):
         try: end_date = datetime.fromisoformat(data['end_date'])
         except: pass
+    _is_rec = bool(data.get('is_recurring'))
+    _end_date = end_date
+    _infinite = bool(data.get('repeat_infinite'))
+
     s = TongBotSchedule(user_id=uid, title=data.get('title',''), description=data.get('description',''),
         event_date=datetime.fromisoformat(data.get('event_date','')),
         end_date=end_date,
@@ -1551,13 +1283,14 @@ def bot_schedule():
         is_allday=data.get('is_allday', False),
         is_recurring=data.get('is_recurring', False),
         repeat_type=data.get('repeat_type', ''),
-        repeat_end_date=end_date if data.get('is_recurring') else None,
         repeat_interval=data.get('repeat_interval', 1) or 1,
-        repeat_infinite=data.get('repeat_infinite', False),
+        repeat_infinite=_infinite,
         repeat_weekdays=data.get('repeat_weekdays', 0) or 0,
         repeat_week_of_month=data.get('repeat_week_of_month', 0) or 0,
         repeat_month_of_year=data.get('repeat_month_of_year', 0) or 0,
-        reminder_minutes=data.get('reminder_minutes', 0) or 0)
+        reminder_minutes=data.get('reminder_minutes', 0) or 0,
+        repeat_exceptions=data.get('repeat_exceptions', '') or '',
+        repeat_end_date=(_end_date if (_is_rec and not _infinite) else None))
     if data.get('departure_time'):
         s.departure_time = datetime.fromisoformat(data['departure_time']) if data['departure_time'] else None
     if data.get('return_time'):
@@ -1565,99 +1298,20 @@ def bot_schedule():
     db.session.add(s)
     db.session.flush()
 
-    auto_created = _ensure_day_routes(uid, s.event_date)
     db.session.commit()
-    return jsonify({"success": True, "id": s.id, "auto_created": auto_created})
-
-@tongbot_bp.route('/api/bot/schedule/update', methods=['POST'])
-def bot_schedule_update():
-    uid = session.get('user_id')
-    if not uid: return jsonify({"error":"로그인"}),401
-    data = request.get_json()
-    s = TongBotSchedule.query.get(data.get('id'))
-    if not s or s.user_id != uid: return jsonify({"error":"권한없음"}),403
-    is_move_event = s.title and ('이동' in s.title or '귀가' in s.title)
-    old_date = s.event_date
-    old_end = s.end_date
-    old_loc = s.location
-    if data.get('title'): s.title = data['title']
-    if data.get('location') is not None: s.location = data['location']
-    if data.get('description'): s.description = data['description']
-    if data.get('memo'): s.memo = data['memo']
-    if data.get('departure_location') is not None: s.departure_location = data['departure_location']
-    if data.get('return_location') is not None: s.return_location = data['return_location']
-    if data.get('event_date'):
-        try: s.event_date = datetime.fromisoformat(data['event_date'])
-        except: pass
-    if data.get('end_date'):
-        try: s.end_date = datetime.fromisoformat(data['end_date'])
-        except: pass
-    if 'is_allday' in data: s.is_allday = data['is_allday']
-    if 'is_recurring' in data: s.is_recurring = data['is_recurring']
-    if data.get('repeat_type') is not None: s.repeat_type = data['repeat_type']
-    if data.get('repeat_interval') is not None: s.repeat_interval = data.get('repeat_interval') or 1
-    if data.get('repeat_infinite') is not None: s.repeat_infinite = data.get('repeat_infinite')
-    if data.get('repeat_weekdays') is not None: s.repeat_weekdays = data.get('repeat_weekdays') or 0
-    if data.get('repeat_week_of_month') is not None: s.repeat_week_of_month = data.get('repeat_week_of_month') or 0
-    if data.get('repeat_month_of_year') is not None: s.repeat_month_of_year = data.get('repeat_month_of_year') or 0
-    if data.get('reminder_minutes') is not None: s.reminder_minutes = data.get('reminder_minutes') or 0
-    if data.get('is_recurring') and s.end_date:
-        s.repeat_end_date = s.end_date
-    elif not data.get('is_recurring'):
-        s.repeat_end_date = None
-    db.session.commit()
-    if not is_move_event:
-        new_date = s.event_date
-        new_loc = s.location
-        new_end = s.end_date
-        loc_changed = data.get('location') is not None and new_loc != old_loc
-        date_changed = data.get('event_date') is not None and new_date != old_date
-        end_changed = data.get('end_date') is not None and new_end != old_end
-        if loc_changed or date_changed or end_changed:
-            recalc_dates = {old_date.replace(hour=0, minute=0, second=0)}
-            recalc_dates.add(new_date.replace(hour=0, minute=0, second=0))
-            for rd in recalc_dates:
-                _ensure_day_routes(uid, rd)
-            db.session.commit()
-    return jsonify({"success": True})
-
-@tongbot_bp.route('/api/bot/schedule/delete', methods=['POST'])
-def bot_schedule_delete():
-    uid = session.get('user_id')
-    if not uid: return jsonify({"error":"로그인"}),401
-    data = request.get_json()
-    s = TongBotSchedule.query.get(data.get('id'))
-    if not s or s.user_id != uid: return jsonify({"error":"권한없음"}),403
-    evt_date = s.event_date
-    is_move = s.title and ('이동' in s.title or '귀가' in s.title)
-    _was_recurring = s.is_recurring
-    _rec_type = s.repeat_type
-    _rec_interval = s.repeat_interval
-    _rec_weekdays = s.repeat_weekdays
-    _rec_wom = s.repeat_week_of_month
-    _rec_moy = s.repeat_month_of_year
-    _rec_infinite = s.repeat_infinite
-    _rec_end = s.repeat_end_date
-    db.session.delete(s)
-    db.session.flush()
-    auto_created = []
-    if not is_move:
-        if _was_recurring and _rec_end:
-            _base = type('DB', (), {'event_date': evt_date, 'is_recurring': True, 'repeat_type': _rec_type, 'repeat_interval': _rec_interval, 'repeat_weekdays': _rec_weekdays, 'repeat_week_of_month': _rec_wom, 'repeat_month_of_year': _rec_moy, 'repeat_infinite': _rec_infinite, 'repeat_end_date': _rec_end, 'repeat_exceptions': ''})()
-            for _d in [evt_date.date()] + list(_gen_occurrences(_base)):
-                _r = _ensure_day_routes(uid, datetime(_d.year, _d.month, _d.day))
-                if _r:
-                    auto_created.extend(_r)
-        else:
-            auto_created = _ensure_day_routes(uid, evt_date)
-    db.session.commit()
-    return jsonify({"success":True, "auto_created": auto_created})
+    enqueue_recalc(uid)
+    return jsonify({"success": True, "id": s.id})
 
 @tongbot_bp.route('/api/bot/schedule/reminders', methods=['GET'])
 def bot_schedule_reminders():
     uid = session.get('user_id')
     if not uid:
         return jsonify({"error": "로그인이 필요합니다."}), 401
+    # 클라이언트 폴링마다 알림 대상 계산(백그라운드 스레드 불안정 시 보완)
+    try:
+        run_notification_check()
+    except Exception:
+        pass
     from models import ScheduleReminderLog
     logs = ScheduleReminderLog.query.filter_by(user_id=uid, seen=False).order_by(ScheduleReminderLog.event_date.asc()).all()
     out = []
@@ -1678,14 +1332,59 @@ def bot_schedule_reminder_seen():
     db.session.commit()
     return jsonify({"success": True})
 
+
+# ---- WebPush (Service Worker) ----
+@tongbot_bp.route('/sw.js')
+def sw_js():
+    resp = make_response(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'sw.js'), encoding='utf-8').read())
+    resp.headers['Content-Type'] = 'application/javascript'
+    resp.headers['Service-Worker-Allowed'] = '/'
+    return resp
+
+@tongbot_bp.route('/api/bot/schedule/push/subscribe', methods=['POST'])
+def push_subscribe():
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({"error": "로그인 필요"}), 401
+    data = request.get_json() or {}
+    endpoint = data.get('endpoint')
+    p256dh = data.get('p256dh') or (data.get('keys') or {}).get('p256dh')
+    auth = data.get('auth') or (data.get('keys') or {}).get('auth')
+    if not (endpoint and p256dh and auth):
+        return jsonify({"error": "invalid subscription"}), 400
+    from models import PushSubscription
+    sub = PushSubscription.query.filter_by(user_id=uid, endpoint=endpoint).first()
+    if not sub:
+        sub = PushSubscription(user_id=uid, endpoint=endpoint, p256dh=p256dh, auth=auth)
+        db.session.add(sub)
+    else:
+        sub.p256dh = p256dh; sub.auth = auth
+    db.session.commit()
+    return jsonify({"success": True})
+
+@tongbot_bp.route('/api/bot/schedule/push/unsubscribe', methods=['POST'])
+def push_unsubscribe():
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({"error": "로그인 필요"}), 401
+    data = request.get_json() or {}
+    endpoint = data.get('endpoint')
+    from models import PushSubscription
+    if endpoint:
+        PushSubscription.query.filter_by(user_id=uid, endpoint=endpoint).delete()
+    else:
+        PushSubscription.query.filter_by(user_id=uid).delete()
+    db.session.commit()
+    return jsonify({"success": True})
+
 def run_notification_check():
     from datetime import datetime, timedelta
     import calendar as _cal
     from run import app
     from models import TongBotSchedule, ScheduleReminderLog
     with app.app_context():
-        now = datetime.utcnow()
-        scheds = TongBotSchedule.query.filter(TongBotSchedule.reminder_minutes > 0).all()
+        now = datetime.utcnow() + timedelta(hours=9)  # KST
+        scheds = TongBotSchedule.query.filter(TongBotSchedule.reminder_minutes != 0).all()
         def _add_months(dt, n):
             y, m = dt.year, dt.month + n
             while m > 12:
@@ -1756,24 +1455,228 @@ def run_notification_check():
             return out
         for s in scheds:
             minutes = s.reminder_minutes or 0
-            if minutes <= 0:
+            if minutes == 0:
                 continue
-            window_end = now + timedelta(minutes=minutes)
+            # minutes == -1 -> '정각'(예약된 시간 그 자체에 알림)
+            is_exact = (minutes == -1)
+            eff_minutes = 0 if is_exact else minutes
+            window_end = now + timedelta(minutes=eff_minutes)
             occs = gen_occ(s, now - timedelta(days=2), window_end)
             for dt in occs:
-                reminder_t = dt - timedelta(minutes=minutes)
-                if reminder_t <= now < dt:
+                reminder_t = dt - timedelta(minutes=eff_minutes)
+                # 창(reminder_t~dt)을 놓쳐도 복구 시점까지 최대 1시간 내 알림 생성
+                if reminder_t <= now < dt + timedelta(minutes=60):
                     occ_date = dt.strftime('%Y-%m-%d')
                     exists = ScheduleReminderLog.query.filter_by(schedule_id=s.id, occ_date=occ_date).first()
                     if not exists:
-                        db.session.add(ScheduleReminderLog(user_id=s.user_id, schedule_id=s.id, occ_date=occ_date, title=s.title, event_date=dt, seen=False))
+                        log = ScheduleReminderLog(user_id=s.user_id, schedule_id=s.id, occ_date=occ_date, title=s.title, event_date=dt, seen=False)
+                        db.session.add(log)
+                        db.session.flush()
+                        # WebPush 전송 (탭이 닫혀 있어도 OS 알림)
+                        try:
+                            from models import PushSubscription
+                            from services.push import send_push
+                            subs = PushSubscription.query.filter_by(user_id=s.user_id).all()
+                            for sub in subs:
+                                ok = send_push(sub, s.title or '알림', (dt.strftime('%Y-%m-%d %H:%M') if dt else '') + ' 일정 알림')
+                                if not ok:
+                                    db.session.delete(sub)
+                        except Exception:
+                            pass
         db.session.commit()
 
+@tongbot_bp.route('/api/bot/schedule/attachment', methods=['POST'])
+def bot_schedule_attachment():
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({"error": "로그인이 필요합니다."}), 401
+    files = request.files.getlist('file')
+    if not files:
+        return jsonify({"error": "파일이 없습니다."}), 400
+    from flask import current_app
+    import os, uuid
+    from services.security import secure_save
+    base_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'schedules', str(uid))
+    if not os.path.exists(base_dir):
+        os.makedirs(base_dir)
+    IMG_EXTS = {'png','jpg','jpeg','gif','webp'}
+    DOC_MAGIC = {b'%PDF': True, b'PK\x03\x04': True, b'\xd0\xcf\x11\xe0': True}
+    urls = []
+    for f in files:
+        if not f or not f.filename:
+            continue
+        ext = f.filename.rsplit('.', 1)[1].lower() if '.' in f.filename else ''
+        try:
+            if ext in IMG_EXTS:
+                p = secure_save(f, base_dir)
+                fname = p.rsplit('/', 1)[1]
+                urls.append('/static/uploads/schedules/%s/%s' % (uid, fname))
+            else:
+                f.seek(0, os.SEEK_END); size = f.tell(); f.seek(0)
+                if size > 30 * 1024 * 1024:
+                    continue
+                if ext in ('txt','csv','md','hwp'):
+                    ok = True
+                else:
+                    header = f.read(8); f.seek(0)
+                    ok = any(header[:len(m)] == m for m in DOC_MAGIC)
+                if not ok:
+                    continue
+                safe = '%s.%s' % (uuid.uuid4().hex, ext)
+                f.seek(0)
+                f.save(os.path.join(base_dir, safe))
+                urls.append('/static/uploads/schedules/%s/%s' % (uid, safe))
+        except Exception:
+            continue
+    if not urls:
+        return jsonify({"error": "업로드 실패"}), 400
+    return jsonify({"urls": urls})
 
+@tongbot_bp.route('/api/bot/schedule/update', methods=['POST'])
+def bot_schedule_update():
+    uid = session.get('user_id')
+    if not uid: return jsonify({"error":"로그인"}),401
+    data = request.get_json()
+    s = TongBotSchedule.query.get(data.get('id'))
+    if not s or s.user_id != uid: return jsonify({"error":"권한없음"}),403
+    is_move_event = s.title and ('이동' in s.title or '귀가' in s.title)
+    old_date = s.event_date
+    old_end = s.end_date
+    old_loc = s.location
+    old_is_recurring = s.is_recurring
+    old_repeat_type = s.repeat_type
+    old_repeat_interval = s.repeat_interval
+    old_repeat_weekdays = s.repeat_weekdays
+    old_repeat_wom = s.repeat_week_of_month
+    old_repeat_moy = s.repeat_month_of_year
+    old_repeat_infinite = s.repeat_infinite
+    old_repeat_end = s.repeat_end_date
+    if data.get('title'): s.title = data['title']
+    if data.get('location') is not None: s.location = data['location']
+    if data.get('description'): s.description = data['description']
+    if data.get('memo'): s.memo = data['memo']
+    if data.get('departure_location') is not None: s.departure_location = data['departure_location']
+    if data.get('return_location') is not None: s.return_location = data['return_location']
+    if data.get('event_date'):
+        try: s.event_date = datetime.fromisoformat(data['event_date'])
+        except: pass
+    if data.get('end_date'):
+        try: s.end_date = datetime.fromisoformat(data['end_date'])
+        except: pass
+    if 'is_allday' in data: s.is_allday = data['is_allday']
+    if 'is_recurring' in data: s.is_recurring = data['is_recurring']
+    if data.get('repeat_type') is not None: s.repeat_type = data['repeat_type']
+    if data.get('repeat_weekdays') is not None: s.repeat_weekdays = data.get('repeat_weekdays') or 0
+    if data.get('repeat_week_of_month') is not None: s.repeat_week_of_month = data.get('repeat_week_of_month') or 0
+    if data.get('repeat_month_of_year') is not None: s.repeat_month_of_year = data.get('repeat_month_of_year') or 0
+    if data.get('reminder_minutes') is not None: s.reminder_minutes = data.get('reminder_minutes') or 0
+    if data.get('repeat_exceptions') is not None: s.repeat_exceptions = data.get('repeat_exceptions') or ''
+    if data.get('is_recurring'):
+        _u_end = s.end_date
+        if data.get('end_date'):
+            try: _u_end = datetime.fromisoformat(data['end_date'])
+            except Exception: pass
+        if not _u_end:
+            s.repeat_infinite = True
+            s.repeat_end_date = None
+        elif s.event_date and _u_end < s.event_date:
+            s.repeat_infinite = True
+            s.repeat_end_date = None
+        else:
+            s.repeat_infinite = False
+            s.repeat_end_date = _u_end
+    else:
+        s.repeat_infinite = False
+        s.repeat_end_date = None
+    db.session.commit()
+    if not is_move_event:
+        new_date = s.event_date
+        new_loc = s.location
+        new_end = s.end_date
+        loc_changed = data.get('location') is not None and new_loc != old_loc
+        date_changed = data.get('event_date') is not None and new_date != old_date
+        end_changed = data.get('end_date') is not None and new_end != old_end
+        if loc_changed or date_changed or end_changed or (old_is_recurring != s.is_recurring) or (old_repeat_type != s.repeat_type) or (old_repeat_weekdays != s.repeat_weekdays) or (old_repeat_wom != s.repeat_week_of_month) or (old_repeat_moy != s.repeat_month_of_year) or (old_repeat_infinite != s.repeat_infinite) or (old_repeat_end != s.repeat_end_date):
+            enqueue_recalc(uid)
+    return jsonify({"success": True})
+
+@tongbot_bp.route('/api/bot/schedule/delete', methods=['POST'])
+def bot_schedule_delete():
+    uid = session.get('user_id')
+    if not uid: return jsonify({"error":"로그인"}),401
+    data = request.get_json()
+    s = TongBotSchedule.query.get(data.get('id'))
+    if not s or s.user_id != uid: return jsonify({"error":"권한없음"}),403
+    mode = data.get('mode', 'all')
+    occ_date = data.get('date')
+    is_move = s.title and ('이동' in s.title or '귀가' in s.title)
+    # 반복 일정 분할 삭제
+    if s.is_recurring and occ_date and mode in ('this_after', 'this_only'):
+        try:
+            occ = datetime.strptime(occ_date[:10], '%Y-%m-%d')
+        except:
+            occ = None
+        start = s.event_date
+        if mode == 'this_only' and occ:
+            import json as _json
+            exc = []
+            try: exc = _json.loads(s.repeat_exceptions or '[]')
+            except: exc = []
+            if occ_date[:10] not in exc:
+                exc.append(occ_date[:10])
+            s.repeat_exceptions = _json.dumps(exc, ensure_ascii=False)
+            if occ:
+                _ensure_day_routes(uid, datetime(occ.year, occ.month, occ.day, s.event_date.hour, s.event_date.minute))
+            db.session.commit()
+            return jsonify({"success": True})
+        if mode == 'this_after':
+            if not occ or (start and occ <= start):
+                pass  # 시작일 포함 이후 = 전체 삭제로 진행
+            else:
+                s.end_date = occ - timedelta(days=1)
+                s.repeat_infinite = False
+                db.session.commit()
+                if not is_move:
+                    _tail_end = s.repeat_end_date.date() if s.repeat_end_date else (occ + timedelta(days=730)).date()
+                    _cur = occ.date()
+                    _g = 0
+                    while _cur <= _tail_end and _g < 2000:
+                        _g += 1
+                        _ensure_day_routes(uid, datetime(_cur.year, _cur.month, _cur.day))
+                        _cur += timedelta(days=1)
+                return jsonify({"success": True})
+    # 전체 삭제 (기본)
+    evt_date = s.event_date
+    _was_recurring = s.is_recurring
+    _rec_type = s.repeat_type
+    _rec_interval = s.repeat_interval
+    _rec_weekdays = s.repeat_weekdays
+    _rec_wom = s.repeat_week_of_month
+    _rec_moy = s.repeat_month_of_year
+    _rec_infinite = s.repeat_infinite
+    _rec_end = s.repeat_end_date
+    db.session.delete(s)
+    db.session.flush()
+    db.session.commit()
+    enqueue_recalc(uid)
+    return jsonify({"success":True})
 
 @tongbot_bp.route('/schedule')
 def schedule_popup():
-    return render_template('schedule2.html')
+    resp = make_response(render_template('schedule2.html'))
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
+
+@tongbot_bp.route('/schedule2')
+def schedule_popup2():
+    resp = make_response(render_template('schedule2.html'))
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
+
 def schedule_popup():
     if not session.get('user_id'):
         return redirect(url_for('login', next='/schedule'))
@@ -2135,6 +2038,8 @@ Rules:
     import json as _json
     naver_id = current_app.config.get('NAVER_CLIENT_ID', os.getenv('NAVER_CLIENT_ID', ''))
     naver_secret = current_app.config.get('NAVER_CLIENT_SECRET', os.getenv('NAVER_CLIENT_SECRET', ''))
+    odsay_key = os.getenv('ODSAY_API_KEY', current_app.config.get('ODSAY_API_KEY', ''))
+    google_key = os.getenv('GOOGLE_MAPS_API_KEY', current_app.config.get('GOOGLE_MAPS_API_KEY', ''))
 
     entries = []
     first_stop = stops[0]
@@ -2194,7 +2099,7 @@ Rules:
         if prev_lat and loc_lat:
             plan = plan_segment(prev_name, prev_lat, prev_lng, sname, loc_lat, loc_lng, stime,
                               home_town=user.town or '', home_village=user.village or '',
-                              naver_id=naver_id, naver_secret=naver_secret)
+                              naver_id=naver_id, naver_secret=naver_secret, odsay_key=odsay_key, google_key=google_key)
             plan.update({"from_lat":prev_lat,"from_lng":prev_lng,"to_lat":loc_lat,"to_lng":loc_lng})
             memo = format_itinerary(plan)
             _compact = format_memo_compact(plan)
@@ -2226,7 +2131,7 @@ Rules:
                 ret_time = f"{ret_min//60:02d}:{ret_min%60:02d}"
         plan_home = plan_segment(prev_name, prev_lat, prev_lng, f"집({home_addr})", home_lat, home_lng, ret_time,
                                home_town=user.town or '', home_village=user.village or '',
-                               naver_id=naver_id, naver_secret=naver_secret)
+                               naver_id=naver_id, naver_secret=naver_secret, odsay_key=odsay_key, google_key=google_key)
         plan_home.update({"from_lat":prev_lat,"from_lng":prev_lng,"to_lat":home_lat,"to_lng":home_lng})
         memo_home = f"🏠 귀가\n{format_itinerary(plan_home)}"
         _compact_home = format_memo_compact(plan_home)
@@ -2316,7 +2221,7 @@ def bot_route_detail(schedule_id):
     evt = s.event_date.strftime("%Y-%m-%d %H:%M") if s.event_date else ""
     return jsonify({"schedule":{"id":s.id,"title":s.title,"event_date":evt,
         "location":s.location,"departure_location":s.departure_location,
-        "return_location":s.return_location},"route":route_data})
+        "return_location":s.return_location,"memo":s.memo,"description":s.description},"route":route_data})
 
 @tongbot_bp.route('/api/bot/route/<int:schedule_id>/save', methods=['POST'])
 def bot_route_save(schedule_id):
@@ -2364,3 +2269,8 @@ def bot_route_shared_list():
         "total_min":r.total_min,"distance_km":r.distance_km,
         "creator_id":r.creator_id
     } for r in routes]})
+
+
+
+
+

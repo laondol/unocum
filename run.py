@@ -1,7 +1,6 @@
 import os
 from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env'))
-
 from flask import Flask
 from config import Config, DB_MODE
 from models import db, User
@@ -134,6 +133,25 @@ def create_app():
                 print(f'[NOTI] error: {e}')
             time.sleep(30)
     threading.Thread(target=notification_scheduler, daemon=True).start()
+
+    # 경로 재계산 주기 워커 (스레드 우선 보강용 safety net)
+    def route_recalc_scheduler():
+        import time
+        from models import User
+        time.sleep(60)  # 앱 시작 후 60초 대기
+        while True:
+            try:
+                with app.app_context():
+                    for u in User.query.all():
+                        try:
+                            from services.route_recalc import recalc_user_routes
+                            recalc_user_routes(u.id)
+                        except Exception as e:
+                            print(f'[ROUTE] user {u.id} recalc error: {e}')
+            except Exception as e:
+                print(f'[ROUTE] scheduler error: {e}')
+            time.sleep(600)  # 10분마다 전체 사용자 재계산
+    threading.Thread(target=route_recalc_scheduler, daemon=True).start()
     
     # DB 마이그레이션: 누락된 컬럼 자동 추가
     def migrate_news_article():

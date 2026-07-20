@@ -15,12 +15,12 @@
             {% if report.image_path %}
             <div class="row g-2 mb-3">
                 <div class="col-12">
-                    <img src="{{ report.image_path }}" class="img-fluid rounded" style="max-height:400px;width:100%;object-fit:cover;" alt="공유 사진">
+                    <img src="{{ report.image_path }}" class="img-fluid rounded" style="max-height:400px;width:100%;object-fit:cover;" alt="공유 사진" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<div style=\'background:#eee;height:160px;display:flex;align-items:center;justify-content:center\'><span style=\'color:#888\'>이미지 없음</span></div>\')">
                 </div>
                 {% if report.extra_images %}
                 {% for img in report.extra_images.split(',') %}
                 <div class="col-4 col-md-3">
-                    <img src="{{ img }}" class="img-fluid rounded" style="height:120px;object-fit:cover;width:100%;" alt="공유 사진">
+                    <img src="{{ img }}" class="img-fluid rounded" style="height:120px;object-fit:cover;width:100%;" alt="공유 사진" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<div style=\'background:#eee;height:160px;display:flex;align-items:center;justify-content:center\'><span style=\'color:#888\'>이미지 없음</span></div>\')">
                 </div>
                 {% endfor %}
                 {% endif %}
@@ -28,7 +28,7 @@
             {% endif %}
 
             {% if report.drawing_path %}
-            <img src="{{ report.drawing_path }}" class="img-fluid rounded mb-3" style="max-height: 400px;" alt="공유 그림">
+            <img src="{{ report.drawing_path }}" class="img-fluid rounded mb-3" style="max-height: 400px;" alt="공유 그림" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<div style=\'background:#eee;height:160px;display:flex;align-items:center;justify-content:center\'><span style=\'color:#888\'>이미지 없음</span></div>\')">
             {% endif %}
             {% if report.video_path and (report.video_path.endswith('.mp4') or report.video_path.endswith('.webm') or report.video_path.endswith('.mov')) %}
             <video controls class="w-100 rounded mb-3" style="max-height:400px;">

@@ -194,9 +194,9 @@ export default function ShareList() {
             <div key={r.id} className="col-12 col-md-6 col-lg-4">
               <div className="card border-0 shadow-sm h-100" style={{borderRadius:16,overflow:'hidden'}}>
                 {r.image_path ? (
-                  <img src={r.image_path} className="card-img-top" style={{height:160,objectFit:'cover'}} />
+                  <img src={r.image_path} className="card-img-top" style={{height:160,objectFit:'cover'}} onError={(e) => { e.currentTarget.style.display = 'none'; const d = document.createElement('div'); d.className = 'bg-light d-flex align-items-center justify-content-center'; d.style.height = '160px'; d.innerHTML = '<span class="text-muted">이미지 없음</span>'; e.currentTarget.parentNode?.insertBefore(d, e.currentTarget); }} />
                 ) : r.drawing_path ? (
-                  <img src={r.drawing_path} className="card-img-top" style={{height:160,objectFit:'cover'}} />
+                  <img src={r.drawing_path} className="card-img-top" style={{height:160,objectFit:'cover'}} onError={(e) => { e.currentTarget.style.display = 'none'; const d = document.createElement('div'); d.className = 'bg-light d-flex align-items-center justify-content-center'; d.style.height = '160px'; d.innerHTML = '<span class="text-muted">이미지 없음</span>'; e.currentTarget.parentNode?.insertBefore(d, e.currentTarget); }} />
                 ) : (
                   <div className="bg-light d-flex align-items-center justify-content-center" style={{height:160}}>
                     <span className="text-muted">이미지 없음</span>

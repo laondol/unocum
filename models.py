@@ -356,6 +356,10 @@ class TongBotSchedule(db.Model):
     repeat_month_of_year = db.Column(db.Integer, default=0)  # 0=매년아님, 1-12=해당월
     reminder_minutes = db.Column(db.Integer, default=0)  # 0=알림안함, 10/30/60/1440(1일전)
     repeat_exceptions = db.Column(db.Text, default='')  # JSON list of 'YYYY-MM-DD' dates to skip
+    # --- 모듈화: parent_id 기반 발생일/경로 추적 ---
+    kind = db.Column(db.String(20), default='base')  # 'base' | 'occurrence' | 'route'
+    parent_id = db.Column(db.Integer, db.ForeignKey('tong_bot_schedule.id', ondelete='CASCADE'), nullable=True)
+    occ_date = db.Column(db.Date, nullable=True)  # 발생일 실제 날짜 (occurrence 전용)
 
 class ChatRoom(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -681,3 +685,13 @@ class ScheduleReminderLog(db.Model):
     event_date = db.Column(db.DateTime)
     sent_at = db.Column(db.DateTime, default=datetime.now)
     seen = db.Column(db.Boolean, default=False)
+
+
+class PushSubscription(db.Model):
+    __tablename__ = 'push_subscription'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    endpoint = db.Column(db.Text, nullable=False)
+    p256dh = db.Column(db.Text, nullable=False)
+    auth = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now)

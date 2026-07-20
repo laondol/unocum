@@ -134,7 +134,8 @@ function renderEventList() {
     el.innerHTML = schedules.map(function(s){
         var end = s.end_date ? ' ~ ' + s.end_date.split(' ')[1].substring(0,5) : '';
         var loc = s.location ? '<br><small>📍 '+s.location+'</small>' : '';
-        var memo = s.description ? '<br><small>📝 '+s.description+'</small>' : '';
+        var memoText = s.memo || s.description || '';
+        var memo = memoText ? '<br><small>📝 '+memoText+'</small>' : '';
         var content = s.content ? '<br><small class="text-muted">'+s.content.replace(/\n/g,'<br>')+'</small>' : '';
         var color = s.color || 'gray';
         var badge = {'red':'🔴','blue':'🔵','green':'🟢','gray':'⚪'}[color] || '⚪';

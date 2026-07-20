@@ -167,17 +167,17 @@ export default function ShareDetail() {
           {r.image_path && (
             <div className="row g-2 mb-3">
               <div className="col-12">
-                <img src={r.image_path} className="img-fluid rounded" style={{maxHeight: 400, width: '100%', objectFit: 'cover'}} />
+                <img src={r.image_path} className="img-fluid rounded" style={{maxHeight: 400, width: '100%', objectFit: 'cover'}} onError={(e) => { const d = document.createElement('div'); d.className = 'bg-light d-flex align-items-center justify-content-center rounded mb-3'; d.style.height = '200px'; d.innerHTML = '<span class="text-muted">이미지 없음</span>'; e.currentTarget.parentElement?.replaceWith(d); }} />
               </div>
               {extraImages.map((img, i) => (
                 <div key={i} className="col-4 col-md-3">
-                  <img src={img} className="img-fluid rounded" style={{height: 120, objectFit: 'cover', width: '100%'}} />
+                  <img src={img} className="img-fluid rounded" style={{height: 120, objectFit: 'cover', width: '100%'}} onError={(e) => { const d = document.createElement('div'); d.className = 'bg-light d-flex align-items-center justify-content-center rounded'; d.style.height = '120px'; d.innerHTML = '<span class="text-muted">없음</span>'; e.currentTarget.parentElement?.replaceWith(d); }} />
                 </div>
               ))}
             </div>
           )}
 
-          {r.drawing_path && <img src={r.drawing_path} className="img-fluid rounded mb-3" style={{maxHeight: 400}} />}
+          {r.drawing_path && <img src={r.drawing_path} className="img-fluid rounded mb-3" style={{maxHeight: 400}} onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
           {r.video_path && (
             <video controls className="w-100 rounded mb-3" style={{maxHeight: 400}}>
               <source src={r.video_path} />

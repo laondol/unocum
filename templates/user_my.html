@@ -199,7 +199,7 @@
                     <strong>{% if scolor == 'red' %}🔴{% elif scolor == 'blue' %}🔵{% elif scolor == 'green' %}🟢{% else %}⚪{% endif %} {{ s.title }}</strong>
                     <span class="text-muted ms-2">{{ sev.strftime('%Y-%m-%d') if sev else '' }}{% if not is_allday %} {{ sev.strftime('%H:%M') if sev else '' }}{% endif %}</span>
                     {% if s.location %}<br>📍 {{ s.location }}{% endif %}
-                    {% if s.description %}<br>{{ s.description[:80] }}{% endif %}
+                    {% set sm = s.memo or s.description %}{% if sm %}<br>{{ sm[:80] }}{% endif %}
                 </div>
             </div>
             {% endfor %}

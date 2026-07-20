@@ -87,7 +87,7 @@
                     </div>
                     {% endif %}
                     {% if r.image_path %}
-                <img src="{{ r.image_path }}" class="card-img-top" style="height: 160px; object-fit: cover;" alt="{{ r.title }}">
+                <img src="{{ r.image_path }}" class="card-img-top" style="height: 160px; object-fit: cover;" alt="{{ r.title }}" onerror="this.outerHTML='<div class='card-img-top bg-light d-flex align-items-center justify-content-center' style='height:160px'><span class='text-muted'>이미지 없음</span></div>'">
                 {% elif r.drawing_path %}
                 <img src="{{ r.drawing_path }}" class="card-img-top" style="height: 160px; object-fit: cover;" alt="{{ r.title }}">
                 {% else %}
