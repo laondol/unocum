@@ -1,6 +1,11 @@
+import os
+import requests
 from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session, current_app
 from datetime import datetime
-from models import db, NewsArticle, NewsComment, NewsRecommendation, Post, User, Message
+from sqlalchemy import or_
+from models import db, NewsArticle, NewsComment, NewsRecommendation, NewsVote, Post, User, Message
+from services.ai_service import call_ai_judge
+from services.point_service import add_points
 
 news_bp = Blueprint('news', __name__)
 
@@ -34,6 +39,7 @@ def admin_news_ai_suggest():
             trending_context = ', '.join(cats)
     except:
         pass
+    from services.news_service import ai_search_news
     suggestions = ai_search_news(news_type=tab, trending_context=trending_context)
     if not suggestions:
         return jsonify({"status": "error", "msg": "AI 주제 제안 실패. Groq 서버를 확인하세요."})
@@ -324,6 +330,7 @@ def admin_news_import_url():
         body_text = '\n'.join(lines)[:3000]
     except:
         body_text = text[:2000]
+    from services.news_service import ai_summarize_url
     result = ai_summarize_url(body_text[:3000])
     if not result:
         result = {"title": "URL에서 가져온 기사", "summary": "AI 요약 실패", "category": "세계뉴스", "is_useful": True}
