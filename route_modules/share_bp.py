@@ -145,29 +145,13 @@ def share_report():
 def admin_share_reports():
     if session.get('role') not in ['admin', 'leader']:
         return "권한 없음", 403
-    filter_type = request.args.get('filter', 'all')
-    base = ShareReport.query
-    if filter_type == 'unmoderated':
-        base = base.filter(db.or_(ShareReport.is_moderated == False, ShareReport.is_moderated == None))
-    elif filter_type == 'moderated':
-        base = base.filter(ShareReport.is_moderated == True)
-    reports = base.order_by(ShareReport.created_at.desc()).all()
-    
-    danger_reports = [r for r in reports if r.ai_danger_alert]
-    
-    total_all = ShareReport.query.count()
-    return render_template('admin_share_reports.html', 
-        reports=reports, 
-        danger_reports=danger_reports,
-        filter_type=filter_type,
-        total_all=total_all)
+    return _serve_react_share()
 
 @share_bp.route('/admin/ramp-applications')
 def admin_ramp_applications():
     if session.get('role') not in ['admin', 'leader']:
         return "권한 없음", 403
-    apps = RampApplication.query.order_by(RampApplication.created_at.desc()).all()
-    return render_template('admin_ramp_applications.html', apps=apps)
+    return _serve_react_share()
 
 @share_bp.route('/admin/message/send', methods=['GET', 'POST'])
 def admin_message_send():
@@ -238,19 +222,13 @@ def admin_message_send():
             db.session.add(msg)
         db.session.commit()
         return jsonify({'status':'success', 'msg':f'{len(recipients)}명에게 쪽지를 발송했습니다. ({total_cost}닢 차감)'})
-    towns = list(YANGPYEONG_BOUNDS.keys())
-    villages = YANGPYEONG_VILLAGES
-    groups = FriendGroup.query.filter_by(user_id=session['user_id']).all()
-    users = User.query.order_by(User.real_name, User.username).all()
-    return render_template('admin_message.html', towns=towns, villages=villages, groups=groups, users=users)
+    return _serve_react_share()
 
 @share_bp.route('/leader/share-reports')
 def leader_share_reports():
     if session.get('role') not in ['admin', 'leader']:
         return "권한 없음", 403
-    user = User.query.get(session['user_id'])
-    reports = ShareReport.query.filter_by(town=user.town, village=user.village).order_by(ShareReport.created_at.desc()).all()
-    return render_template('leader_share_reports.html', reports=reports, town=user.town, village=user.village)
+    return _serve_react_share()
 
 @share_bp.route('/share-report/edit/<int:report_id>', methods=['GET', 'POST'])
 def share_report_edit(report_id):
@@ -525,7 +503,7 @@ def share_report_edit(report_id):
 
         db.session.commit()
         return jsonify({"status": "success", "msg": "수정되었습니다."})
-    return render_template('share_report_edit.html', report=report)
+    return _serve_react_share()
 
 @share_bp.route('/share-report/delete-image/<int:report_id>', methods=['POST'])
 def share_report_delete_image(report_id):
@@ -578,7 +556,8 @@ def api_share_reports():
     reports = query.order_by(ShareReport.created_at.desc()).limit(50).all()
     return jsonify([{
         "id": r.id, "title": r.title, "description": r.description,
-        "image_path": r.image_path, "drawing_path": r.drawing_path,
+        "image_path": r.image_path, "extra_images": r.extra_images or '',
+        "drawing_path": r.drawing_path,
         "video_path": r.video_path, "latitude": r.latitude,
         "longitude": r.longitude, "town": r.town, "village": r.village,
         "address": r.address, "author_name": r.author_name,
@@ -625,12 +604,7 @@ def share_map():
             "summary": (r.ai_summary or r.description or "")[:80]
         })
     categories = ['사건', '풍경', '장소', '맛집', '기타']
-    return render_template('share_map.html',
-        reports=reports,
-        reports_json=json.dumps(reports_json, ensure_ascii=False),
-        categories=categories,
-        selected_category=category
-    )
+    return _serve_spa()
 
 @share_bp.route('/share/nearby')
 def share_nearby():

@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 
 interface ShareItem {
   id: number; title: string; description: string
-  image_path: string | null; drawing_path: string | null
+  image_path: string | null; extra_images: string
+  drawing_path: string | null
   latitude: number; longitude: number
   town: string; village: string
   ai_category: string; ai_summary: string
@@ -193,15 +194,38 @@ export default function ShareList() {
             return (
             <div key={r.id} className="col-12 col-md-6 col-lg-4">
               <div className="card border-0 shadow-sm h-100" style={{borderRadius:16,overflow:'hidden'}}>
-                {r.image_path ? (
-                  <img src={r.image_path} className="card-img-top" style={{height:160,objectFit:'cover'}} />
-                ) : r.drawing_path ? (
-                  <img src={r.drawing_path} className="card-img-top" style={{height:160,objectFit:'cover'}} />
-                ) : (
-                  <div className="bg-light d-flex align-items-center justify-content-center" style={{height:160}}>
-                    <span className="text-muted">이미지 없음</span>
-                  </div>
-                )}
+                {(() => {
+                  const extraImgs = r.extra_images ? r.extra_images.split(',').filter(Boolean) : []
+                  const allImgs = [r.image_path, ...extraImgs].filter(Boolean) as string[]
+                  const showDraw = r.drawing_path && allImgs.length === 0
+                  return (
+                    <>
+                      {allImgs.length > 0 ? (
+                        <img src={allImgs[0]} className="card-img-top" style={{height:160,objectFit:'cover'}} />
+                      ) : r.drawing_path ? (
+                        <img src={r.drawing_path} className="card-img-top" style={{height:160,objectFit:'cover'}} />
+                      ) : (
+                        <div className="bg-light d-flex align-items-center justify-content-center" style={{height:160}}>
+                          <span className="text-muted">이미지 없음</span>
+                        </div>
+                      )}
+                      {allImgs.length > 1 && (
+                        <div className="d-flex gap-1 px-2 pt-1 pb-2 bg-white" style={{overflow:'auto'}}>
+                          {allImgs.slice(0, 5).map((img, i) => (
+                            <img key={i} src={img} style={{width:50,height:50,objectFit:'cover',borderRadius:6,border:'1px solid #eee',flexShrink:0}} />
+                          ))}
+                          {allImgs.length > 5 && <span className="small text-muted align-self-center">+{allImgs.length-5}</span>}
+                          {r.drawing_path && <img src={r.drawing_path} style={{width:50,height:50,objectFit:'cover',borderRadius:6,border:'1px solid #dee2fc',flexShrink:0}} title="그리기" />}
+                        </div>
+                      )}
+                      {allImgs.length <= 1 && r.drawing_path && !showDraw && (
+                        <div className="px-2 pb-2 bg-white">
+                          <img src={r.drawing_path} style={{width:50,height:50,objectFit:'cover',borderRadius:6,border:'1px solid #dee2fc'}} title="그리기" />
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
                 <div className="card-body p-3 d-flex flex-column">
                   <div className="d-flex gap-1 flex-wrap mb-2">
                     <span className="badge bg-info">{r.ai_category}</span>

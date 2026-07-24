@@ -1,5 +1,7 @@
 flask
 flask-sqlalchemy
+flask-cors
+flask-migrate
 requests
 beautifulsoup4
 werkzeug
@@ -9,4 +11,8 @@ chromadb
 sentence-transformers
 openai
 Pillow
+pillow-heif
 opencv-python-headless
+authlib
+psycopg2-binary
+pywebpush

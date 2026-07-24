@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 interface BotInfo {
   bot_name: string; mood: string; level: number; exp: number
@@ -10,7 +11,6 @@ interface Draft { id: number; title: string; status: string; category: string; c
 interface Friend { id: number; name: string; username: string; town: string; village: string }
 interface ChatRoomT { id: number; name: string; created_at: string }
 interface ChatMsg { id: number; username: string; message: string; is_bot: boolean; time: string }
-
 const MOODS: Record<string, { emoji: string; label: string }> = {
   warm: { emoji: '💕', label: '따스한' }, proud: { emoji: '🥲', label: '대견한' },
   encourage: { emoji: '💪', label: '응원' }, worried: { emoji: '😌', label: '걱정' },
@@ -30,6 +30,7 @@ const BOARD_RULES: Record<string, string> = {
 type TabId = 'write' | 'friendchat' | 'schedule' | 'task'
 
 export default function UserMyPage() {
+  const navigate = useNavigate()
   const [me, setMe] = useState<UserInfo | null>(null)
   const [bot, setBot] = useState<BotInfo | null>(null)
   const [tab, setTab] = useState<TabId>('write')
@@ -397,7 +398,7 @@ export default function UserMyPage() {
               onClick={() => {
                 setTab(t); window.location.hash = 'tab' + t
                 if (t === 'friendchat') loadFriends()
-                if (t === 'task') window.open('/schedule2', 'sched2', 'width=800,height=700,left=100,top=50')
+                if (t === 'task') navigate('/schedule')
               }}>
               {tabLabels[t]}
             </button>
@@ -729,9 +730,8 @@ export default function UserMyPage() {
       <div id="tabTask" style={{ display: tab === 'task' ? '' : 'none' }}>
         <div className="text-center py-4">
           <div className="fs-1 mb-2">📋</div>
-          <p className="text-muted small">일정2.0 팝업에서 관리할 수 있습니다.</p>
-          <a href="#" onClick={e => { e.preventDefault(); window.open('/schedule2', 'sched2', 'width=800,height=700,left=100,top=50') }}
-            className="btn btn-success">일정2.0 열기</a>
+          <p className="text-muted small">일정 페이지에서 관리할 수 있습니다.</p>
+          <a href="/schedule" className="btn btn-success">일정 관리 열기</a>
         </div>
       </div>
 

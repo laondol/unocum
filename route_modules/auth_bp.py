@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, timedelta
-from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session, current_app, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User, PointHistory, Message
 
@@ -88,7 +88,7 @@ def register_verify_email_confirm(token):
 
 @auth_bp.route('/reset-password')
 def reset_password():
-    return render_template('reset_password.html')
+    return _serve_spa()
 
 @auth_bp.route('/reset-password/send', methods=['POST'])
 def reset_password_send():
@@ -118,7 +118,7 @@ def reset_password_confirm(token):
     user = User.query.filter_by(reset_token=token).first()
     if not user or not user.reset_token_expiry or user.reset_token_expiry < datetime.now():
         return "<script>alert('만료된 링크입니다.'); location.href='/reset-password';</script>"
-    return render_template('reset_confirm.html', token=token)
+    return _serve_spa()
 
 @auth_bp.route('/reset-password/confirm', methods=['POST'])
 def reset_password_confirm_post():
@@ -134,8 +134,16 @@ def reset_password_confirm_post():
     db.session.commit()
     return jsonify({"status":"success","msg":"비밀번호가 변경되었습니다. 로그인해 주세요."})
 
+def _serve_spa():
+    react_index = os.path.join(current_app.root_path, 'frontend', 'dist', 'index.html')
+    if os.path.exists(react_index):
+        return send_file(react_index)
+    return render_template('intro.html')
+
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
+    if request.method == 'GET':
+        return _serve_spa()
     if request.method == 'POST':
         verified_email = session.pop('email_verified_for_register', None)
         if not verified_email:
@@ -239,7 +247,7 @@ def register():
             f"{real_name}님, 양평마을에 가입해 주셔서 감사합니다.\n\n지금 바로 다양한 서비스를 이용해 보세요.\n- 게시글 작성 및 공유\n- 법률/심리 상담\n- 경사로 설치 신청\n- 이웃과 소통\n\nhttps://test.unocum.kr")
         
         return "<script>alert('가입 신청 완료! 로그인을 진행하세요.'); location.href='/intro';</script>"
-    return render_template('register.html')
+    return _serve_spa()
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -278,8 +286,8 @@ def login():
                 u.last_payout = now
                 db.session.commit()
             return redirect(next_url or url_for('user.user_profile', user_id=u.id))
-        return render_template('login.html', next=next_url, error='로그인 정보가 올바르지 않습니다.')
-    return render_template('login.html', next=next_url)
+        return jsonify({"status":"error","msg":"로그인 정보가 올바르지 않습니다."}), 401
+    return _serve_spa()
 
 @auth_bp.route('/logout')
 def logout():
@@ -451,3 +459,76 @@ def user_update_address():
     user.curr_town = town
     user.curr_village = village
     db.session.commit()
+
+@auth_bp.route('/api/auth/login', methods=['POST'])
+def api_login():
+    data = request.get_json()
+    login_id = data.get('username', '')
+    u = User.query.filter_by(email=login_id).first()
+    if u and check_password_hash(u.password, data.get('password', '')):
+        session.update({'user_id': u.id, 'username': u.username, 'role': u.role, 'email': u.email or '', 'real_name': u.real_name or '', 'managed_pages': u.managed_pages or ''})
+        u.last_login = datetime.now()
+        db.session.commit()
+        return jsonify({'status': 'success', 'user': {'id': u.id, 'username': u.username, 'role': u.role, 'email': u.email, 'real_name': u.real_name, 'managed_pages': u.managed_pages, 'points': u.points, 'town': u.town, 'village': u.village}})
+    return jsonify({'status': 'error', 'msg': '로그인 정보가 올바르지 않습니다.'}), 401
+
+@auth_bp.route('/api/auth/register', methods=['POST'])
+def api_register():
+    data = request.form
+    verified_email = session.pop('email_verified_for_register', None)
+    if not verified_email:
+        return jsonify({'status': 'error', 'msg': '이메일 인증을 먼저 완료해 주세요.'}), 400
+    password = data.get('password', '')
+    real_name = data.get('real_name', '')
+    username = data.get('username', '').strip()
+    if not username and verified_email:
+        username = verified_email.split('@')[0][:20]
+    lat = data.get('lat', type=float)
+    lon = data.get('lon', type=float)
+    town = data.get('town', '')
+    village = data.get('village', '')
+    neighbor = False
+    if lat and lon:
+        from services.geocode import gps_to_town_village, is_in_yangpyeong
+        if is_in_yangpyeong(lat, lon):
+            t, v = gps_to_town_village(lat, lon)
+            town = t or town
+            village = v or village
+            neighbor = True
+    if User.query.filter_by(email=verified_email).first():
+        session.pop('verify_email', None)
+        return jsonify({'status': 'error', 'msg': '이미 등록된 이메일입니다.'}), 400
+    hashed_pw = generate_password_hash(password)
+    now = datetime.now()
+    new_user = User(username=username, password=hashed_pw, real_name=real_name, email=verified_email, email_verified=True, town=town, village=village, reg_town=town, reg_village=village, curr_town=town, curr_village=village, is_neighbor=neighbor, location_updated_at=now, points=1000)
+    profile_img = request.files.get('profile_img')
+    if profile_img and profile_img.filename:
+        import os
+        from services.security import validate_upload, secure_save
+        ok, msg = validate_upload(profile_img, max_mb=5)
+        if ok:
+            profile_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'profiles')
+            os.makedirs(profile_dir, exist_ok=True)
+            try:
+                path = secure_save(profile_img, profile_dir, max_mb=5)
+                new_user.profile_image = path
+            except Exception:
+                pass
+    db.session.add(new_user)
+    db.session.flush()
+    new_user.last_payout = now
+    history = PointHistory(user_id=new_user.id, change_type='signup', amount=1000, balance_after=1000, description='회원가입 지급')
+    db.session.add(history)
+    db.session.commit()
+    return jsonify({'status': 'success', 'msg': '가입 완료! 로그인해 주세요.'})
+
+@auth_bp.route('/api/auth/logout', methods=['POST'])
+def api_logout():
+    uid = session.get('user_id')
+    if uid:
+        user = User.query.get(uid)
+        if user:
+            user.last_logout = datetime.now()
+            db.session.commit()
+    session.clear()
+    return jsonify({'status': 'success'})

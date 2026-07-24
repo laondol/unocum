@@ -1,0 +1,17 @@
+node_modules
+**/node_modules
+frontend/node_modules
+.git
+__pycache__
+**/__pycache__
+*.pyc
+.env
+instance
+*.db
+venv
+.venv
+DockerDesktopWSL
+scripts
+*.md
+.vscode
+.idea

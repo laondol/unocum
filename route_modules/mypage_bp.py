@@ -1,7 +1,16 @@
-from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session, current_app, send_file
 from models import db, User, PointHistory
 
 mypage_bp = Blueprint('mypage', __name__)
+
+def _serve_spa():
+    import os
+    from flask import current_app, send_file
+    path = os.path.join(current_app.root_path, 'frontend', 'dist', 'index.html')
+    if os.path.exists(path):
+        return send_file(path)
+    from flask import render_template
+    return render_template('intro.html')
 
 @mypage_bp.route('/mypage/points')
 def mypage_points():
@@ -14,7 +23,7 @@ def mypage_points():
     for h in raw_history:
         h.balance_after = running
         running -= h.amount
-    return render_template('mypage_points.html', user=user, history=raw_history)
+    return _serve_spa()
 
 @mypage_bp.route('/mypage/points/charge')
 def points_charge():
@@ -24,8 +33,17 @@ def points_charge():
     history = PointHistory.query.filter_by(user_id=user.id).order_by(PointHistory.created_at.desc()).limit(20).all()
     portone_store = current_app.config.get('PORTONE_STORE_ID', 'store-12345678')
     portone_channel = current_app.config.get('PORTONE_CHANNEL_KEY', 'channel-key-12345678')
-    return render_template('points_charge.html', user=user, point_history=history,
-        portone_store_id=portone_store, portone_channel=portone_channel)
+    return _serve_spa()
+
+@mypage_bp.route('/my/did')
+def my_did():
+    if not session.get('username'):
+        return redirect(url_for('auth.login', next='/my/did'))
+    return _serve_spa()
+
+@mypage_bp.route('/did/claim')
+def did_claim():
+    return _serve_spa()
 
 @mypage_bp.route('/api/payment/prepare', methods=['POST'])
 def payment_prepare():

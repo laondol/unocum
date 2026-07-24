@@ -1,12 +1,25 @@
-from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session, current_app
-from models import db, LegalPost, User, Message
+from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session, current_app, send_file
+from models import db, LegalPost, User, Message, LawyerSchedule, LegalAppointment
 
 legal_bp = Blueprint('legal', __name__)
+
+def _serve_spa():
+    import os
+    from flask import current_app, send_file
+    path = os.path.join(current_app.root_path, 'frontend', 'dist', 'index.html')
+    if os.path.exists(path):
+        return send_file(path)
+    from flask import render_template
+    return render_template('intro.html')
+
+@legal_bp.route('/legal/list')
+def legal_list():
+    return _serve_spa()
 
 @legal_bp.route('/legal/issues')
 def legal_issues():
     posts = LegalPost.query.filter(LegalPost.password == '', LegalPost.labor_approved == True).order_by(LegalPost.created_at.desc()).limit(30).all()
-    return render_template('labor_board.html', posts=posts)
+    return _serve_spa()
 
 @legal_bp.route('/legal/issues/write', methods=['GET','POST'])
 def legal_issues_write():
@@ -36,12 +49,12 @@ def legal_issues_write():
         db.session.add(post)
         db.session.commit()
         return redirect(url_for('.'))
-    return render_template('labor_write.html')
+    return _serve_spa()
 
 @legal_bp.route('/legal/issues/<int:post_id>')
 def legal_issue_detail(post_id):
     post = LegalPost.query.get_or_404(post_id)
-    return render_template('labor_detail.html', post=post)
+    return _serve_spa()
 
 @legal_bp.route('/legal/issues/comment/<int:post_id>', methods=['POST'])
 def legal_issue_comment(post_id):
@@ -68,7 +81,7 @@ def legal_issues_admin():
     if session.get('role') not in ['admin', 'leader']:
         return "권한 없음", 403
     posts = LegalPost.query.filter(LegalPost.password == '').order_by(LegalPost.created_at.desc()).limit(50).all()
-    return render_template('labor_admin.html', posts=posts)
+    return _serve_spa()
 
 @legal_bp.route('/legal/issues/ai-suggest', methods=['POST'])
 def legal_issues_ai_suggest():
@@ -175,5 +188,159 @@ def legal_issues_toggle(post_id):
     post.labor_approved = not post.labor_approved
     db.session.commit()
     return jsonify({"status":"success","approved":post.labor_approved})
+
+@legal_bp.route('/legal/schedule')
+def legal_schedule():
+    return _serve_spa()
+
+# --- API endpoints ---
+
+@legal_bp.route('/api/legal/posts')
+def api_legal_posts():
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    posts = LegalPost.query.order_by(LegalPost.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
+    return jsonify([{
+        'id': p.id, 'title': p.title, 'author_name': p.author_name,
+        'status': p.status, 'is_public': p.is_public,
+        'answer': p.answer, 'created_at': p.created_at.isoformat() if p.created_at else None,
+        'answered_at': p.answered_at.isoformat() if p.answered_at else None,
+    } for p in posts.items])
+
+@legal_bp.route('/api/legal/post/<int:post_id>')
+def api_legal_post(post_id):
+    post = LegalPost.query.get_or_404(post_id)
+    return jsonify({
+        'id': post.id, 'title': post.title, 'content': post.content,
+        'author_name': post.author_name, 'answer': post.answer,
+        'comments': post.comments, 'status': post.status,
+        'is_public': post.is_public, 'fee': post.fee,
+        'created_at': post.created_at.isoformat() if post.created_at else None,
+        'answered_at': post.answered_at.isoformat() if post.answered_at else None,
+    })
+
+@legal_bp.route('/api/legal/appointments')
+def api_legal_appointments():
+    uid = session.get('user_id')
+    if not uid: return jsonify({'error': 'login'}), 401
+    appts = LegalAppointment.query.filter_by(user_id=uid).order_by(LegalAppointment.date.desc()).limit(20).all()
+    return jsonify([{
+        'id': a.id, 'name': a.name, 'date': a.date.isoformat() if a.date else None,
+        'time_slot': a.time_slot, 'status': a.status, 'location': a.location,
+    } for a in appts])
+
+@legal_bp.route('/api/legal/create', methods=['POST'])
+def api_legal_create():
+    title = request.form.get('title', '').strip()
+    content = request.form.get('content', '').strip()
+    if not title or not content:
+        return jsonify({'status': 'error', 'msg': '제목과 내용을 입력하세요.'})
+    post = LegalPost(
+        title=title, content=content,
+        author_name=request.form.get('author_name', '익명'),
+        email=request.form.get('email', ''),
+        password=request.form.get('password', ''),
+        user_id=session.get('user_id'),
+    )
+    if request.files.get('attachment'):
+        from services.file_service import save_upload
+        path = save_upload(request.files['attachment'], subdir='legal')
+        post.file_path = path
+    db.session.add(post)
+    db.session.commit()
+    return jsonify({'status': 'success', 'id': post.id})
+
+@legal_bp.route('/api/legal/post/<int:post_id>/comment', methods=['POST'])
+def api_legal_comment(post_id):
+    content = request.form.get('content', '').strip()
+    if not content:
+        return jsonify({'status': 'error', 'msg': '내용을 입력하세요.'})
+    post = LegalPost.query.get_or_404(post_id)
+    comments = post.comments or ''
+    name = session.get('real_name') or session.get('username', '익명')
+    from datetime import datetime
+    comments += f'\n[{name}] {content} ({datetime.now().strftime("%m/%d %H:%M")})'
+    post.comments = comments
+    db.session.commit()
+    return jsonify({'status': 'success'})
+
+@legal_bp.route('/api/legal/schedules')
+def api_legal_schedules():
+    from datetime import date, timedelta
+    schedule_rows = LawyerSchedule.query.filter_by(is_available=True).all()
+    available_day_ids = {s.day_of_week for s in schedule_rows}
+    booked = db.session.query(LegalAppointment.date).filter(LegalAppointment.status.in_(['pending', 'approved'])).distinct().all()
+    booked_dates = {b[0] for b in booked}
+    available_dates = []
+    today = date.today()
+    for i in range(2, 62):
+        d = today + timedelta(days=i)
+        if d.weekday() in available_day_ids and d not in booked_dates:
+            available_dates.append(d.isoformat())
+    all_slots = []
+    for s in schedule_rows:
+        for h in range(s.start_hour, s.end_hour, s.slot_hours):
+            all_slots.append({"start": f"{h:02d}:00", "end": f"{h+s.slot_hours:02d}:00"})
+    return jsonify({'available_dates': available_dates, 'time_slots': all_slots})
+
+@legal_bp.route('/api/legal/issues')
+def api_legal_issues():
+    posts = LegalPost.query.filter(LegalPost.password == '', LegalPost.labor_approved == True).order_by(LegalPost.created_at.desc()).limit(30).all()
+    return jsonify([{
+        'id': p.id, 'title': p.title, 'content': (p.content or '')[:200],
+        'author_name': p.author_name, 'comments_count': len(p.comments.split('\n')) if p.comments else 0,
+        'created_at': p.created_at.isoformat() if p.created_at else None,
+    } for p in posts])
+
+@legal_bp.route('/api/legal/issues/<int:post_id>')
+def api_legal_issue(post_id):
+    post = LegalPost.query.get_or_404(post_id)
+    comments = []
+    if post.comments:
+        for line in post.comments.split('\n'):
+            line = line.strip()
+            if line:
+                comments.append({'text': line})
+    return jsonify({
+        'id': post.id, 'title': post.title, 'content': post.content,
+        'author_name': post.author_name, 'email': post.email,
+        'comments': comments,
+        'created_at': post.created_at.isoformat() if post.created_at else None,
+    })
+
+@legal_bp.route('/api/legal/issues/write', methods=['POST'])
+def api_legal_issues_write():
+    if session.get('role') not in ('admin', 'leader'):
+        return jsonify({'status': 'error', 'msg': '권한 없음'}), 403
+    data = request.form
+    title = data.get('title', '')
+    content = data.get('content', '').strip()
+    if not content:
+        keyword = data.get('keyword', title)
+        from services.ai_service import call_groq
+        prompt = f"다음 주제에 대한 노동법률 정보를 한국어로 500자 내외로 작성해주세요: {keyword}"
+        content = call_groq(prompt) or '내용 생성 실패'
+    post = LegalPost(title=title, content=content, email=session.get('email', ''),
+                   author_name=session.get('real_name') or session.get('username', '이훈노무사'),
+                   user_id=session.get('user_id'), password='')
+    db.session.add(post)
+    db.session.commit()
+    return jsonify({'status': 'success', 'id': post.id})
+
+@legal_bp.route('/api/legal/issues/comment/<int:post_id>', methods=['POST'])
+def api_legal_issue_comment(post_id):
+    post = LegalPost.query.get_or_404(post_id)
+    content = request.form.get('content', '').strip()
+    if not content:
+        return jsonify({'status': 'error', 'msg': '내용을 입력해주세요.'}), 400
+    from services.ai_service import moderate_comment
+    moderate_comment(content)
+    from datetime import datetime
+    now = datetime.now().strftime('%m/%d %H:%M')
+    name = session.get('real_name') or session.get('username', '익명')
+    entry = f'[{name}] {content} ({now})'
+    post.comments = (post.comments or '') + '\n' + entry
+    db.session.commit()
+    return jsonify({'status': 'success'})
 
 # --- [심리상담소] ---

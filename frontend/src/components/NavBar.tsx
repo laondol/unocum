@@ -1,24 +1,14 @@
-import { useEffect, useState } from 'react'
-
-interface UserInfo {
-  id: number | null; username: string | null; role: string | null; managed_pages: string[]
-}
+import { useAuth } from '../contexts/AuthContext'
 
 export default function NavBar() {
-  const [me, setMe] = useState<UserInfo>({ id: null, username: null, role: null, managed_pages: [] })
-  const [siteName, setSiteName] = useState('함께사는양평')
+  const { user, loading } = useAuth()
+  const host = window.location.hostname
+  const siteName = host === 'localhost' || host === '127.0.0.1' ? '함께사는로컬'
+    : host === 'test.unocum.kr' ? '함께사는테스트' : '함께사는양평'
 
-  useEffect(() => {
-    const host = window.location.hostname
-    if (host === 'localhost' || host === '127.0.0.1') setSiteName('함께사는로컬')
-    else if (host === 'test.unocum.kr') setSiteName('함께사는테스트')
-
-    fetch('/api/me').then(r => r.json()).then(d => { if (d.id) setMe(d) }).catch(() => {})
-  }, [])
-
-  const hasVillage = me.managed_pages?.some(p => p.startsWith('vi_') || p === 'village') || me.role === 'leader'
+  const hasVillage = user?.managed_pages?.some(p => p.startsWith('vi_') || p === 'village') || user?.role === 'leader'
   const villageParts = (() => {
-    for (const p of (me.managed_pages || [])) {
+    for (const p of (user?.managed_pages || [])) {
       if (p.startsWith('vi_')) {
         const parts = p.slice(3).split('_')
         return { myeon: parts[0] || '', ri: parts[1] || '', tooltip: parts[1] + ' 마을' }
@@ -39,7 +29,7 @@ export default function NavBar() {
             <button className="btn btn-sm btn-outline-warning px-2 py-0" style={{ fontSize: '0.9rem' }}
               onClick={() => document.getElementById('quickMenu')?.classList.toggle('d-none')}>⭐</button>
             <a href="/share-report" className="btn btn-sm btn-outline-success px-2 py-0 ms-1" style={{ fontSize: '0.9rem' }}>📸</a>
-            {me.id && hasVillage && (
+            {user?.id && hasVillage && (
               <div className="d-inline-flex align-items-center ms-1 position-relative">
                 <a href="/village" className="text-decoration-none" title={villageParts.tooltip} style={{ fontSize: '1.2rem' }}
                   onClick={e => { e.preventDefault(); document.getElementById('villageMenu')?.classList.toggle('d-none') }}>🏘️</a>
@@ -110,7 +100,7 @@ export default function NavBar() {
                 <li><a className="dropdown-item" href="/all-proposals">누구의꿈</a></li>
               </ul>
             </li>
-            {me.role === 'leader' && (
+            {user?.role === 'leader' && (
               <li className="nav-item dropdown mx-1">
                 <a className="nav-link dropdown-toggle px-2" href="#" data-bs-toggle="dropdown">관리</a>
                 <ul className="dropdown-menu border-0 shadow">
@@ -126,10 +116,10 @@ export default function NavBar() {
                   <li><a className="dropdown-item" href="/admin/ai-feedback">📋 AI 피드백</a></li>
                   <li><a className="dropdown-item" href="/admin/ai-train">📚 양평AI 가르치기</a></li>
                   <li><div className="dropdown-divider"></div></li>
-                  {window.location.hostname !== 'unocum.kr' && (
+                  {host !== 'unocum.kr' && (
                     <li><a className="dropdown-item" href="/admin/page-managers">🔑 페이지관리자</a></li>
                   )}
-                  <li><a className="dropdown-item" href="/admin/message/send">쪽지 발송</a></li>
+                  <li><a className="dropdown-item" href="/admin/message">쪽지 발송</a></li>
                 </ul>
               </li>
             )}
@@ -149,11 +139,11 @@ export default function NavBar() {
         <div className="d-flex align-items-center flex-shrink-0 position-relative">
           <a href="/ai/chat" className="btn btn-sm btn-outline-success px-2 py-0"
             style={{ fontSize: '1.1rem', borderRadius: '50%', width: 34, height: 34, lineHeight: '1' }} title="양평AI">🤖</a>
-          {me.id ? (
+          {!loading && user?.id ? (
             <>
               <a href="/friends" className="text-decoration-none ms-2 d-none d-lg-inline" title="벗">👥</a>
               <a href="/message/inbox" className="text-decoration-none ms-2 d-none d-lg-inline" title="쪽지">💬</a>
-              <a href={`/user/${me.id}`} className="text-decoration-none ms-2" title="회원정보">👤</a>
+              <a href={`/user/${user.id}`} className="text-decoration-none ms-2" title="회원정보">👤</a>
             </>
           ) : (
             <a href="/login" className="text-decoration-none text-muted ms-2" title="회원정보">👤</a>

@@ -1,24 +1,21 @@
-from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session, current_app, send_file
 from models import db, User, Friend, FriendGroup, Message
 from route_modules.common import has_page_access
 
 friends_bp = Blueprint('friends', __name__)
 
+def _serve_spa():
+    import os
+    path = os.path.join(current_app.root_path, 'frontend', 'dist', 'index.html')
+    if os.path.exists(path):
+        return send_file(path)
+    return render_template('intro.html')
+
 @friends_bp.route('/friends')
 def friends():
-    uid = session.get('user_id')
-    if not uid: return redirect(url_for('auth.login', next='/friends'))
-    friend_ids = [f.receiver_id for f in Friend.query.filter_by(requester_id=uid, status='accepted').all()] + \
-                 [f.requester_id for f in Friend.query.filter_by(receiver_id=uid, status='accepted').all()]
-    friend_users = User.query.filter(User.id.in_(friend_ids)).all() if friend_ids else []
-    pending_friends = Friend.query.filter_by(receiver_id=uid, status='pending').all()
-    pending_users = User.query.filter(User.id.in_([f.requester_id for f in pending_friends])).all() if pending_friends else []
-    my_pending = Friend.query.filter_by(requester_id=uid, status='pending').all()
-    my_pending_ids = [f.receiver_id for f in my_pending]
-    my_pending_users = User.query.filter(User.id.in_(my_pending_ids)).all() if my_pending_ids else []
-    groups = FriendGroup.query.filter_by(user_id=uid).all()
-    return render_template('friends.html', friend_users=friend_users, pending_users=pending_users,
-                           my_pending_ids=my_pending_ids, my_pending_users=my_pending_users, groups=groups)
+    if not session.get('user_id'):
+        return redirect(url_for('auth.login', next='/friends'))
+    return _serve_spa()
 
 @friends_bp.route('/friends/list')
 def friends_list_json():
@@ -40,7 +37,7 @@ def friends_list_json():
 @friends_bp.route('/friends/map')
 def friends_map():
     if not session.get('user_id'): return redirect(url_for('auth.login', next='/friends/map'))
-    return render_template('friends_map.html')
+    return _serve_spa()
 
 @friends_bp.route('/friends/request/<int:other_id>', methods=['POST'])
 def friend_request(other_id):

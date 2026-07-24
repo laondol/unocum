@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session, current_app, send_file
 from datetime import datetime
 from sqlalchemy import or_
 from models import db, User, ShareReport, VillageWish, Post, Message, VillageCache, VillagePage, VillageEvent, VillageEventAttendee, VillageEventChat, StoreInfo, NewsArticle
@@ -7,62 +7,20 @@ from services.geocode import haversine
 
 village_bp = Blueprint('village', __name__)
 
+def _serve_spa():
+    import os
+    from flask import current_app, send_file
+    path = os.path.join(current_app.root_path, 'frontend', 'dist', 'index.html')
+    if os.path.exists(path):
+        return send_file(path)
+    from flask import render_template
+    return render_template('intro.html')
+
 @village_bp.route('/village')
 def village_admin():
     if not has_page_access('village'):
         return "권한 없음", 403
-    uid = session.get('user_id')
-    user = User.query.get(uid)
-    # 마을지기의 담당 리 목록 추출
-    mp = (user.managed_pages or '').split(',') if user else []
-    village_ris = []
-    for p in mp:
-        if p.startswith('vi_'):
-            parts = p[3:].split('_')
-            if len(parts) >= 2:
-                village_ris.append({'myeon': parts[0], 'ri': parts[1]})
-    # 리가 없으면 전체 village 쿼리
-    if village_ris:
-        conditions = []
-        for vr in village_ris:
-            conditions.append((User.town == vr['myeon']) & (User.village == vr['ri']))
-        from sqlalchemy import or_
-        village_users = User.query.filter(or_(*conditions)).all() if conditions else []
-    else:
-        village_users = []
-    # QR 등록 회원 추가
-    qr_member_ids = [int(p.split('_')[1]) for p in mp if p.startswith('member_')]
-    qr_users = User.query.filter(User.id.in_(qr_member_ids)).all() if qr_member_ids else []
-    # 중복 제거 후 통합
-    all_users = {u.id: u for u in village_users + qr_users}
-    village_users = list(all_users.values())
-    # 마을에 바란다
-    village_wishes = VillageWish.query.filter(
-        VillageWish.village_ri.in_([vr['ri'] for vr in village_ris])
-    ).order_by(VillageWish.created_at.desc()).limit(20).all() if village_ris else []
-    # 마을의 게시글 (제안)
-    village_posts = Post.query.filter(
-        Post.user_id.in_([u.id for u in village_users])
-    ).order_by(Post.created_at.desc()).limit(20).all()
-    # 마을의 공유마당
-    village_shares = ShareReport.query.filter(
-        ShareReport.user_id.in_([u.id for u in village_users])
-    ).order_by(ShareReport.created_at.desc()).limit(20).all()
-    # 마을의 뉴스
-    village_news = []
-    if village_users:
-        village_news = NewsArticle.query.filter(
-            NewsArticle.created_by.in_([u.id for u in village_users])
-        ).order_by(NewsArticle.created_at.desc()).limit(10).all()
-    # 마을 전체 회원 (쪽지 발송용)
-    member_count = len(village_users)
-    # 진 인증 회원 목록
-    jin_users = [u for u in village_users if u.is_verified_resident]
-    return render_template('village_admin.html',
-        village_ris=village_ris, village_posts=village_posts,
-        village_shares=village_shares, village_news=village_news,
-        village_users=village_users, jin_users=jin_users,
-        member_count=member_count, village_wishes=village_wishes)
+    return _serve_spa()
 
 @village_bp.route('/village/ai-categorize', methods=['POST'])
 def village_ai_categorize():
@@ -166,7 +124,7 @@ def village_qr():
     # 마을지기가 만든 페이지 목록
     myeon = ris[0] if ris else ''
     pages = VillagePage.query.filter_by(myeon=myeon, created_by=uid).all()
-    return render_template('village_qr.html', qr_url_base=qr_url_base, code=code, expiry=expiry, ris=ris, pages=pages)
+    return _serve_spa()
 
 @village_bp.route('/village/jin-verify/<int:member_id>', methods=['POST'])
 def village_jin_verify(member_id):
@@ -257,7 +215,39 @@ def village_page_edit():
         page.visibility = request.form.get('visibility', page.visibility)
         db.session.commit()
         return "<script>alert('저장되었습니다.'); location.reload();</script>"
-    return render_template('village_page_edit.html', page=page)
+    return _serve_spa()
+
+@village_bp.route('/api/village/page')
+def api_village_page():
+    myeon = request.args.get('myeon', '').strip()
+    ri = request.args.get('ri', '').strip()
+    if not myeon or not ri:
+        return jsonify({"error":"myeon과 ri 파라미터가 필요합니다."}), 400
+    page = VillagePage.query.filter_by(myeon=myeon, ri=ri).first()
+    if not page or page.visibility == 'off':
+        return jsonify({"error":"페이지를 찾을 수 없습니다."}), 404
+    content = page.content or ''
+    if '[gallery]' in content:
+        shares = ShareReport.query.filter(ShareReport.image_path.isnot(None), ShareReport.image_path != '').order_by(ShareReport.created_at.desc()).limit(12).all()
+        imgs = ''.join([f'<div class="col-4 col-md-3 mb-2"><img src="{s.image_path}" class="img-fluid rounded" style="height:150px;object-fit:cover;width:100%;"></div>' for s in shares if s.image_path])
+        gallery_html = f'<div class="row g-2 my-3">{imgs}</div>' if imgs else '<p class="text-muted">갤러리 이미지가 없습니다.</p>'
+        content = content.replace('[gallery]', gallery_html)
+    if '[stores]' in content:
+        stores = StoreInfo.query.filter(StoreInfo.is_active == True).order_by(StoreInfo.created_at.desc()).limit(10).all()
+        store_items = ''.join([f'<div class="col-6 mb-2"><div class="card p-2"><strong>{s.name}</strong><br><small>{getattr(s, "address", "") or ""}</small></div></div>' for s in stores])
+        stores_html = f'<div class="row g-2 my-3">{store_items}</div>' if store_items else '<p class="text-muted">등록된 가게가 없습니다.</p>'
+        content = content.replace('[stores]', stores_html)
+    if '[posts]' in content:
+        recent_posts = Post.query.filter(Post.total_score > -50).order_by(Post.created_at.desc()).limit(10).all()
+        post_items = ''.join([f'<div class="mb-2"><a href="/post/{p.id}" class="text-decoration-none"><strong>{p.title}</strong></a><br><small class="text-muted">{"👍 " + str(p.like_count or 0)}</small></div>' for p in recent_posts])
+        posts_html = f'<div class="my-3">{post_items}</div>' if post_items else '<p class="text-muted">게시글이 없습니다.</p>'
+        content = content.replace('[posts]', posts_html)
+    return jsonify({
+        'id': page.id, 'myeon': page.myeon, 'ri': page.ri,
+        'title': page.title, 'content': content,
+        'visibility': page.visibility,
+        'created_at': page.created_at.isoformat() if page.created_at else None,
+    })
 
 @village_bp.route('/village/view/<string:tmyeon>/<string:tri>')
 def village_page_view(tmyeon, tri):
@@ -304,7 +294,7 @@ def village_page_view(tmyeon, tri):
         post_items = ''.join([f'<div class="mb-2"><a href="/post/{p.id}" class="text-decoration-none"><strong>{p.title}</strong></a><br><small class="text-muted">{p.created_at.strftime("%m/%d") if p.created_at else ""} | 👍 {p.like_count or 0}</small></div>' for p in recent_posts])
         posts_html = f'<div class="my-3">{post_items}</div>' if post_items else '<p class="text-muted">게시글이 없습니다.</p>'
         content = content.replace('[posts]', posts_html)
-    return render_template('village_page_view.html', page=page, is_member=is_member, content=content, at_location=at_location)
+    return _serve_spa()
 
 @village_bp.route('/village/page/toggle', methods=['POST'])
 def village_page_toggle():
@@ -333,17 +323,7 @@ def village_page_toggle():
 def village_events():
     if not has_page_access('village'):
         return "권한 없음", 403
-    uid = session.get('user_id')
-    user = User.query.get(uid)
-    mp = (user.managed_pages or '').split(',') if user else []
-    myeon = ri = None
-    for p in mp:
-        if p.startswith('vi_'):
-            parts = p[3:].split('_')
-            if len(parts) >= 2:
-                myeon, ri = parts[0], parts[1]; break
-    events = VillageEvent.query.filter_by(myeon=myeon, ri=ri).order_by(VillageEvent.event_date.desc()).all()
-    return render_template('village_event_list.html', events=events, myeon=myeon, ri=ri)
+    return _serve_spa()
 
 @village_bp.route('/village/event/create', methods=['GET','POST'])
 def village_event_create():
@@ -372,18 +352,11 @@ def village_event_create():
         db.session.add(ev)
         db.session.commit()
         return redirect(url_for('village_event_view', event_id=ev.id))
-    return render_template('village_event_create.html', myeon=myeon, ri=ri)
+    return _serve_spa()
 
 @village_bp.route('/village/event/<int:event_id>')
 def village_event_view(event_id):
-    ev = VillageEvent.query.get_or_404(event_id)
-    uid = session.get('user_id')
-    attendee = None
-    if uid:
-        attendee = VillageEventAttendee.query.filter_by(event_id=event_id, user_id=uid).first()
-    chat = VillageEventChat.query.filter_by(event_id=event_id).order_by(VillageEventChat.created_at.asc()).limit(50).all()
-    attendees = VillageEventAttendee.query.filter_by(event_id=event_id).all()
-    return render_template('village_event_view.html', event=ev, attendee=attendee, chat=chat, attendees=attendees)
+    return _serve_spa()
 
 @village_bp.route('/village/event/<int:event_id>/join', methods=['POST'])
 def village_event_join(event_id):
@@ -495,7 +468,7 @@ def village_event_qr(event_id):
     ev = VillageEvent.query.get_or_404(event_id)
     site_url = current_app.config.get('SITE_URL', request.host_url.rstrip('/'))
     qr_url = f'{site_url}/village/event/{ev.id}'
-    return render_template('village_event_qr.html', event=ev, qr_url=qr_url)
+    return _serve_spa()
 
 @village_bp.route('/village/event/<int:event_id>/message', methods=['POST'])
 def village_event_message(event_id):
@@ -564,7 +537,7 @@ def village_invite(target):
     user = User.query.get(uid)
     # 진 인증 체크 (6개월)
     if not user.jin_verified_at or (datetime.now() - user.jin_verified_at).days > 150:
-        return render_template('village_jin_consent.html', target=target)
+        return _serve_spa()
     # target에 따라 이동
     if target == 'join':
         return redirect(url_for('village_join', code=request.args.get('code','')))
@@ -621,11 +594,52 @@ def village_wish_reply(wish_id):
 
 @village_bp.route('/village/my-wishes')
 def village_my_wishes():
-    uid = session.get('user_id')
-    if not uid:
+    if not session.get('user_id'):
         return redirect(url_for('auth.login'))
+    return _serve_spa()
+
+@village_bp.route('/api/village/events')
+def api_village_events():
+    myeon = request.args.get('myeon', '')
+    ri = request.args.get('ri', '')
+    q = VillageEvent.query
+    if myeon: q = q.filter(VillageEvent.myeon == myeon)
+    if ri: q = q.filter(VillageEvent.ri == ri)
+    events = q.order_by(VillageEvent.event_date.desc()).limit(20).all()
+    return jsonify([{
+        'id': e.id, 'myeon': e.myeon, 'ri': e.ri, 'title': e.title,
+        'event_type': e.event_type, 'description': e.description,
+        'location': e.location, 'status': e.status,
+        'event_date': e.event_date.isoformat() if e.event_date else None,
+        'created_at': e.created_at.isoformat() if e.created_at else None,
+    } for e in events])
+
+@village_bp.route('/api/village/wishes')
+def api_village_wishes():
+    uid = session.get('user_id')
+    if not uid: return jsonify({"error":"login"}), 401
     wishes = VillageWish.query.filter_by(user_id=uid).order_by(VillageWish.created_at.desc()).all()
-    return render_template('village_my_wishes.html', wishes=wishes)
+    return jsonify([{
+        'id': w.id, 'content': w.content, 'village_ri': w.village_ri,
+        'status': w.status, 'reply': w.reply,
+        'created_at': w.created_at.isoformat() if w.created_at else None,
+    } for w in wishes])
+
+@village_bp.route('/api/village/alerts')
+def api_village_alerts():
+    town = request.args.get('town', '')
+    village = request.args.get('village', '')
+    q = VillageAlert.query.filter_by(is_active=True)
+    if town: q = q.filter(VillageAlert.town == town)
+    if village: q = q.filter(VillageAlert.village == village)
+    alerts = q.order_by(VillageAlert.created_at.desc()).limit(20).all()
+    return jsonify([{
+        'id': a.id, 'title': a.title, 'content': a.content,
+        'town': a.town, 'village': a.village,
+        'alert_type': a.alert_type, 'urgency': a.urgency,
+        'author_name': a.author_name,
+        'created_at': a.created_at.isoformat() if a.created_at else None,
+    } for a in alerts])
 
 @village_bp.route('/api/village/images')
 def village_images():
@@ -684,5 +698,5 @@ def village_join():
                 member.photo_path = '/static/uploads/village_members/' + fname
             db.session.commit()
         return "<script>alert('마을 등록이 완료되었습니다!'); location.href='/user/%d';</script>" % uid
-    return render_template('village_join.html', code=code, caretaker=caretaker, ris=ris)
+    return _serve_spa()
 

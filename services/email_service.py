@@ -1,11 +1,21 @@
 import smtplib
 import ssl
+import os
 from email.mime.text import MIMEText
 from flask import current_app
+
+_DEV_MODE = os.environ.get('DEV_MODE') == '1'
 
 class EmailService:
     @staticmethod
     def send(to, subject, body):
+        if _DEV_MODE:
+            print(f"[DEV EMAIL] To: {to}")
+            print(f"[DEV EMAIL] Subject: {subject}")
+            print(f"[DEV EMAIL] Body:\\n{body}")
+            print(f"[DEV EMAIL] ---")
+            return True
+
         smtp_host = current_app.config.get('SMTP_HOST')
         smtp_port = int(current_app.config.get('SMTP_PORT', 587))
         smtp_user = current_app.config.get('SMTP_USERNAME')

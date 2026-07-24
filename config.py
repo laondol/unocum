@@ -1,20 +1,19 @@
 import os
-from dotenv import load_dotenv, find_dotenv
+from dotenv import load_dotenv
 
-load_dotenv(find_dotenv())
+# Docker 컨테이너에서도 .env를 찾을 수 있도록 명시적 경로 지정
+_env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+if os.path.exists(_env_path):
+    load_dotenv(_env_path)
+else:
+    from dotenv import find_dotenv
+    load_dotenv(find_dotenv())
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
-DB_MODE = os.getenv('DB_MODE', 'sqlite')  # sqlite or postgresql
-
 class Config:
     SECRET_KEY = os.getenv('SECRET_KEY', 'fallback_dev_key')
-    INSTANCE_PATH = os.path.join(BASE_DIR, 'instance')
-    if DB_MODE == 'postgresql':
-        SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', 'postgresql://yp_user:yp_pass@localhost:5432/yp_db')
-    else:
-        db_name = os.getenv('DB_NAME', 'yangpyeong_v10.db')
-        SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(INSTANCE_PATH, db_name)
+    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', 'postgresql://yp_dev:yp_dev_pass_2026@postgres:5432/yp_local')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SESSION_COOKIE_SAMESITE = 'Lax'
     SESSION_COOKIE_SECURE = bool(os.getenv('SESSION_COOKIE_SECURE', os.getenv('SITE_URL','').startswith('https')))

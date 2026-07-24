@@ -132,7 +132,7 @@ class NewsArticle(db.Model):
     ai_score = db.Column(db.Integer, default=0)
     summary = db.Column(db.Text)
     content = db.Column(db.Text)
-    source_url = db.Column(db.String(500))
+    source_url = db.Column(db.Text)
     source_name = db.Column(db.String(200))
     image_path = db.Column(db.String(300))
     category = db.Column(db.String(50), default='세계뉴스')
@@ -917,3 +917,31 @@ class GuideTemplate(db.Model):
             "use_count": self.use_count,
             "created_at": self.created_at.strftime('%Y-%m-%d %H:%M') if self.created_at else None,
         }
+
+class DIDDocument(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    did = db.Column(db.String(200), unique=True, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    public_key_jwk = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+class VerifiableCredential(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    vc_id = db.Column(db.String(200), unique=True, nullable=False)
+    issuer_did = db.Column(db.String(200), nullable=False)
+    subject_did = db.Column(db.String(200), nullable=False)
+    subject_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    type = db.Column(db.String(100), default='ResidentCredential')
+    vc_json = db.Column(db.Text, nullable=False)
+    issued_at = db.Column(db.DateTime, default=datetime.now)
+    revoked = db.Column(db.Boolean, default=False)
+
+class QRSession(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.String(64), unique=True, nullable=False)
+    issuer_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    subject_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    purpose = db.Column(db.String(50), default='issue_vc')
+    status = db.Column(db.String(20), default='pending')
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    expires_at = db.Column(db.DateTime, nullable=False)

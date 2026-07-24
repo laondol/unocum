@@ -19,15 +19,16 @@ def migrate():
         from sqlalchemy import create_engine
         from config import BASE_DIR
 
-        # 슈퍼유저(postgres) 연결
-        su_uri = pg_uri.replace('yp_user:yp_pass@', 'postgres:@')
+        # 슈퍼유저 연결 (yp_dev는 superuser이므로 그대로 사용)
+        su_uri = pg_uri
         su_engine = create_engine(su_uri)
         su_conn = su_engine.connect()
         su_conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
         su_conn.execute(text("CREATE SCHEMA public"))
-        su_conn.execute(text("GRANT ALL ON SCHEMA public TO yp_user"))
-        su_conn.execute(text("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO yp_user"))
-        su_conn.execute(text("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO yp_user"))
+        pg_user = pg_uri.split('://')[1].split(':')[0]
+        su_conn.execute(text(f"GRANT ALL ON SCHEMA public TO {pg_user}"))
+        su_conn.execute(text(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO {pg_user}"))
+        su_conn.execute(text(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO {pg_user}"))
         su_conn.commit()
 
         # 테이블 생성
@@ -60,27 +61,46 @@ def migrate():
         with engine.connect() as conn:
             trans = conn.begin()
             tables = list(db.metadata.tables.keys())
+            # SQLite에 실제로 존재하는 컬럼 목록 조회
+            sqlite_cols = {}
+            for table_name in tables:
+                try:
+                    pragma_rows = sqlite_conn.execute(text(f'PRAGMA table_info("{table_name}")')).fetchall()
+                    sqlite_cols[table_name] = {r[1] for r in pragma_rows}
+                except:
+                    sqlite_cols[table_name] = set()
             for table_name in tables:
                 table = db.metadata.tables[table_name]
+                if table_name not in sqlite_cols or not sqlite_cols[table_name]:
+                    print(f"[MIGRATE] {table_name}: SQLite에 없는 테이블, 생성만 함")
+                    continue
                 rows = sqlite_conn.execute(text(f'SELECT * FROM "{table_name}"')).fetchall()
                 if not rows:
                     print(f"[MIGRATE] {table_name}: 0건 (빈 테이블)")
                     continue
-                columns = [c.name for c in table.columns]
+                model_cols = [c.name for c in table.columns]
+                # SQLite와 모델에 모두 존재하는 컬럼만
+                common_cols = [c for c in model_cols if c in sqlite_cols[table_name]]
+                if not common_cols:
+                    print(f"[MIGRATE] {table_name}: 공통 컬럼 없음, 건너뜀")
+                    continue
                 bool_cols = {c.name for c in table.columns if isinstance(c.type, SaBoolean)}
-                def convert_row(r):
+                def convert_row(r, cols):
                     d = {}
-                    for col in columns:
-                        val = getattr(r, col)
+                    for col in cols:
+                        try:
+                            val = getattr(r, col)
+                        except:
+                            continue
                         if col in bool_cols and isinstance(val, str):
                             d[col] = val.lower() in ('1', 'true', 'yes', 'on')
                         else:
                             d[col] = val
                     return d
-                data = [convert_row(r) for r in rows]
+                data = [convert_row(r, common_cols) for r in rows]
                 stmt = table.insert().values(data)
                 conn.execute(stmt)
-                print(f"[MIGRATE] {table_name}: {len(rows)}건 복사")
+                print(f"[MIGRATE] {table_name}: {len(rows)}건 복사 (컬럼 {len(common_cols)})")
             trans.commit()
 
         # FK 복원 (각각 독립 트랜잭션)

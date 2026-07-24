@@ -1,6 +1,6 @@
 import os
 import requests
-from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session, current_app, send_file
 from datetime import datetime
 from sqlalchemy import or_
 from models import db, NewsArticle, NewsComment, NewsRecommendation, NewsVote, Post, User, Message
@@ -9,122 +9,123 @@ from services.point_service import add_points
 
 news_bp = Blueprint('news', __name__)
 
+def _serve_spa():
+    import os
+    from flask import current_app, send_file
+    path = os.path.join(current_app.root_path, 'frontend', 'dist', 'index.html')
+    if os.path.exists(path):
+        return send_file(path)
+    from flask import render_template
+    return render_template('intro.html')
+
 @news_bp.route('/admin/news')
 def admin_news():
     if session.get('role') not in ['admin', 'leader']:
         return "권한 없음", 403
-    page = request.args.get('page', 1, type=int)
-    tab = request.args.get('tab', 'all')
-    query = NewsArticle.query
-    if tab == 'all':
-        query = query.filter(or_(NewsArticle.is_ai_generated == False, NewsArticle.is_selected == True))
-    elif tab == 'world':
-        query = query.filter(NewsArticle.category.in_(['세계뉴스', '환경뉴스', '건강정보', '복지정보', '농업정보', '관광소식']))
-    elif tab == 'kr_yp':
-        query = query.filter(NewsArticle.category.in_(['대한민국뉴스', '양평소식', '정책정보', '지역소식']))
-    news_list = query.order_by(NewsArticle.created_at.desc()).paginate(page=page, per_page=20, error_out=False)
-    return render_template('admin_news.html', news_list=news_list, tab=tab)
+    return _serve_spa()
 
 @news_bp.route('/admin/news/ai-suggest', methods=['POST'])
 def admin_news_ai_suggest():
     if session.get('role') not in ['admin', 'leader']:
         return jsonify({"status": "error", "msg": "권한 없음"}), 403
     tab = request.form.get('tab', 'world')
-    # 회원들이 많이 추천한 인기 카테고리/키워드 수집
-    trending_context = ''
     try:
-        top_cats = db.session.query(NewsArticle.category, db.func.count(NewsVote.id)).join(NewsVote, NewsVote.news_id == NewsArticle.id).filter(NewsVote.vote == 'like').group_by(NewsArticle.category).order_by(db.func.count(NewsVote.id).desc()).limit(3).all()
-        if top_cats:
-            cats = [c[0] for c in top_cats if c[0]]
-            trending_context = ', '.join(cats)
-    except:
-        pass
-    from services.news_service import ai_search_news
-    suggestions = ai_search_news(news_type=tab, trending_context=trending_context)
-    if not suggestions:
-        return jsonify({"status": "error", "msg": "AI 주제 제안 실패. Groq 서버를 확인하세요."})
-    from services.naver_news import search_news
-    count = 0
-    for item in suggestions:
-        title = item.get('title', '')
-        if not title:
-            continue
-        search_lang = 'en' if tab == 'world' else 'ko'
-        news_results, news_source = search_news(title, display=1, language=search_lang)
-        if news_results:
-            real = news_results[0]
-            category = item.get('category', '세계뉴스')
-            if tab == 'kr_yp' and category not in ['대한민국뉴스', '양평소식', '정책정보', '지역소식']:
-                category = '대한민국뉴스'
-            elif tab == 'world' and category not in ['세계뉴스', '환경뉴스', '건강정보', '복지정보', '농업정보', '관광소식']:
-                category = '세계뉴스'
-            ai_reason = item.get('reason', '')
-            # 세계뉴스는 영문→한글 번역
-            raw_title = real.get('title', title)
-            raw_desc = real.get('description', '')
-            if tab == 'world' and raw_title:
+        trending_context = ''
+        try:
+            top_cats = db.session.query(NewsArticle.category, db.func.count(NewsVote.id)).join(NewsVote, NewsVote.news_id == NewsArticle.id).filter(NewsVote.vote == 'like').group_by(NewsArticle.category).order_by(db.func.count(NewsVote.id).desc()).limit(3).all()
+            if top_cats:
+                cats = [c[0] for c in top_cats if c[0]]
+                trending_context = ', '.join(cats)
+        except:
+            pass
+        from services.news_service import ai_search_news
+        suggestions = ai_search_news(news_type=tab, trending_context=trending_context)
+        if not suggestions:
+            return jsonify({"status": "error", "msg": "AI 주제 제안 실패. Groq API 키를 확인하세요."})
+        from services.naver_news import search_news
+        count = 0
+        for item in suggestions:
+            title = item.get('title', '')
+            if not title:
+                continue
+            search_lang = 'en' if tab == 'world' else 'ko'
+            news_results, news_source = search_news(title, display=1, language=search_lang)
+            if news_results:
+                real = news_results[0]
+                category = item.get('category', '세계뉴스')
+                if tab == 'kr_yp' and category not in ['대한민국뉴스', '양평소식', '정책정보', '지역소식']:
+                    category = '대한민국뉴스'
+                elif tab == 'world' and category not in ['세계뉴스', '환경뉴스', '건강정보', '복지정보', '농업정보', '관광소식']:
+                    category = '세계뉴스'
+                ai_reason = item.get('reason', '')
+                raw_title = real.get('title', title)
+                raw_desc = real.get('description', '')
+                if tab == 'world' and raw_title:
+                    try:
+                        from services.news_service import _groq_text
+                        trans = _groq_text(
+                            "Translate English news to natural Korean. Output JSON only.",
+                            f"Translate to Korean:\nEN title: {raw_title[:200]}\nEN description: {raw_desc[:500]}\n\nJSON: {{\"title\": \"번역된 제목\", \"description\": \"번역된 내용\"}}",
+                            format_json=True
+                        )
+                        if trans:
+                            raw_title = trans.get('title', raw_title) or raw_title
+                            raw_desc = trans.get('description', raw_desc) or raw_desc
+                    except:
+                        pass
+                article = NewsArticle(
+                    title=raw_title,
+                    summary=(raw_desc or '')[:200],
+                    content=f"<p>{(raw_desc or '')[:1000]}</p>",
+                    category=category,
+                    source_url=real.get('url', ''),
+                    is_ai_generated=True,
+                    is_selected=True,
+                    ai_reason=ai_reason,
+                    created_by=session.get('user_id'),
+                    source_name=news_source
+                )
                 try:
-                    from services.news_service import _groq_text
-                    trans = _groq_text(
-                        "Translate English news to natural Korean. Output JSON only.",
-                        f"Translate to Korean:\nEN title: {raw_title[:200]}\nEN description: {raw_desc[:500]}\n\nJSON: {{\"title\": \"번역된 제목\", \"description\": \"번역된 내용\"}}",
-                        format_json=True
-                    )
-                    if trans:
-                        raw_title = trans.get('title', raw_title) or raw_title
-                        raw_desc = trans.get('description', raw_desc) or raw_desc
+                    from services.news_service import clean_cjk_text
+                    cleaned_title, cleaned_summary, cleaned_content = clean_cjk_text(article.title, article.summary, article.content)
+                    article.title = cleaned_title or article.title
+                    article.summary = cleaned_summary or article.summary
+                    article.content = cleaned_content or article.content
                 except:
                     pass
-            article = NewsArticle(
-                title=raw_title,
-                summary=(raw_desc or '')[:200],
-                content=f"<p>{(raw_desc or '')[:1000]}</p>",
-                category=category,
-                source_url=real.get('url', ''),
-                is_ai_generated=False,
-                is_selected=True,
-                world_admin_approved=False,  # 관리자 승인 대기
-                world_ai_approved=False,     # AI 검토 대기
-                ai_reason=ai_reason,
-                created_by=session.get('user_id'),
-                source_name=news_source
-            )
-            # 한자/일본어 정리
-            try:
-                from services.news_service import clean_cjk_text
-                cleaned_title, cleaned_summary, cleaned_content = clean_cjk_text(article.title, article.summary, article.content)
-                article.title = cleaned_title or article.title
-                article.summary = cleaned_summary or article.summary
-                article.content = cleaned_content or article.content
-            except:
-                pass
-            # AI 승인 자동 True
-            if tab == 'world':
-                article.world_ai_approved = True
-            elif tab == 'kr_yp':
-                article.kr_yp_ai_approved = True
-            db.session.add(article)
-            count += 1
-    db.session.commit()
-    return jsonify({"status": "success", "count": count, "msg": f"✅ 실제 뉴스 {count}개를 가져왔습니다{' (영문→한글 번역 완료)' if tab == 'world' else ''}."})
+                if tab == 'world':
+                    article.world_ai_approved = True
+                elif tab == 'kr_yp':
+                    article.kr_yp_ai_approved = True
+                db.session.add(article)
+                count += 1
+        db.session.commit()
+        return jsonify({"status": "success", "count": count, "msg": f"✅ 실제 뉴스 {count}개를 가져왔습니다{' (영문→한글 번역 완료)' if tab == 'world' else ''}."})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"status": "error", "msg": f"서버 오류: {str(e)}"}), 500
 
 @news_bp.route('/admin/news/toggle/<int:news_id>')
 def admin_news_toggle(news_id):
     if session.get('role') not in ['admin', 'leader']:
-        return "권한 없음", 403
+        return jsonify({"status": "error", "msg": "권한 없음"}), 403
     article = NewsArticle.query.get_or_404(news_id)
     article.is_selected = not article.is_selected
     article.updated_at = datetime.now()
     db.session.commit()
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return jsonify({"status": "success", "is_selected": article.is_selected})
-    return redirect(url_for('.admin_news'))
+    return jsonify({"status": "success", "is_selected": article.is_selected})
 
 @news_bp.route('/admin/news/approve/<int:news_id>/<string:tab>/<string:approver>')
 def admin_news_approve(news_id, tab, approver):
     if session.get('role') not in ['admin', 'leader']:
-        return "권한 없음", 403
+        return jsonify({"status": "error", "msg": "권한 없음"}), 403
     article = NewsArticle.query.get_or_404(news_id)
+    if tab == 'all':
+        if article.category in ('세계뉴스', '환경뉴스', '건강정보', '복지정보', '농업정보', '관광소식'):
+            tab = 'world'
+        else:
+            tab = 'kr_yp'
     if tab == 'world':
         if approver == 'ai':
             article.world_ai_approved = not article.world_ai_approved
@@ -137,14 +138,12 @@ def admin_news_approve(news_id, tab, approver):
             article.kr_yp_admin_approved = not article.kr_yp_admin_approved
     article.updated_at = datetime.now()
     db.session.commit()
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return jsonify({"status": "success"})
-    return redirect(url_for('.admin_news', tab=tab))
+    return jsonify({"status": "success"})
 
-@news_bp.route('/admin/news/delete/<int:news_id>')
+@news_bp.route('/admin/news/delete/<int:news_id>', methods=['POST'])
 def admin_news_delete(news_id):
     if session.get('role') not in ['admin', 'leader']:
-        return "권한 없음", 403
+        return jsonify({"status": "error", "msg": "권한 없음"}), 403
     article = NewsArticle.query.get_or_404(news_id)
     if article.image_path:
         img_path = os.path.join(current_app.root_path, article.image_path.lstrip('/'))
@@ -153,7 +152,7 @@ def admin_news_delete(news_id):
         except: pass
     db.session.delete(article)
     db.session.commit()
-    return redirect(url_for('.admin_news'))
+    return jsonify({"status": "success"})
 
 @news_bp.route('/admin/news/create', methods=['GET', 'POST'])
 def admin_news_create():
@@ -204,7 +203,7 @@ def admin_news_create():
         db.session.add(article)
         db.session.commit()
         return redirect(url_for('.admin_news'))
-    return render_template('admin_news_create.html', article=None)
+    return _serve_spa()
 
 @news_bp.route('/admin/news/edit/<int:news_id>', methods=['GET', 'POST'])
 def admin_news_edit(news_id):
@@ -264,7 +263,7 @@ def admin_news_edit(news_id):
             pass
         db.session.commit()
         return redirect(url_for('.admin_news'))
-    return render_template('admin_news_create.html', article=article, translated=translated)
+    return _serve_spa()
 
 @news_bp.route('/admin/news/clean-cjk', methods=['POST'])
 def admin_news_clean_cjk():
@@ -313,18 +312,14 @@ def admin_news_import_url():
     try:
         from bs4 import BeautifulSoup
         soup = BeautifulSoup(text, 'html.parser')
-        # 제거할 태그
         for tag in soup(['script', 'style', 'nav', 'footer', 'header', 'aside', 'iframe', 'noscript', 'form', 'button']): tag.decompose()
-        # 제거할 클래스/아이디 패턴 (UI/광고/네비게이션)
         for pattern in ['gnb', 'lnb', 'menu', 'navi', 'sidebar', 'footer', 'header', 'banner', 'ad ', 'wrap_', 'search', 'comment', 'reply', 'btn_', 'link_']:
             for el in soup.find_all(class_=lambda c: c and pattern in str(c).lower()):
                 el.decompose()
             for el in soup.find_all(id=lambda i: i and pattern in str(i).lower()):
                 el.decompose()
-        # 본문 영역 우선 추출 시도
         main_area = soup.find('article') or soup.find('main') or soup.find('[role="main"]')
         raw_text = main_area.get_text(separator='\n', strip=True) if main_area else soup.get_text(separator='\n', strip=True)
-        # 한 줄에 2글자 미만 or 특정 UI 키워드 줄 제거
         ui_keywords = ['본문 바로가기', '카테고리 이동', 'MY메뉴', '검색', '공유하기', 'URL복사', '신고하기',
                        '메뉴 열기', '메뉴 닫기', '이웃추가', '폰트 크기', '폰트크기', '블로그', '카페',
                        '메일', '뉴스', '지도', '로그인', 'MY', '메뉴', '펼쳐보기', '더보기']
@@ -332,43 +327,48 @@ def admin_news_import_url():
                  if len(l.strip()) >= 3
                  and not any(kw in l for kw in ui_keywords)]
         body_text = '\n'.join(lines)[:3000]
-    except:
+    except Exception as e:
         body_text = text[:2000]
-    from services.news_service import ai_summarize_url
-    result = ai_summarize_url(body_text[:3000])
+    try:
+        from services.news_service import ai_summarize_url
+        result = ai_summarize_url(body_text[:3000])
+    except Exception as e:
+        result = None
     if not result:
         result = {"title": "URL에서 가져온 기사", "summary": "AI 요약 실패", "category": "세계뉴스", "is_useful": True}
-    # URL을 가져온 탭에 맞게 카테고리 지정
-    category = result.get('category', '세계뉴스')
-    if tab == 'kr_yp' and category not in ['대한민국뉴스', '양평소식', '정책정보', '지역소식']:
-        category = '대한민국뉴스'
-    article = NewsArticle(
-        title=result.get('title', '가져온 기사'),
-        summary=result.get('summary', ''),
-        content=f"<p>{body_text[:2000].replace(chr(10), '</p><p>')}</p>",
-        source_url=url,
-        category=category,
-        is_selected=True,
-        is_ai_generated=True,
-        created_by=session.get('user_id')
-    )
-    # 한자/일본어 정리
     try:
-        from services.news_service import clean_cjk_text
-        cleaned_title, cleaned_summary, cleaned_content = clean_cjk_text(article.title, article.summary, article.content)
-        article.title = cleaned_title or article.title
-        article.summary = cleaned_summary or article.summary
-        article.content = cleaned_content or article.content
-    except:
-        pass
-    # AI 승인 자동 True
-    if tab == 'world':
-        article.world_ai_approved = True
-    elif tab == 'kr_yp':
-        article.kr_yp_ai_approved = True
-    db.session.add(article)
-    db.session.commit()
-    return jsonify({"status": "success", "news_id": article.id})
+        category = result.get('category', '세계뉴스')
+        if tab == 'kr_yp' and category not in ['대한민국뉴스', '양평소식', '정책정보', '지역소식']:
+            category = '대한민국뉴스'
+        article = NewsArticle(
+            title=result.get('title', '가져온 기사'),
+            summary=result.get('summary', ''),
+            content=f"<p>{body_text[:2000].replace(chr(10), '</p><p>')}</p>",
+            source_url=url,
+            category=category,
+            is_selected=True,
+            is_ai_generated=True,
+            created_by=session.get('user_id')
+        )
+        try:
+            from services.news_service import clean_cjk_text
+            cleaned_title, cleaned_summary, cleaned_content = clean_cjk_text(article.title, article.summary, article.content)
+            article.title = cleaned_title or article.title
+            article.summary = cleaned_summary or article.summary
+            article.content = cleaned_content or article.content
+        except:
+            pass
+        if tab == 'world':
+            article.world_ai_approved = True
+        elif tab == 'kr_yp':
+            article.kr_yp_ai_approved = True
+        db.session.add(article)
+        db.session.commit()
+        return jsonify({"status": "success", "news_id": article.id})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"status": "error", "msg": f"서버 오류: {str(e)}"}), 500
 
 @news_bp.route('/news/like/<int:news_id>', methods=['POST'])
 def news_like(news_id):
@@ -412,9 +412,7 @@ def news_dislike(news_id):
 
 @news_bp.route('/news/<int:news_id>')
 def news_detail(news_id):
-    article = NewsArticle.query.get_or_404(news_id)
-    comments = NewsComment.query.filter_by(news_id=news_id).order_by(NewsComment.created_at.asc()).all()
-    return render_template('news_detail.html', article=article, comments=comments)
+    return _serve_spa()
 
 @news_bp.route('/news/comment', methods=['POST'])
 def news_comment():
@@ -453,7 +451,35 @@ def news_comment():
 @news_bp.route('/news/<int:news_id>/comments')
 def news_comments_fragment(news_id):
     comments = NewsComment.query.filter_by(news_id=news_id).order_by(NewsComment.created_at.asc()).all()
-    return render_template('news_comment_item.html', comments=comments)
+    return jsonify([{
+        'id': c.id, 'news_id': c.news_id, 'author_name': c.author_name,
+        'content': c.content, 'parent_id': c.parent_id,
+        'ai_score': c.ai_score, 'is_hidden': c.is_hidden,
+        'created_at': c.created_at.isoformat() if c.created_at else None,
+    } for c in comments])
+
+@news_bp.route('/api/news')
+def api_news():
+    category = request.args.get('category', '')
+    page = request.args.get('page', 1, type=int)
+    q = NewsArticle.query.filter(NewsArticle.is_selected == True)
+    if category:
+        if category == 'kr_yp':
+            q = q.filter(NewsArticle.kr_yp_admin_approved == True, NewsArticle.category.in_(['대한민국뉴스', '양평소식', '정책정보', '지역소식']))
+        elif category == 'world':
+            q = q.filter(NewsArticle.world_admin_approved == True, NewsArticle.category.in_(['세계뉴스', '환경뉴스', '건강정보', '복지정보', '농업정보', '관광소식']))
+        else:
+            q = q.filter(NewsArticle.category == category)
+    else:
+        q = q.filter(db.or_(NewsArticle.world_admin_approved == True, NewsArticle.kr_yp_admin_approved == True))
+    articles = q.order_by(NewsArticle.created_at.desc()).paginate(page=page, per_page=20, error_out=False)
+    return jsonify([{
+        'id': a.id, 'title': a.title, 'summary': a.summary,
+        'source_name': a.source_name, 'category': a.category,
+        'image_path': a.image_path, 'ai_score': a.ai_score,
+        'like_count': a.like_count, 'dislike_count': a.dislike_count,
+        'created_at': a.created_at.isoformat() if a.created_at else None,
+    } for a in articles.items])
 
 @news_bp.route('/api/news/content/<int:news_id>')
 def api_news_content(news_id):
@@ -475,13 +501,13 @@ def _get_news_with_recs(news_list):
 def world_news():
     page = request.args.get('page', 1, type=int)
     news_list = NewsArticle.query.filter(NewsArticle.is_selected == True, NewsArticle.world_admin_approved == True, NewsArticle.category.in_(['세계뉴스', '환경뉴스', '건강정보', '복지정보', '농업정보', '관광소식'])).order_by(NewsArticle.like_count.desc(), NewsArticle.created_at.desc()).paginate(page=page, per_page=12, error_out=False)
-    return render_template('world_news.html', news_list=_get_news_with_recs(news_list), title="세계 뉴스")
+    return _serve_spa()
 
 @news_bp.route('/yp-news')
 def yp_news():
     page = request.args.get('page', 1, type=int)
     news_list = NewsArticle.query.filter(NewsArticle.is_selected == True, db.or_(NewsArticle.world_admin_approved == True, NewsArticle.kr_yp_admin_approved == True)).order_by(NewsArticle.like_count.desc(), NewsArticle.created_at.desc()).paginate(page=page, per_page=12, error_out=False)
-    return render_template('yp_news.html', news_list=_get_news_with_recs(news_list), title="양평 소식")
+    return _serve_spa()
 
 @news_bp.route('/kr-yp-news')
 def kr_yp_news():
@@ -491,7 +517,7 @@ def kr_yp_news():
         NewsArticle.kr_yp_admin_approved == True,
         NewsArticle.category.in_(['대한민국뉴스', '양평소식', '정책정보', '지역소식'])
     ).order_by(NewsArticle.like_count.desc(), NewsArticle.created_at.desc()).paginate(page=page, per_page=12, error_out=False)
-    return render_template('kr_yp_news.html', news_list=_get_news_with_recs(news_list), title="대한민국과양평")
+    return _serve_spa()
 
 @news_bp.route('/news/<int:news_id>/recommend', methods=['POST'])
 def news_recommend(news_id):
@@ -518,7 +544,23 @@ def news_recommend(news_id):
 @news_bp.route('/news/<int:news_id>/recommendations')
 def news_recommendations_fragment(news_id):
     recs = NewsRecommendation.query.filter_by(news_id=news_id, is_approved=True).order_by(NewsRecommendation.created_at.desc()).all()
-    return render_template('news_recommendation_item.html', recommendations=recs)
+    return jsonify([{
+        'id': r.id, 'news_id': r.news_id, 'title': r.title, 'url': r.url,
+        'description': r.description, 'author_name': r.author_name,
+        'is_approved': r.is_approved,
+        'created_at': r.created_at.isoformat() if r.created_at else None,
+    } for r in recs])
+
+@news_bp.route('/api/news/recommendations/pending')
+def api_news_recommendations_pending():
+    if session.get('role') not in ['admin', 'leader']:
+        return jsonify({"error":"권한 없음"}), 403
+    recs = NewsRecommendation.query.filter_by(is_approved=False).order_by(NewsRecommendation.created_at.desc()).limit(50).all()
+    return jsonify([{
+        'id': r.id, 'news_id': r.news_id, 'title': r.title, 'url': r.url,
+        'description': r.description, 'author_name': r.author_name,
+        'created_at': r.created_at.isoformat() if r.created_at else None,
+    } for r in recs])
 
 @news_bp.route('/admin/news/recommendations')
 def admin_news_recommendations():
@@ -526,7 +568,7 @@ def admin_news_recommendations():
         return "권한 없음", 403
     page = request.args.get('page', 1, type=int)
     recs = NewsRecommendation.query.filter_by(is_approved=False).order_by(NewsRecommendation.created_at.desc()).paginate(page=page, per_page=20, error_out=False)
-    return render_template('admin_news_recommendations.html', recs=recs)
+    return _serve_spa()
 
 @news_bp.route('/admin/news/recommendation/approve/<int:rec_id>')
 def admin_news_recommendation_approve(rec_id):

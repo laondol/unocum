@@ -1,7 +1,16 @@
-from flask import Blueprint, request, jsonify, render_template, session
+from flask import Blueprint, request, jsonify, render_template, session, send_file
 from models import Post
 
 search_bp = Blueprint('search', __name__)
+
+def _serve_spa():
+    import os
+    from flask import current_app, send_file
+    path = os.path.join(current_app.root_path, 'frontend', 'dist', 'index.html')
+    if os.path.exists(path):
+        return send_file(path)
+    from flask import render_template
+    return render_template('intro.html')
 
 @search_bp.route('/search')
 def search():
@@ -18,7 +27,7 @@ def search():
             db.or_(NewsArticle.title.ilike(f'%{q}%'), NewsArticle.summary.ilike(f'%{q}%')),
             db.or_(NewsArticle.world_admin_approved == True, NewsArticle.kr_yp_admin_approved == True)
         ).order_by(NewsArticle.created_at.desc()).limit(20).all()
-    return render_template('search.html', q=q, results=results)
+    return _serve_spa()
 
 @search_bp.route('/api/rag/search')
 def rag_search_api():

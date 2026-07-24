@@ -58,12 +58,12 @@ def sanitize_image(file):
     from PIL import Image
     ext = (file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else '')
     try:
-        if ext in ('heic', 'heif'):
-            try:
-                import pillow_heif
-                pillow_heif.register_heif_opener()
-            except Exception:
-                pass
+        # Always register HEIF opener — handles .heic, .heif AND misnamed .jpg with HEIC content
+        try:
+            import pillow_heif
+            pillow_heif.register_heif_opener()
+        except Exception:
+            pass
         img = Image.open(file)
         # EXIF orientation 자동 적용 (회전 깨짐 방지)
         try:

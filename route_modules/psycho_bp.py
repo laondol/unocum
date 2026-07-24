@@ -1,9 +1,18 @@
-from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session, current_app, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
 from route_modules.common import has_page_access
 from models import db, PsychoPost, PsychoAppointment, PsychoDoctorSchedule, PsychoGoogleCalendarConfig, TongBotSchedule, User, Message
 
 psycho_bp = Blueprint('psycho', __name__)
+
+def _serve_spa():
+    import os
+    from flask import current_app, send_file
+    path = os.path.join(current_app.root_path, 'frontend', 'dist', 'index.html')
+    if os.path.exists(path):
+        return send_file(path)
+    from flask import render_template
+    return render_template('intro.html')
 
 @psycho_bp.route('/psycho/list')
 def psycho_list():
@@ -18,7 +27,7 @@ def psycho_list():
             posts = PsychoPost.query.filter_by(email=verified_email).order_by(PsychoPost.created_at.desc()).all()
         else:
             posts = []
-    return render_template('psycho_board.html', posts=posts)
+    return _serve_spa()
 
 @psycho_bp.route('/psycho/write', methods=['GET', 'POST'])
 def psycho_write():
@@ -66,7 +75,7 @@ def psycho_write():
         session.pop('email_verified_for_psycho', None)
         session.pop('verify_email', None)
         return "<script>alert('상담 글이 등록되었습니다.'); location.href='/psycho/list';</script>"
-    return render_template('psycho_write.html')
+    return _serve_spa()
 
 @psycho_bp.route('/psycho/post/<int:post_id>', methods=['GET', 'POST'])
 def psycho_post(post_id):
@@ -77,13 +86,13 @@ def psycho_post(post_id):
     is_admin = role in ('admin','leader')
     if request.method == 'POST':
         if is_author or is_admin or check_password_hash(post.password, request.form.get('password','')):
-            return render_template('psycho_post.html', post=post, need_password=False, error=False)
-        return render_template('psycho_post.html', post=post, need_password=True, error=True)
+            return _serve_spa()
+        return _serve_spa()
     if is_author or is_admin:
-        return render_template('psycho_post.html', post=post, need_password=False, error=False)
+        return _serve_spa()
     if session.get('email_verified_for_legal') and session.get('verify_email') == post.email:
-        return render_template('psycho_post.html', post=post, need_password=False, error=False)
-    return render_template('psycho_post.html', post=post, need_password=True, error=False)
+        return _serve_spa()
+    return _serve_spa()
 
 @psycho_bp.route('/psycho/post/<int:post_id>/edit', methods=['GET','POST'])
 def psycho_post_edit(post_id):
@@ -106,7 +115,7 @@ def psycho_post_edit(post_id):
             pass
         db.session.commit()
         return redirect(url_for('psycho_post', post_id=post.id))
-    return render_template('psycho_post_edit.html', post=post)
+    return _serve_spa()
 
 @psycho_bp.route('/psycho/admin')
 def psycho_admin():
@@ -114,7 +123,7 @@ def psycho_admin():
         return "<script>alert('관리자 전용입니다.'); location.href='/service/psycho';</script>"
     pending_posts = PsychoPost.query.filter_by(answer=None).order_by(PsychoPost.created_at.desc()).all()
     answered_posts = PsychoPost.query.filter(PsychoPost.answer.isnot(None)).order_by(PsychoPost.answered_at.desc()).all()
-    return render_template('psycho_admin.html', pending_posts=pending_posts, answered_posts=answered_posts)
+    return _serve_spa()
 
 @psycho_bp.route('/psycho/admin/appointments')
 def psycho_admin_appointments():
@@ -125,7 +134,7 @@ def psycho_admin_appointments():
     schedule_rows = PsychoDoctorSchedule.query.all()
     schedules = {str(s.day_of_week): {'is_available': s.is_available, 'start_hour': s.start_hour, 'end_hour': s.end_hour, 'slot_hours': s.slot_hours} for s in schedule_rows}
     gc = PsychoGoogleCalendarConfig.query.first()
-    return render_template('psycho_admin_appointments.html', pending_appointments=pending_appts, approved_appointments=approved_appts, schedules=schedules, gc=gc)
+    return _serve_spa()
 
 @psycho_bp.route('/psycho/admin/answer/<int:post_id>', methods=['POST'])
 def psycho_admin_answer(post_id):
@@ -248,7 +257,97 @@ def psycho_schedule():
     my_appointments = []
     if uid:
         my_appointments = PsychoAppointment.query.filter_by(user_id=uid).order_by(PsychoAppointment.date.desc()).limit(10).all()
-    return render_template('psycho_schedule.html', available_dates=available_dates, time_slots=all_slots, my_appointments=my_appointments)
+    return _serve_spa()
+
+# --- API endpoints ---
+
+@psycho_bp.route('/api/psycho/posts')
+def api_psycho_posts():
+    uid = session.get('user_id')
+    if not uid: return jsonify({'error': 'login'}), 401
+    posts = PsychoPost.query.filter_by(user_id=uid).order_by(PsychoPost.created_at.desc()).limit(20).all()
+    return jsonify([{
+        'id': p.id, 'title': p.title, 'author_name': p.author_name,
+        'status': p.status, 'is_public': p.is_public,
+        'answer': p.answer, 'fee': p.fee,
+        'created_at': p.created_at.isoformat() if p.created_at else None,
+        'answered_at': p.answered_at.isoformat() if p.answered_at else None,
+    } for p in posts])
+
+@psycho_bp.route('/api/psycho/post/<int:post_id>')
+def api_psycho_post(post_id):
+    post = PsychoPost.query.get_or_404(post_id)
+    return jsonify({
+        'id': post.id, 'title': post.title, 'content': post.content,
+        'author_name': post.author_name, 'answer': post.answer,
+        'status': post.status, 'is_public': post.is_public,
+        'fee': post.fee, 'travel_allowance': post.travel_allowance,
+        'ai_score': post.ai_score, 'ai_reason': post.ai_reason,
+        'created_at': post.created_at.isoformat() if post.created_at else None,
+        'answered_at': post.answered_at.isoformat() if post.answered_at else None,
+    })
+
+@psycho_bp.route('/api/psycho/appointments')
+def api_psycho_appointments():
+    uid = session.get('user_id')
+    if not uid: return jsonify({'error': 'login'}), 401
+    appts = PsychoAppointment.query.filter_by(user_id=uid).order_by(PsychoAppointment.date.desc()).limit(20).all()
+    return jsonify([{
+        'id': a.id, 'name': a.name, 'date': a.date.isoformat() if a.date else None,
+        'time_slot': a.time_slot, 'status': a.status, 'location': a.location,
+    } for a in appts])
+
+@psycho_bp.route('/api/psycho/create', methods=['POST'])
+def api_psycho_create():
+    title = request.form.get('title', '').strip()
+    content = request.form.get('content', '').strip()
+    if not title or not content:
+        return jsonify({'status': 'error', 'msg': '제목과 내용을 입력하세요.'})
+    post = PsychoPost(
+        title=title, content=content,
+        author_name=request.form.get('author_name', '익명'),
+        email=request.form.get('email', ''),
+        password=request.form.get('password', ''),
+        user_id=session.get('user_id'),
+    )
+    db.session.add(post)
+    db.session.commit()
+    return jsonify({'status': 'success', 'id': post.id})
+
+@psycho_bp.route('/api/psycho/post/<int:post_id>/comment', methods=['POST'])
+def api_psycho_comment(post_id):
+    content = request.form.get('content', '').strip()
+    if not content:
+        return jsonify({'status': 'error', 'msg': '내용을 입력하세요.'})
+    post = PsychoPost.query.get_or_404(post_id)
+    comments = post.comments or ''
+    name = session.get('real_name') or session.get('username', '익명')
+    from datetime import datetime
+    comments += f'\n[{name}] {content} ({datetime.now().strftime("%m/%d %H:%M")})'
+    post.comments = comments
+    db.session.commit()
+    return jsonify({'status': 'success'})
+
+@psycho_bp.route('/api/psycho/schedules')
+def api_psycho_schedules():
+    from datetime import date, timedelta
+    rows = PsychoDoctorSchedule.query.filter_by(is_available=True).all()
+    available_day_ids = {s.day_of_week for s in rows}
+    booked = db.session.query(PsychoAppointment.date).filter(PsychoAppointment.status.in_(['pending', 'approved'])).distinct().all()
+    booked_dates = {b[0] for b in booked}
+    available_dates = []
+    today = date.today()
+    for i in range(2, 62):
+        d = today + timedelta(days=i)
+        if d.weekday() in available_day_ids and d not in booked_dates:
+            available_dates.append(d.isoformat())
+    all_slots = []
+    for s in rows:
+        for h in range(s.start_hour, s.end_hour, s.slot_hours):
+            all_slots.append({"start": f"{h:02d}:00", "end": f"{h+s.slot_hours:02d}:00"})
+    return jsonify({'available_dates': available_dates, 'time_slots': all_slots})
+
+# --- 기존 라우트 ---
 
 @psycho_bp.route('/psycho/appointment/book', methods=['POST'])
 def psycho_appointment_book():

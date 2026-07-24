@@ -9,38 +9,16 @@ from config import Config
 
 construction_bp = Blueprint('construction', __name__)
 
+def _serve_spa():
+    import os
+    path = os.path.join(current_app.root_path, 'frontend', 'dist', 'index.html')
+    if os.path.exists(path):
+        return send_file(path)
+    return render_template('intro.html')
+
 @construction_bp.route('/construction')
 def construction():
-    six_months_ago = datetime.now() - timedelta(days=180)
-    notices = ConstructionNotice.query.filter(
-        ConstructionNotice.is_active == True,
-        db.or_(
-            ConstructionNotice.start_date >= six_months_ago,
-            ConstructionNotice.start_date == None
-        )
-    ).all()
-    # 사용자 집 기준 거리순 정렬
-    uid = session.get('user_id')
-    if uid:
-        user = User.query.get(uid)
-        if user and (user.curr_latitude or user.reg_latitude):
-            from services.transit import haversine_km
-            home_lat = user.curr_latitude or user.reg_latitude
-            home_lng = user.curr_longitude or user.reg_longitude
-            def dist_key(n):
-                if n.latitude and n.longitude:
-                    return haversine_km(home_lat, home_lng, n.latitude, n.longitude)
-                return 999
-            notices = sorted(notices, key=dist_key)
-        else:
-            notices = sorted(notices, key=lambda n: n.created_at or datetime.min, reverse=True)
-    else:
-        notices = sorted(notices, key=lambda n: n.created_at or datetime.min, reverse=True)
-    alerts = VillageAlert.query.filter_by(is_active=True).order_by(VillageAlert.created_at.desc()).limit(20).all()
-    from config import Config
-    dg_key = getattr(Config, 'DATA_GO_KR_API_KEY', '')
-    gg_key = getattr(Config, 'GG_TRAFFIC_API_KEY', '')
-    return render_template('construction.html', notices=notices, alerts=alerts, api_key_configured=bool(dg_key), traffic_key_configured=bool(gg_key))
+    return _serve_spa()
 
 @construction_bp.route('/construction/heritage')
 def construction_heritage():
@@ -115,9 +93,9 @@ def construction_transit():
         return jsonify({"error": "등록된 주소가 없습니다. 마이페이지에서 설정해 주세요."}), 400
     home_town = user.town or user.curr_town or ''
     home_village = user.village or user.curr_village or ''
-    # 보정된 위치가 있으면 그걸 집 주소로
-    if user.curr_address and user.curr_latitude and user.curr_longitude:
-        to_address = user.curr_address
+    # 위치보정된 주소를 집 주소로 사용
+    if user.curr_latitude and user.curr_longitude:
+        to_address = user.address or f"경기 양평군 {home_town} {home_village}".strip()
         dest = {"lat": user.curr_latitude, "lng": user.curr_longitude, "address": to_address}
     else:
         to_address = f"경기 양평군 {home_town} {home_village}".strip()
@@ -191,17 +169,13 @@ def construction_transit_suggest():
     gps_result = gps_to_town_village(corrected_lat, corrected_lng)
     gps_town = gps_result[0] if gps_result else ""
     gps_village = gps_result[1] if gps_result else ""
-    same_village = bool(gps_town and gps_town == home_town and gps_village == home_village)
-    # 집 판정: 보정좌표와 등록좌표 거리 1km 이내면 집
+    # 집 판정: 보정좌표와 등록좌표 거리 200m 이내면 집
     user_home_lat = user.curr_latitude or user.reg_latitude or 0
     user_home_lng = user.curr_longitude or user.reg_longitude or 0
     is_home = False
     if user_home_lat and user_home_lng:
         d = haversine_km(corrected_lat, corrected_lng, user_home_lat, user_home_lng)
         is_home = d <= 0.2
-    if not is_home:
-        same_village = bool(gps_town and gps_town == home_town and gps_village == home_village)
-        is_home = same_village
     if is_home:
         home_addr = user.curr_address or f"{home_town} {home_village}"
         return jsonify({
@@ -212,7 +186,7 @@ def construction_transit_suggest():
     suggestion = suggest_optimal_departure(from_lat, from_lng, home_town, home_village)
     if not suggestion:
         return jsonify({"error": "경로를 찾을 수 없습니다."}), 404
-    # 보정된 위치가 있으면 그걸로 집 좌표+주소 사용
+    # 위치보정된 집 좌표를 집 좌표로 사용
     if user.curr_latitude and user.curr_longitude:
         home_coords = {"lat": user.curr_latitude, "lng": user.curr_longitude}
     else:
@@ -448,7 +422,7 @@ def construction_store_detail(store_name):
             store_address = geo['address']
     if not store_address:
         store_address = f'{town} {village}'
-    return render_template('store_detail.html', store_name=display_name, posts=grouped, town=town, village=village, store_link=store_link, link_label=link_label, naver_map=naver_map, gallery=gallery, store_address=store_address)
+    return _serve_spa()
 
 @construction_bp.route('/construction/local-scenery')
 def construction_local_scenery():
@@ -496,8 +470,7 @@ def construction_local_scenery():
 def admin_stores():
     if session.get('role') not in ('admin','leader'):
         return "권한 없음", 403
-    stores = StoreInfo.query.order_by(StoreInfo.town, StoreInfo.name).all()
-    return render_template('admin_stores.html', stores=stores)
+    return _serve_spa()
 
 @construction_bp.route('/admin/stores/new', methods=['GET','POST'])
 def admin_stores_new():
@@ -517,7 +490,7 @@ def admin_stores_new():
         db.session.add(s)
         db.session.commit()
         return redirect('/admin/stores')
-    return render_template('admin_store_edit.html', store=None)
+    return _serve_spa()
 
 @construction_bp.route('/admin/stores/edit/<int:store_id>', methods=['GET','POST'])
 def admin_stores_edit(store_id):
@@ -535,7 +508,7 @@ def admin_stores_edit(store_id):
         s.smartplace = request.form.get('smartplace','').strip()
         db.session.commit()
         return redirect('/admin/stores')
-    return render_template('admin_store_edit.html', store=s)
+    return _serve_spa()
 
 @construction_bp.route('/admin/stores/delete/<int:store_id>', methods=['POST'])
 def admin_stores_delete(store_id):
@@ -550,16 +523,7 @@ def admin_stores_delete(store_id):
 def admin_alerts():
     if session.get('role') not in ('admin', 'leader', 'village_leader'):
         return "권한 없음", 403
-    role = session.get('role')
-    user_town = session.get('town', '')
-    user_village = session.get('village', '')
-    if role == 'admin':
-        alerts = VillageAlert.query.order_by(VillageAlert.created_at.desc()).all()
-    elif role == 'leader':
-        alerts = VillageAlert.query.filter_by(town=user_town).order_by(VillageAlert.created_at.desc()).all()
-    else:
-        alerts = VillageAlert.query.filter_by(town=user_town, village=user_village).order_by(VillageAlert.created_at.desc()).all()
-    return render_template('admin_alerts.html', alerts=alerts, role=role, town=user_town, village=user_village)
+    return _serve_spa()
 
 @construction_bp.route('/admin/alerts/new', methods=['GET', 'POST'])
 def admin_alerts_new():
@@ -597,7 +561,7 @@ def admin_alerts_new():
     user_town = session.get('town', '')
     user_village = session.get('village', '')
     towns = db.session.query(VillageAlert.town).distinct().all() if session.get('role') == 'admin' else [(user_town,)]
-    return render_template('admin_alerts_new.html', town=user_town, village=user_village, role=session.get('role'), towns=[t[0] for t in towns if t[0]])
+    return _serve_spa()
 
 @construction_bp.route('/admin/alerts/edit/<int:alert_id>', methods=['GET', 'POST'])
 def admin_alerts_edit(alert_id):
@@ -616,7 +580,7 @@ def admin_alerts_edit(alert_id):
         alert.updated_at = datetime.now()
         db.session.commit()
         return redirect('/admin/alerts')
-    return render_template('admin_alerts_edit.html', alert=alert, role=session.get('role'))
+    return _serve_spa()
 
 @construction_bp.route('/admin/alerts/delete/<int:alert_id>', methods=['POST'])
 def admin_alerts_delete(alert_id):

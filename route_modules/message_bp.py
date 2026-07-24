@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session, current_app, send_file
 from models import db, Message, User, Friend, PointHistory
 from datetime import datetime
 
@@ -52,27 +52,30 @@ def message_count():
     return jsonify({'count': cnt})
 
 
+def _serve_spa():
+    import os
+    path = os.path.join(current_app.root_path, 'frontend', 'dist', 'index.html')
+    if os.path.exists(path):
+        return send_file(path)
+    return render_template('intro.html')
+
 @message_bp.route('/message/inbox')
 def message_inbox():
     if not session.get('username'):
         return redirect(url_for('auth.login', next='/message/inbox'))
-    uid = session['user_id']
-    role = session.get('role', 'user')
-    tab = request.args.get('tab', 'received')
+    return _serve_spa()
 
-    # 받은 편지: 본인 수신 + (관리자/책임자는 공개편지도 열람 가능)
-    received = Message.query.filter(
-        (Message.receiver_id == uid) |
-        ((Message.is_public == True) & (role in ['admin', 'leader']))
-    ).order_by(Message.created_at.desc()).all()
+@message_bp.route('/message/send')
+def message_send():
+    if not session.get('username'):
+        return redirect(url_for('auth.login', next='/message/send'))
+    return _serve_spa()
 
-    # 보낸 편지
-    sent = Message.query.filter_by(sender_id=uid).order_by(Message.created_at.desc()).all()
-    for m in sent:
-        u = User.query.get(m.receiver_id)
-        m.receiver_name = u.real_name or u.username if u else '알수없음'
-
-    # 벗 목록 (편지 보낼 수 있는 대상)
+@message_bp.route('/api/message/users')
+def api_message_users():
+    uid = session.get('user_id')
+    if not uid: return jsonify({'error': 'login'}), 401
+    # 벗 목록
     friends = Friend.query.filter(
         (Friend.requester_id == uid) & (Friend.status == 'accepted')
     ).all()
@@ -81,24 +84,87 @@ def message_inbox():
         (Friend.receiver_id == uid) & (Friend.status == 'accepted')
     ).all()
     friend_ids += [f.requester_id for f in friends2]
-    friend_users = User.query.filter(User.id.in_(friend_ids)).all() if friend_ids else []
+    users = User.query.filter(User.id.in_(friend_ids)).all() if friend_ids else []
+    result = [{'id': u.id, 'username': u.username, 'real_name': u.real_name, 'town': u.town, 'village': u.village} for u in users]
+    return jsonify(result)
 
-    # 전체관리자 (단일 내부 계정)
-    internal_admin = _get_internal_admin()
 
-    # 마을지기 (같은 읍/면/리의 마을지기)
-    me = User.query.get(uid)
-    village_leader = None
-    if me and me.town and me.village:
-        village_leader = _get_village_leader(me.town, me.village)
+@message_bp.route('/api/messages')
+def api_messages():
+    uid = session.get('user_id')
+    if not uid: return jsonify({'error': 'login'}), 401
+    tab = request.args.get('tab', 'received')
+    role = session.get('role', 'user')
+    if tab == 'received':
+        msgs = Message.query.filter(
+            (Message.receiver_id == uid) |
+            ((Message.is_public == True) & (role in ['admin', 'leader']))
+        ).order_by(Message.created_at.desc()).limit(50).all()
+    else:
+        msgs = Message.query.filter_by(sender_id=uid).order_by(Message.created_at.desc()).limit(50).all()
+    result = []
+    for m in msgs:
+        sender = User.query.get(m.sender_id)
+        receiver = User.query.get(m.receiver_id)
+        result.append({
+            'id': m.id, 'subject': m.subject, 'content': m.content,
+            'sender_name': sender.real_name or sender.username if sender else '알수없음',
+            'receiver_name': receiver.real_name or receiver.username if receiver else '알수없음',
+            'sender_role': m.sender_role, 'letter_type': m.letter_type,
+            'is_read': m.is_read, 'is_public': m.is_public,
+            'created_at': m.created_at.isoformat() if m.created_at else None,
+        })
+    return jsonify(result)
 
-    return render_template('message_inbox.html',
-                           received=received, sent=sent, tab=tab,
-                           friends=friend_users, internal_admin=internal_admin,
-                           village_leader=village_leader,
-                           user_points=_get_balance(uid),
-                           letter_cost=LETTER_COST)
+@message_bp.route('/api/message/send', methods=['POST'])
+def api_message_send():
+    uid = session.get('user_id')
+    if not uid: return jsonify({'status': 'error', 'msg': '로그인이 필요합니다.'}), 401
+    receiver_id = request.form.get('receiver_id')
+    subject = request.form.get('subject', '').strip()
+    content = request.form.get('content', '').strip()
+    if not receiver_id or not content:
+        return jsonify({'status': 'error', 'msg': '받는 사람과 내용을 입력하세요.'}), 400
+    balance = _get_balance(uid)
+    if balance < LETTER_COST:
+        return jsonify({'status': 'error', 'msg': f'닢이 부족합니다. (현재 {balance}닢, 필요 {LETTER_COST}닢)'}), 400
+    if not _deduct_points(uid, LETTER_COST, f'편지 발송 → {receiver_id}'):
+        return jsonify({'status': 'error', 'msg': '닢 차감 실패'}), 400
+    receiver = User.query.get(int(receiver_id))
+    if not receiver:
+        return jsonify({'status': 'error', 'msg': '받는 사람을 찾을 수 없습니다.'}), 404
+    msg = Message(
+        sender_id=uid,
+        sender_name=session.get('real_name', session['username']),
+        sender_role=session.get('role', 'user'),
+        receiver_id=receiver.id,
+        subject=subject,
+        content=content,
+        letter_type='normal'
+    )
+    db.session.add(msg)
+    db.session.commit()
+    return jsonify({'status': 'success', 'msg': '편지가 전송되었습니다.'})
 
+import os as _os
+from services.security import validate_upload, secure_save
+
+@message_bp.route('/api/message/upload-image', methods=['POST'])
+def api_message_upload_image():
+    uid = session.get('user_id')
+    if not uid: return jsonify({'error': 'login'}), 401
+    file = request.files.get('image')
+    if not file: return jsonify({'error': '파일 없음'}), 400
+    ok, msg = validate_upload(file)
+    if not ok: return jsonify({'error': msg}), 400
+    upload_dir = _os.path.join(current_app.config['UPLOAD_FOLDER'], 'message_images')
+    _os.makedirs(upload_dir, exist_ok=True)
+    try:
+        path = secure_save(file, upload_dir)
+        url = '/static/uploads/message_images/' + _os.path.basename(path)
+        return jsonify({'url': url})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @message_bp.route('/message/send/global', methods=['GET', 'POST'])
 def send_message_global():
@@ -155,10 +221,7 @@ def send_message_global():
 
         return jsonify({'success': True, 'msg': f'{LETTER_COST}坭이 차감되었습니다. ({_get_balance(uid)}坭 남음)'})
 
-    return render_template('send_message.html', receiver=receiver,
-                           is_admin=is_admin, is_village_leader=is_village_leader,
-                           admin_type='global',
-                           user_points=_get_balance(uid), letter_cost=LETTER_COST)
+    return _serve_spa()
 
 
 @message_bp.route('/message/send/admin', methods=['GET', 'POST'])
@@ -204,10 +267,7 @@ def send_message_admin():
         db.session.commit()
         return jsonify({'success': True, 'msg': f'{LETTER_COST}坭이 차감되었습니다. ({_get_balance(uid)}坭 남음)'})
 
-    return render_template('send_message.html', receiver=internal_admin,
-                           is_admin=True, is_village_leader=False,
-                           user_points=_get_balance(uid), letter_cost=LETTER_COST,
-                           admin_type='global')
+    return _serve_spa()
 
 @message_bp.route('/message/send/village_leader', methods=['GET', 'POST'])
 def send_message_village_leader():
@@ -254,10 +314,7 @@ def send_message_village_leader():
         db.session.commit()
         return jsonify({'success': True, 'msg': f'{LETTER_COST}坭이 차감되었습니다. ({_get_balance(uid)}坭 남음)'})
 
-    return render_template('send_message.html', receiver=village_leader,
-                           is_admin=False, is_village_leader=True,
-                           user_points=_get_balance(uid), letter_cost=LETTER_COST,
-                           admin_type='village')
+    return _serve_spa()
 
 
 @message_bp.route('/message/read/<int:msg_id>', methods=['GET', 'POST'])
@@ -316,7 +373,7 @@ def admin_pending_letters():
             Message.village == me.village
         ).order_by(Message.created_at.desc()).all()
     
-    return render_template('admin_pending_letters.html', pending=pending, role=role)
+    return _serve_spa()
 
 @message_bp.route('/message/admin/pending/<int:msg_id>/approve', methods=['POST'])
 def admin_approve_pending(msg_id):

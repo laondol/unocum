@@ -280,8 +280,8 @@ def _ensure_day_routes(uid, evt_date, exclude_ids=None):
 
     if not events and not all_day_events: return []
     auto_created = []
-    prev_location = None
-    prev_lat = prev_lng = None
+    prev_location = home_addr
+    prev_lat, prev_lng = home_lat, home_lng
     prev_end_dt = None
     # 이동: only for non-all-day events
     for idx, evt in enumerate(events):

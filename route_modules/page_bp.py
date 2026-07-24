@@ -1,21 +1,21 @@
 import os
-from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session, current_app, send_file
 from datetime import datetime, timedelta
 from models import db, User, Post, Message, NewsArticle, ShareReport
 
 page_bp = Blueprint('page', __name__)
 from route_modules.user_bp import _cleanup_expired_posts
 
+def _serve_spa():
+    path = os.path.join(current_app.root_path, 'frontend', 'dist', 'index.html')
+    if os.path.exists(path):
+        return send_file(path)
+    return render_template('intro.html')
+
 @page_bp.route('/spa')
 @page_bp.route('/spa/<path:path>')
 def spa_fallback(path=''):
-    spa_index = os.path.join(current_app.root_path, 'static', 'spa', 'index.html')
-    if os.path.exists(spa_index):
-        return current_app.send_static_file('spa/index.html')
-    return render_template('intro.html')
-
-
-# React 공유마당 SPA (frontend/dist/index.html)
+    return _serve_spa()
 
 
 @page_bp.route('/')
@@ -36,7 +36,7 @@ def intro():
 
 @page_bp.route('/ai/chat')
 def ai_chat():
-    return render_template('ai_chat.html')
+    return _serve_spa()
 
 @page_bp.route('/ai/chat/send', methods=['POST'])
 def ai_chat_send():
@@ -111,30 +111,22 @@ def ai_chat_send():
 
 @page_bp.route('/presentation')
 def presentation():
-    return render_template('presentation.html', selected_news=None)
+    return _serve_spa()
 @page_bp.route('/proposal')
 def proposal():
-    return render_template('proposal.html')
+    return _serve_spa()
 
 @page_bp.route('/terms')
 def terms():
-    return render_template('terms.html')
+    return _serve_spa()
 
 @page_bp.route('/charter')
 def charter():
-    import markdown as md
-    charter_path = os.path.join(current_app.root_path, 'charter.md')
-    with open(charter_path, 'r', encoding='utf-8') as f:
-        content = f.read()
-    html = md.markdown(content, extensions=['fenced_code', 'tables'])
-    return render_template('charter.html', content=html)
+    return _serve_spa()
 
 @page_bp.route('/main')
 def index():
-    now = datetime.now()
-    _cleanup_expired_posts()
-    posts = Post.query.filter(Post.total_score > -50, ((Post.created_at <= now - timedelta(hours=48)) | (Post.is_forced_approved == True))).order_by(Post.created_at.desc()).all()
-    return render_template('index.html', posts=posts)
+    return _serve_spa()
 
 @page_bp.route('/all-proposals')
 def all_proposals():
@@ -169,7 +161,7 @@ def all_proposals():
         if p.user_id == user_id:
             posts.append(p)
             continue
-    return render_template('all_proposals.html', posts=posts, now=now, timedelta=timedelta)
+    return _serve_spa()
 
 # --- [회원가입] 이웃 가입 및 선택적 주민 인증 수집 ---
 @page_bp.route('/api/correct-address', methods=['POST'])
@@ -249,3 +241,71 @@ def reverse_geocode():
 
 
     return jsonify({'status':'success','msg':'주소가 수정되었습니다.'})
+
+@page_bp.route('/api/page/intro')
+def api_intro():
+    yp_news = NewsArticle.query.filter(NewsArticle.is_selected == True, NewsArticle.world_admin_approved == True, ~NewsArticle.category.in_(['세계뉴스', '해외뉴스'])).order_by(NewsArticle.updated_at.desc()).limit(5).all()
+    world_news = NewsArticle.query.filter(NewsArticle.is_selected == True, NewsArticle.world_admin_approved == True, NewsArticle.category.in_(['세계뉴스', '해외뉴스'])).order_by(NewsArticle.updated_at.desc()).limit(5).all()
+    bg_images = db.session.query(ShareReport.image_path).filter(ShareReport.status == 'approved', ShareReport.image_path.isnot(None), ShareReport.image_path != '').order_by(db.func.random()).limit(30).all()
+    return jsonify({
+        'yp_news': [{'id': n.id, 'title': n.title, 'category': n.category, 'created_at': n.created_at.isoformat() if n.created_at else None} for n in yp_news],
+        'world_news': [{'id': n.id, 'title': n.title, 'category': n.category, 'created_at': n.created_at.isoformat() if n.created_at else None} for n in world_news],
+        'bg_images': [i[0] for i in bg_images if i[0]]
+    })
+
+@page_bp.route('/api/page/all-proposals')
+def api_all_proposals():
+    from datetime import timedelta
+    now = datetime.now()
+    posts = Post.query.order_by(Post.created_at.desc()).all()
+    result = []
+    uid = session.get('user_id')
+    role = session.get('role')
+    for p in posts:
+        is_own = p.user_id == uid
+        visible = False
+        if is_own or role in ('admin', 'leader'):
+            visible = True
+        elif p.is_forced_approved:
+            visible = True
+        elif p.total_score > -50 and (p.created_at and now - p.created_at >= timedelta(hours=48)):
+            visible = True
+        elif p.total_score > 0:
+            visible = True
+        if not visible:
+            continue
+        result.append({
+            'id': p.id, 'title': p.title, 'content': p.content[:150] if p.content else '',
+            'file_path': p.file_path, 'author_name': p.author_name, 'user_id': p.user_id,
+            'like_count': p.like_count, 'dislike_count': p.dislike_count,
+            'ai_score': p.ai_score, 'admin_score': p.admin_score,
+            'leader_score': p.leader_score, 'member_score': p.member_score,
+            'total_score': p.total_score,
+            'is_forced_approved': p.is_forced_approved,
+            'created_at': p.created_at.isoformat() if p.created_at else None,
+        })
+    return jsonify(result)
+
+@page_bp.route('/api/page/index-posts')
+def api_index_posts():
+    from datetime import timedelta
+    now = datetime.now()
+    posts = Post.query.filter(Post.total_score > -50, ((Post.created_at <= now - timedelta(hours=48)) | (Post.is_forced_approved == True))).order_by(Post.created_at.desc()).all()
+    return jsonify([{
+        'id': p.id, 'title': p.title, 'content': p.content[:150] if p.content else '',
+        'file_path': p.file_path, 'author_name': p.author_name, 'user_id': p.user_id,
+        'like_count': p.like_count, 'dislike_count': p.dislike_count,
+        'ai_score': p.ai_score, 'total_score': p.total_score,
+        'is_forced_approved': p.is_forced_approved,
+        'created_at': p.created_at.isoformat() if p.created_at else None,
+    } for p in posts])
+
+@page_bp.route('/api/page/charter')
+def api_charter():
+    import markdown
+    md_path = os.path.join(current_app.root_path, 'charter.md')
+    content = ''
+    if os.path.exists(md_path):
+        with open(md_path, 'r', encoding='utf-8') as f:
+            content = markdown.markdown(f.read(), extensions=['extra'])
+    return jsonify({'content': content})

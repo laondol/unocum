@@ -12,6 +12,8 @@
   "dependencies": {
     "axios": "^1.18.1",
     "cropperjs": "^1.6.2",
+    "html5-qrcode": "^2.3.8",
+    "idb": "^8.0.3",
     "leaflet": "^1.9.4",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

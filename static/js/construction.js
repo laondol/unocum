@@ -2,7 +2,7 @@
 // location-based 안내 (풍경/가게/교통/알림)
 // ========================================
 
-var transitData = null, suggestData = null, alarmTimer = null;
+var transitData = null, suggestData = null, alarmTimer = null, alarmTimers = [];
 
 function loadTrafficLive() {
     var parent = document.getElementById('alertList');
@@ -336,7 +336,27 @@ function loadHome() {
                 transitData = data; suggestData = suggest&&!suggest.error?suggest:null;
                 if (loc.address) data.departure.address = loc.address;
                 renderHome(data, loc);
-            }).catch(function(){ el.innerHTML = '<div class="alert alert-danger">경로 검색에 실패했습니다.</div>'; });
+            }).catch(function(){
+                var gpsInfo = '위도: ' + lat.toFixed(6) + ', 경도: ' + lng.toFixed(6);
+                fetch('/construction/transit/suggest?from_lat='+lat+'&from_lng='+lng).then(function(r){return r.json()}).then(function(s){
+                    if (s && s.already_home) {
+                        var homeAddr = s.home_address || (loc.town+' '+loc.village);
+                        el.innerHTML = '<div class="card border-0 shadow-sm mb-3 text-center" style="border-radius:16px;border:2px solid #198754;">'
+                            +'<div class="card-body p-4"><div class="fs-1 mb-2">🏠</div>'
+                            +'<h4 class="fw-bold text-success mb-2">집 또는 회사 입니다</h4>'
+                            +'<p class="text-muted small mb-1">📍 '+homeAddr+'</p>'
+                            +'<p class="text-muted small">📡 '+gpsInfo+'</p></div></div>';
+                    } else {
+                        el.innerHTML = '<div class="alert alert-warning text-center">'
+                            +'<div class="mb-2">😅 경로 검색에 실패했습니다</div>'
+                            +'<div class="small text-muted">📡 '+gpsInfo+'</div></div>';
+                    }
+                }).catch(function(){
+                    el.innerHTML = '<div class="alert alert-warning text-center">'
+                        +'<div class="mb-2">😅 경로 검색에 실패했습니다</div>'
+                        +'<div class="small text-muted">📡 '+gpsInfo+'</div></div>';
+                });
+            });
         }, function(err){
             var msg = '위치 정보를 가져올 수 없습니다.';
             if (err.code===1) msg='위치 권한이 거부되었습니다.';
@@ -353,10 +373,14 @@ function renderHome(data, loc) {
     var html = '';
     if (suggestData && suggestData.already_home) {
         var homeAddr = suggestData.home_address || (loc.town+' '+loc.village);
+        var lat = document.getElementById('corrGpsLat').value;
+        var lng = document.getElementById('corrGpsLng').value;
         html += '<div class="card border-0 shadow-sm mb-3 text-center" style="border-radius:16px;border:2px solid #198754;">';
         html += '<div class="card-body p-4"><div class="fs-1 mb-2">🏠</div>';
-        html += '<h4 class="fw-bold text-success mb-2">현재 집입니다</h4>';
-        html += '<p class="text-muted small mb-0">📍 '+homeAddr+'</p></div></div>';
+        html += '<h4 class="fw-bold text-success mb-2">집 또는 회사 입니다</h4>';
+        html += '<p class="text-muted small mb-1">📍 '+homeAddr+'</p>';
+        if (lat && lng) html += '<p class="text-muted small">📡 위도: '+parseFloat(lat).toFixed(6)+', 경도: '+parseFloat(lng).toFixed(6)+'</p>';
+        html += '</div></div>';
         el.innerHTML = html;
         return;
     } else if (suggestData && suggestData.optimal_departure) {
@@ -373,16 +397,20 @@ function renderHome(data, loc) {
         if (nowMin>lastMin) html += '<div class="alert alert-warning py-1 small">⚠️ 막차 시간이 지났습니다.</div>';
         else if (nowMin>optMin) html += '<div class="alert alert-warning py-1 small">⚠️ 최적 출발 시간이 지났습니다. 서두르세요!</div>';
         else { var rem=optMin-nowMin; var remH=Math.floor(rem/60), remM=rem%60; html += '<div class="small text-muted mt-1">⏳ 출발까지 '+(remH>0?remH+'시간 ':'')+remM+'분 남음</div>'; }
+        html += '<hr><div class="mt-2"><div class="form-check form-check-inline"><input type="checkbox" id="pre10min" class="form-check-input" checked><label class="form-check-label small" for="pre10min">10분 전 알림</label></div><div class="form-check form-check-inline"><input type="checkbox" id="pre5min" class="form-check-input" checked><label class="form-check-label small" for="pre5min">5분 전 알림</label></div></div>';
+        html += '<button class="btn btn-sm btn-danger w-100 mt-2" onclick="setAlarm()">🔔 알람 설정</button><div id="alarmStatus" class="small text-center mt-1"></div>';
         html += '</div></div></div>';
     }
     html += '<div class="card border-0 shadow-sm mb-3 home-loc-card"><div class="card-body p-3">';
     html += '<div class="d-flex align-items-center gap-2 mb-2"><span class="badge bg-primary">📍 현재위치</span><small>'+dep+'</small></div>';
     html += '<div class="d-flex align-items-center gap-2 mb-3"><span class="badge bg-danger">🏠 기본주소</span><small>'+dest+'</small></div>';
     html += '<div class="small text-muted mb-2">📍 직선거리 약 '+km+'km</div>';
+    var glat = document.getElementById('corrGpsLat').value;
+    var glng = document.getElementById('corrGpsLng').value;
+    if (glat && glng) html += '<div class="small text-muted">📡 위도: '+parseFloat(glat).toFixed(6)+', 경도: '+parseFloat(glng).toFixed(6)+'</div>';
     if (data.last_transit&&data.last_transit.length>0){var lt=data.last_transit[0];var h=Math.floor(lt.total_min/60),m=lt.total_min%60;html+='<div class="p-2 bg-success bg-opacity-10 rounded mb-2"><strong>⏱ 소요시간</strong> 약 '+(h>0?h+'시간 ':'')+m+'분</div>';}
     else if(data.rough_estimate_min){var h2=Math.floor(data.rough_estimate_min/60),m2=data.rough_estimate_min%60;html+='<div class="alert alert-info py-2 mb-2"><strong>⏱ 예상 소요시간</strong> 약 '+(h2>0?h2+'시간 ':'')+m2+'분 (직선거리 기반 추정)</div>';}
     html += '<hr><div class="mb-2"><label class="form-label small fw-bold">⏱ 희망 도착시간</label><div class="input-group input-group-sm"><input type="time" id="arrivalTime" class="form-control" value="21:00"><button class="btn btn-outline-secondary" onclick="calcDeparture()">계산</button></div></div><div id="departureResult" class="small mb-2"></div>';
-    html += '<button class="btn btn-sm btn-danger w-100" onclick="setAlarm()">🔔 알람 설정</button><div id="alarmStatus" class="small text-center mt-1"></div>';
     html += '</div></div>'; el.innerHTML = html;
 }
 
@@ -400,25 +428,55 @@ function calcDeparture() {
 }
 
 function setAlarm() {
-    var arrivalVal = document.getElementById('arrivalTime').value;
-    if (!arrivalVal) { document.getElementById('alarmStatus').innerHTML='<span class="text-danger">희망 도착시간을 먼저 입력해 주세요.</span>'; return; }
-    var parts = arrivalVal.split(':').map(Number);
-    var totalMin = transitData.last_transit ? transitData.last_transit[0].total_min : (transitData.rough_estimate_min||30);
-    var depTotal = parts[0]*60+parts[1]-totalMin;
-    if (depTotal<0) { document.getElementById('alarmStatus').innerHTML='<span class="text-danger">늦었습니다.</span>'; return; }
-    var now = new Date(), nowTotal = now.getHours()*60+now.getMinutes(), diffMin = depTotal-nowTotal;
+    var departureMin = null;
+    if (suggestData && suggestData.optimal_departure) {
+        var parts = suggestData.optimal_departure.split(':').map(Number);
+        departureMin = parts[0]*60+parts[1];
+    } else {
+        var arrivalVal = document.getElementById('arrivalTime').value;
+        if (!arrivalVal) { document.getElementById('alarmStatus').innerHTML='<span class="text-danger">희망 도착시간을 먼저 입력해 주세요.</span>'; return; }
+        var parts = arrivalVal.split(':').map(Number);
+        var totalMin = transitData.last_transit ? transitData.last_transit[0].total_min : (transitData.rough_estimate_min||30);
+        departureMin = parts[0]*60+parts[1]-totalMin;
+        if (departureMin<0) { document.getElementById('alarmStatus').innerHTML='<span class="text-danger">늦었습니다.</span>'; return; }
+    }
+    var now = new Date(), nowTotal = now.getHours()*60+now.getMinutes(), diffMin = departureMin-nowTotal;
     if (diffMin<=0) { document.getElementById('alarmStatus').innerHTML='<span class="text-danger">출발 시간이 이미 지났습니다.</span>'; return; }
     if (Notification.permission==='denied') { document.getElementById('alarmStatus').innerHTML='<span class="text-danger">알림이 차단되었습니다.</span>'; return; }
-    if (Notification.permission==='default') { Notification.requestPermission().then(function(perm){ if (perm==='granted') scheduleAlarm(diffMin); else document.getElementById('alarmStatus').innerHTML='<span class="text-danger">알림 권한이 필요합니다.</span>'; }); }
-    else scheduleAlarm(diffMin);
+    if (Notification.permission==='default') { Notification.requestPermission().then(function(perm){ if (perm==='granted') scheduleAlarms(diffMin); else document.getElementById('alarmStatus').innerHTML='<span class="text-danger">알림 권한이 필요합니다.</span>'; }); }
+    else scheduleAlarms(diffMin);
 }
 
-function scheduleAlarm(diffMin) {
+function scheduleAlarms(diffMin) {
+    alarmTimers.forEach(function(t){ clearTimeout(t); });
+    alarmTimers = [];
     if (alarmTimer) { clearTimeout(alarmTimer); alarmTimer = null; }
-    var dh=Math.floor(diffMin/60), dm=diffMin%60;
     var dest = transitData.destination ? transitData.destination.address : '';
-    document.getElementById('alarmStatus').innerHTML = '<span class="text-success">🔔 '+(dh>0?dh+'시간 ':'')+dm+'분 후 알림 예정</span>';
-    alarmTimer = setTimeout(function(){ new Notification('🚌 출발 시간입니다!',{body:'지금 출발해야 '+dest+'에 도착할 수 있습니다.',icon:'/static/favicon.ico'}); document.getElementById('alarmStatus').innerHTML='<span class="text-danger fw-bold">🔔 출발 시간! 지금 출발하세요!</span>'; }, diffMin*60*1000);
+    var pre10 = document.getElementById('pre10min') ? document.getElementById('pre10min').checked : false;
+    var pre5 = document.getElementById('pre5min') ? document.getElementById('pre5min').checked : false;
+    if (pre10 && diffMin > 10) {
+        var t10 = setTimeout(function(){
+            new Notification('🔔 10분 후 출발 시간', {body: dest+' 방면 막차 10분 전입니다. 준비하세요!', icon:'/static/favicon.ico'});
+            document.getElementById('alarmStatus').innerHTML = '<span class="text-warning fw-bold">🔔 10분 전! 준비하세요!</span>';
+        }, (diffMin-10)*60*1000);
+        alarmTimers.push(t10);
+    }
+    if (pre5 && diffMin > 5) {
+        var t5 = setTimeout(function(){
+            new Notification('🔔 5분 후 출발 시간', {body: dest+' 방면 막차 5분 전입니다. 이동을 시작하세요!', icon:'/static/favicon.ico'});
+            document.getElementById('alarmStatus').innerHTML = '<span class="text-warning fw-bold">🔔 5분 전! 이동하세요!</span>';
+        }, (diffMin-5)*60*1000);
+        alarmTimers.push(t5);
+    }
+    alarmTimer = setTimeout(function(){
+        new Notification('🚌 출발 시간입니다!', {body: '지금 출발해야 '+dest+'에 막차를 탈 수 있습니다.', icon:'/static/favicon.ico'});
+        document.getElementById('alarmStatus').innerHTML = '<span class="text-danger fw-bold">🔔 출발 시간! 지금 출발하세요!</span>';
+    }, diffMin*60*1000);
+    var dh=Math.floor(diffMin/60), dm=diffMin%60;
+    var msg = '🔔 '+(dh>0?dh+'시간 ':'')+dm+'분 후 알림 예정';
+    if (pre10 && diffMin > 10) msg += ' · 10분 전 알림';
+    if (pre5 && diffMin > 5) msg += ' · 5분 전 알림';
+    document.getElementById('alarmStatus').innerHTML = '<span class="text-success">'+msg+'</span>';
 }
 
 // ---- 스탬프 ----

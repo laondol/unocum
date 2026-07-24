@@ -1,6 +1,6 @@
 import random, string, re, requests, json
 from sqlalchemy import or_
-from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template, current_app, make_response
+from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template, current_app, make_response, send_file
 from models import db, User, TongBot, TongBotDraft, TongBotSchedule, ChatRoom, ChatMessage, Message, FriendCache, BotKnowledge, StoreInfo, ShareReport, SharedRoute
 from services.geo import _geocode_location
 from services.route_recalc import _ensure_day_routes
@@ -11,6 +11,15 @@ from datetime import datetime, timedelta, timezone
 import os, uuid
 
 tongbot_bp = Blueprint('tongbot', __name__)
+
+def _serve_spa():
+    import os
+    from flask import current_app, send_file
+    path = os.path.join(current_app.root_path, 'frontend', 'dist', 'index.html')
+    if os.path.exists(path):
+        return send_file(path)
+    from flask import render_template
+    return render_template('intro.html')
 
 def _get_bot(user_id):
     bot = TongBot.query.filter_by(user_id=user_id).first()
@@ -50,8 +59,7 @@ def my_page():
     greeting = _greeting(user)
     import json
     chat_rooms = ChatRoom.query.filter(ChatRoom.is_active==True, ChatRoom.participants.contains(str(user.id))).order_by(ChatRoom.created_at.desc()).limit(10).all()
-    tpl = 'user_my_popup.html' if popup else 'user_my.html'
-    return render_template(tpl, user=user, bot=bot, drafts=drafts, schedules=schedules, stamps_count=stamps_count, greeting=greeting, chat_rooms=chat_rooms, json=json, active_tab=active_tab)
+    return _serve_spa()
 
 @tongbot_bp.route('/chat')
 def chat_page():
@@ -68,7 +76,7 @@ def chat_page():
     import json
     chat_rooms = ChatRoom.query.filter(ChatRoom.is_active==True, ChatRoom.participants.contains(str(user.id))).order_by(ChatRoom.created_at.desc()).limit(10).all()
     open_room = room_id if room_id else 0
-    return render_template('chat.html', user=user, bot=bot, chat_rooms=chat_rooms, json=json, open_room=open_room)
+    return _serve_spa()
 
 @tongbot_bp.route('/api/bot/rename', methods=['POST'])
 def bot_rename():
@@ -1300,7 +1308,12 @@ def bot_schedule():
 
     db.session.commit()
     enqueue_recalc(uid)
-    return jsonify({"success": True, "id": s.id})
+    warning = None
+    if data.get('location'):
+        lat, lng = _geocode_location(data.get('location', ''))
+        if not (lat and lng):
+            warning = "장소가 분명하지 않습니다"
+    return jsonify({"success": True, "id": s.id, "warning": warning})
 
 @tongbot_bp.route('/api/bot/schedule/reminders', methods=['GET'])
 def bot_schedule_reminders():
@@ -1638,7 +1651,12 @@ def bot_schedule_update():
         end_changed = data.get('end_date') is not None and new_end != old_end
         if loc_changed or date_changed or end_changed or (old_is_recurring != s.is_recurring) or (old_repeat_type != s.repeat_type) or (old_repeat_weekdays != s.repeat_weekdays) or (old_repeat_wom != s.repeat_week_of_month) or (old_repeat_moy != s.repeat_month_of_year) or (old_repeat_infinite != s.repeat_infinite) or (old_repeat_end != s.repeat_end_date):
             enqueue_recalc(uid)
-    return jsonify({"success": True})
+    warning = None
+    if s.location and not is_move_event:
+        _lat, _lng = _geocode_location(s.location)
+        if not (_lat and _lng):
+            warning = "장소가 분명하지 않습니다"
+    return jsonify({"success": True, "warning": warning})
 
 @tongbot_bp.route('/api/bot/schedule/delete', methods=['POST'])
 def bot_schedule_delete():
@@ -1665,7 +1683,7 @@ def bot_schedule_delete():
             if occ_date[:10] not in exc:
                 exc.append(occ_date[:10])
             s.repeat_exceptions = _json.dumps(exc, ensure_ascii=False)
-            if occ:
+            if not is_move and occ:
                 _ensure_day_routes(uid, datetime(occ.year, occ.month, occ.day, s.event_date.hour, s.event_date.minute))
             db.session.commit()
             return jsonify({"success": True})
@@ -1698,44 +1716,29 @@ def bot_schedule_delete():
     db.session.delete(s)
     db.session.flush()
     db.session.commit()
-    enqueue_recalc(uid)
+    if not is_move:
+        enqueue_recalc(uid)
     return jsonify({"success":True})
 
 @tongbot_bp.route('/schedule')
-def schedule_popup():
-    resp = make_response(render_template('schedule2.html'))
-    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-    resp.headers['Pragma'] = 'no-cache'
-    resp.headers['Expires'] = '0'
-    return resp
-
-@tongbot_bp.route('/schedule2')
-def schedule_popup2():
-    resp = make_response(render_template('schedule2.html'))
-    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-    resp.headers['Pragma'] = 'no-cache'
-    resp.headers['Expires'] = '0'
-    return resp
-
-def schedule_popup():
+def schedule_page():
     if not session.get('user_id'):
         return redirect(url_for('auth.login', next='/schedule'))
-    user = User.query.get(session['user_id'])
-    bot = _get_bot(user.id)
-    # 약속 수락/거절 처리
-    accept_uid = request.args.get('accept', type=int)
-    decline_uid = request.args.get('decline', type=int)
-    event_date = request.args.get('date','')
-    title = request.args.get('title','약속')
-    msg = ''
-    if accept_uid and event_date:
-        s = TongBotSchedule(user_id=user.id, title=f'{title} (수락)', event_date=datetime.fromisoformat(event_date))
-        db.session.add(s)
-        db.session.commit()
-        msg = '약속이 일정에 등록되었습니다!'
-    if decline_uid:
-        msg = '약속을 거절했습니다.'
-    return render_template('schedule_popup.html', user=user, bot=bot, msg=msg)
+    import os
+    path = os.path.join(current_app.root_path, 'frontend', 'dist', 'index.html')
+    if os.path.exists(path):
+        return send_file(path)
+    return render_template('intro.html')
+
+@tongbot_bp.route('/schedule2')
+def schedule_page2():
+    if not session.get('user_id'):
+        return redirect(url_for('auth.login', next='/schedule2'))
+    import os
+    path = os.path.join(current_app.root_path, 'frontend', 'dist', 'index.html')
+    if os.path.exists(path):
+        return send_file(path)
+    return render_template('intro.html')
 
 @tongbot_bp.route('/api/bot/schedule/common', methods=['POST'])
 def schedule_common():

@@ -1,3 +1,13 @@
-body { background: #f8f9fa; font-family: system-ui, -apple-system, sans-serif; }
-.card { transition: 0.2s; }
-.card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important; }
+body {
+  background: #f8f9fa;
+  font-family: system-ui, -apple-system, 'Pretendard', sans-serif;
+}
+.card {
+  transition: 0.2s;
+}
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+}
+a { text-decoration: none; }
+.navbar { background: white; border-bottom: 1px solid #e9ecef; }

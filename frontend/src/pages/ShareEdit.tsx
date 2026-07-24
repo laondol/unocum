@@ -162,7 +162,15 @@ export default function ShareEdit() {
     const files = e.target.files
     if (!files?.length) return
     const arr: File[] = []; const urls: string[] = []
-    for (const f of files) { arr.push(f); if (f.type.startsWith('image/')) urls.push(URL.createObjectURL(f)) }
+    for (const f of files) {
+      arr.push(f)
+      const ext = f.name.split('.').pop()?.toLowerCase() || ''
+      if (f.type.startsWith('image/') && !['heic', 'heif'].includes(ext)) {
+        urls.push(URL.createObjectURL(f))
+      } else if (['heic', 'heif'].includes(ext)) {
+        urls.push('')  // placeholder — HEIC will convert server-side
+      }
+    }
     setNewFiles(prev => [...prev, ...arr])
     setNewPreviews(prev => [...prev, ...urls])
   }
@@ -255,7 +263,8 @@ export default function ShareEdit() {
 
     newFiles.forEach((f, i) => {
       const blob = editedBlobs[`new_${i}`]
-      fd.append('image', blob || f, `new_${i}.jpg`)
+      const name = blob ? `new_${i}.jpg` : f.name
+      fd.append('image', blob || f, name)
       const a = rotations[`new_${i}`]
       if (a) fd.append(`rotate_angle_${i}`, String(a))
     })
@@ -303,21 +312,27 @@ export default function ShareEdit() {
                     <button type="button" onClick={() => setWatermarkTarget(p.path)} className="btn btn-sm btn-warning position-absolute" style={{ top: -6, left: -6, width: 22, height: 22, padding: 0, fontSize: 8, lineHeight: '1', borderRadius: '50%' }}>W</button>
                   </div>
                 ))}
-                {newPreviews.map((u, i) => (
+                {newPreviews.map((u, i) => {
+                  const ext = (newFiles[i]?.name || '').split('.').pop()?.toLowerCase() || ''
+                  const isHeic = ['heic', 'heif'].includes(ext)
+                  const imgSrc = editedBlobs[`new_${i}`] ? URL.createObjectURL(editedBlobs[`new_${i}`]) : (isHeic ? '' : u)
+                  return (
                   <div key={`new-${i}`} className="position-relative" style={{ width: 100 }}>
                     <div style={{ width: 100, height: 100, overflow: 'hidden', borderRadius: 8, border: '2px solid #0d6efd', backgroundColor: '#f1f3f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <img
-                        src={editedBlobs[`new_${i}`] ? URL.createObjectURL(editedBlobs[`new_${i}`]) : u}
-                        style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', transform: `rotate(${rotations[`new_${i}`] || 0}deg)` }}
-                      />
+                      {isHeic && !editedBlobs[`new_${i}`] ? (
+                        <span style={{fontSize: 11, color: '#999', textAlign: 'center', lineHeight: 1.2}}>HEIC<br/>변환 중</span>
+                      ) : (
+                        <img src={imgSrc} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', transform: `rotate(${rotations[`new_${i}`] || 0}deg)` }} />
+                      )}
                     </div>
                     <button type="button" onClick={() => removeNewFile(i)} className="btn btn-sm btn-danger position-absolute" style={{ top: -6, right: -6, width: 22, height: 22, padding: 0, fontSize: 12, lineHeight: '1', borderRadius: '50%' }}>&times;</button>
-                    <button type="button" onClick={() => openCrop({ type: 'new', index: i }, u)} className="btn btn-sm btn-dark position-absolute" style={{ bottom: -6, right: -6, width: 22, height: 22, padding: 0, fontSize: 10, lineHeight: '1', borderRadius: '50%' }}>C</button>
-                    <button type="button" onClick={() => openRotate(`new_${i}`, editedBlobs[`new_${i}`] ? URL.createObjectURL(editedBlobs[`new_${i}`]) : u)} className="btn btn-sm btn-primary position-absolute" style={{ bottom: -6, left: -6, width: 22, height: 22, padding: 0, fontSize: 10, lineHeight: '1', borderRadius: '50%' }}>R</button>
+                    <button type="button" onClick={() => !isHeic && openCrop({ type: 'new', index: i }, u)} className="btn btn-sm btn-dark position-absolute" style={{ bottom: -6, right: -6, width: 22, height: 22, padding: 0, fontSize: 10, lineHeight: '1', borderRadius: '50%' }}>C</button>
+                    <button type="button" onClick={() => openRotate(`new_${i}`, imgSrc)} className="btn btn-sm btn-primary position-absolute" style={{ bottom: -6, left: -6, width: 22, height: 22, padding: 0, fontSize: 10, lineHeight: '1', borderRadius: '50%' }}>R</button>
                   </div>
-                ))}
+                  )
+                })}
               </div>
-              <input type="file" ref={fileInputRef} className="form-control" accept="image/*" multiple onChange={onFileChange} />
+              <input type="file" ref={fileInputRef} className="form-control" accept="image/*,.heic,.heif" multiple onChange={onFileChange} />
               <small className="text-muted">C 자르기, R 회전, W 워터마크</small>
             </div>
 

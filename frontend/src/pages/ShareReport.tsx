@@ -9,7 +9,7 @@ export default function ShareReport() {
   const [addressDetail, setAddressDetail] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [cameraReady, setCameraReady] = useState(true)
-  const [previews, setPreviews] = useState<string[]>([])
+  const [previews, setPreviews] = useState<(string | null)[]>([])
   const [cameraPreview, setCameraPreview] = useState<string | null>(null)
   const [videoPreview, setVideoPreview] = useState<string | null>(null)
   const [canvasVisible, setCanvasVisible] = useState(false)
@@ -18,6 +18,7 @@ export default function ShareReport() {
   const [videoFileUpload, setVideoFileUpload] = useState<File | null>(null)
   const [videoUploadPreview, setVideoUploadPreview] = useState<string | null>(null)
   const [hasContent, setHasContent] = useState(false)
+  const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [leafletReady, setLeafletReady] = useState(false)
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -143,10 +144,16 @@ export default function ShareReport() {
     const files = e.target.files
     if (!files?.length) return
     setHasContent(true)
-    const urls: string[] = []
+    const urls: (string | null)[] = []
     for (const f of files) {
-      if (f.type.startsWith('image/')) urls.push(URL.createObjectURL(f))
+      const ext = f.name.split('.').pop()?.toLowerCase() || ''
+      if (f.type.startsWith('image/') && !['heic', 'heif'].includes(ext)) {
+        urls.push(URL.createObjectURL(f))
+      } else if (['heic', 'heif'].includes(ext)) {
+        urls.push(null)  // HEIC placeholder
+      }
     }
+    setPendingFiles(Array.from(files))
     setPreviews(urls)
   }
 
@@ -197,7 +204,9 @@ export default function ShareReport() {
 
     const fd = new FormData()
     if (cameraFile) fd.append('image', cameraFile)
-    if (fileInputRef.current?.files) {
+    if (pendingFiles.length > 0) {
+      for (const f of pendingFiles) fd.append('image', f)
+    } else if (fileInputRef.current?.files) {
       for (const f of fileInputRef.current.files) fd.append('image', f)
     }
     if (videoFile) {
@@ -286,11 +295,15 @@ export default function ShareReport() {
             </div>
             <div className="mb-3">
               <span className="fw-bold small d-block mb-1">파일 업로드</span>
-              <input type="file" ref={fileInputRef} className="form-control" accept="image/*" multiple onChange={onFileChange} />
+              <input type="file" ref={fileInputRef} className="form-control" accept="image/*,.heic,.heif" multiple onChange={onFileChange} />
               {previews.length > 0 && (
                 <div className="mt-2 d-flex flex-wrap gap-1">
                   {previews.map((u, i) => (
-                    <img key={i} src={u} style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid #eee' }} />
+                    u ? (
+                      <img key={i} src={u} style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid #eee' }} />
+                    ) : (
+                      <div key={i} style={{ width: 80, height: 80, borderRadius: 8, border: '1px solid #eee', background: '#f8f9fa', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#999' }}>HEIC</div>
+                    )
                   ))}
                 </div>
               )}

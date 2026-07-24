@@ -161,18 +161,21 @@ export default function ShareDetail() {
           </div>
           <h3 className="fw-bold mb-3">{r.title}</h3>
 
-          {r.image_path && (
-            <div className="row g-2 mb-3">
+          <div className="row g-2 mb-3">
+            {r.image_path && (
               <div className="col-12">
                 <img src={r.image_path} className="img-fluid rounded" style={{maxHeight: 400, width: '100%', objectFit: 'cover'}} />
               </div>
-              {extraImages.map((img, i) => (
-                <div key={i} className="col-4 col-md-3">
-                  <img src={img} className="img-fluid rounded" style={{height: 120, objectFit: 'cover', width: '100%'}} />
-                </div>
-              ))}
-            </div>
-          )}
+            )}
+            {(r.image_path ? extraImages : extraImages.slice(0, 6)).map((img, i) => (
+              <div key={i} className="col-4 col-md-3">
+                <img src={img} className="img-fluid rounded" style={{height: 120, objectFit: 'cover', width: '100%'}} />
+              </div>
+            ))}
+            {!r.image_path && extraImages.length === 0 && !r.drawing_path && (
+              <div className="col-12 text-center text-muted py-3 bg-light rounded">이미지 없음</div>
+            )}
+          </div>
 
           {r.drawing_path && <img src={r.drawing_path} className="img-fluid rounded mb-3" style={{maxHeight: 400}} />}
           {r.video_path && (

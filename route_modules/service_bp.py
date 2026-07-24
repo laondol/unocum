@@ -1,9 +1,18 @@
 import os
-from flask import Blueprint, request, jsonify, render_template, session, current_app
+from flask import Blueprint, request, jsonify, render_template, session, current_app, send_file
 from models import db, Post, User, RampApplication
 
 service_bp = Blueprint('service', __name__)
 from route_modules.user_bp import _cleanup_expired_posts
+
+def _serve_spa():
+    import os
+    from flask import current_app, send_file
+    path = os.path.join(current_app.root_path, 'frontend', 'dist', 'index.html')
+    if os.path.exists(path):
+        return send_file(path)
+    from flask import render_template
+    return render_template('intro.html')
 
 @service_bp.route('/go')
 def go():
@@ -13,7 +22,7 @@ def go():
         return "URL이 필요합니다.", 400
     from urllib.parse import quote
     back = request.args.get('back', request.headers.get('Referer', '/construction'))
-    return render_template('go.html', url=url, title=title, back=back)
+    return _serve_spa()
 
 # --- [소식 번역] ---
 @service_bp.route('/api/news/translate')
@@ -40,6 +49,30 @@ def news_translate():
     except Exception as e:
         return f"<p>오류: {str(e)[:100]}</p>"
 
+@service_bp.route('/service/legal')
+def service_legal():
+    return _serve_spa()
+
+@service_bp.route('/service/legal/edit', methods=['GET', 'POST'])
+def service_legal_edit():
+    if session.get('role') not in ('admin', 'leader'):
+        return "<script>alert('권한이 없습니다.'); history.back();</script>"
+    if request.method == 'POST':
+        return "<script>alert('저장되었습니다.'); location.href='/service/legal';</script>"
+    return _serve_spa()
+
+@service_bp.route('/service/psycho')
+def service_psycho():
+    return _serve_spa()
+
+@service_bp.route('/service/psycho/edit', methods=['GET', 'POST'])
+def service_psycho_edit():
+    if session.get('role') not in ('admin', 'leader') and 'psycho' not in (session.get('managed_pages', '')):
+        return "<script>alert('권한이 없습니다.'); history.back();</script>"
+    if request.method == 'POST':
+        return "<script>alert('저장되었습니다.'); location.href='/service/psycho';</script>"
+    return _serve_spa()
+
 @service_bp.route('/service/ramp')
 def service_ramp():
     _cleanup_expired_posts()
@@ -57,7 +90,7 @@ def service_ramp():
         for f in sorted(os.listdir(video_dir), reverse=True):
             if f.lower().endswith(('.mp4', '.webm', '.mov', '.avi', '.mkv')):
                 ramp_videos.append(f"/static/videos/ramp/{f}")
-    return render_template('service_ramp.html', ramp_posts=ramp_posts, waiting_count=waiting_count, ramp_videos=ramp_videos)
+    return _serve_spa()
 
 @service_bp.route('/service/ramp/apply', methods=['POST'])
 def service_ramp_apply():
